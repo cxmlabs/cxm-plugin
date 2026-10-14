@@ -17,24 +17,34 @@ cost or savings and answer with live data from your CloudExMachina organization.
 
 ## Install
 
+```bash
+npx @cloudexmachina/cxm@latest install
+```
+
+It finds Claude Code and Codex on your machine, shows the commands it will run, installs the
+plugin into each, then opens your browser to sign in. Run it again to update. Options:
+`--agent claude|codex`, `--yes` (no confirmation), `--no-login`. Requires Node.js 22 or later.
+
+### Or by hand
+
 The plugin ships through a marketplace hosted in this repo, `cxm-marketplace`, that both Claude
 Code and Codex read. One command adds it, one installs the plugin.
 
-### Claude Code
+#### Claude Code
 
 ```bash
 claude plugin marketplace add https://github.com/cxmlabs/cxm-plugin.git
 claude plugin install cxm-agent-plugin@cxm-marketplace
 ```
 
-### Codex
+#### Codex
 
 ```bash
 codex plugin marketplace add cxmlabs/cxm-plugin --ref main
 codex plugin add cxm-agent-plugin@cxm-marketplace
 ```
 
-### Then sign in
+#### Then sign in
 
 Start one agent session first (`claude`, then `/exit`): the plugin puts `cxm` on your PATH at
 session start, with a symlink in `~/.local/bin` (never on top of an existing `cxm`).
@@ -64,8 +74,16 @@ Ask your agent:
 
 ## Update
 
+Run the install again: it refreshes the marketplace and moves the plugin to the latest version.
+
 ```bash
-claude plugin marketplace update cxm-marketplace && claude plugin install cxm-agent-plugin@cxm-marketplace
+npx @cloudexmachina/cxm@latest install --no-login
+```
+
+By hand:
+
+```bash
+claude plugin marketplace update cxm-marketplace && claude plugin update cxm-agent-plugin@cxm-marketplace
 codex plugin marketplace upgrade cxm-marketplace && codex plugin add cxm-agent-plugin@cxm-marketplace
 ```
 
@@ -87,7 +105,8 @@ with `cxm setup --no-hooks`.
 
 ## Uninstall
 
-Run `cxm uninstall` first, while `cxm` still exists, then remove the plugin:
+Run `cxm uninstall` first, while `cxm` still exists (or `npx @cloudexmachina/cxm@latest uninstall`),
+then remove the plugin:
 
 ```bash
 cxm uninstall                   # the PATH symlink, your credentials, the Codex prompt, and in this repo what setup wrote

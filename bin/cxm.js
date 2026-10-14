@@ -27,6 +27,7 @@ if (process.argv[2] !== 'hook' && cfg?.caCertPath && !process.env.NODE_EXTRA_CA_
 const { api, cube, whoami } = await import('../src/commands/query.js');
 const { init, uninstall } = await import('../src/commands/init.js');
 const { login } = await import('../src/commands/login.js');
+const { install } = await import('../src/commands/install.js');
 const { price } = await import('../src/commands/price.js');
 const { hook } = await import('../src/commands/hook.js');
 const { reportOpportunity } = await import('../src/commands/report.js');
@@ -40,7 +41,9 @@ const USAGE = `Cloud cost and optimization data, for your coding agent
 
 Usage: cxm <command> [options]
 
-Setup. A person runs these two. A skill runs everything else.
+Setup. A person runs these. A skill runs everything else.
+  install [--agent claude|codex] [--yes] [--no-login] [--url <base>]
+                                                Install the plugin into Claude Code and Codex, then sign in
   setup [--url <base>] [--agent claude|codex]   Install the skills and the /cxm command
   login [--url <base>]                          Sign in through the browser and pick an organization
   whoami                                        Show the signed-in user and the active organization
@@ -75,6 +78,7 @@ const asQuery = (argv) =>
 // schema call and the query call are one capability. A deeper tree would be ceremony that an LLM
 // must learn and that no person reads. `hook` runs before dispatch and is absent here.
 const tree = {
+  install: (a) => install(a),
   setup: (a) => init(a),
   login: (a) => login(a),
   whoami: () => whoami(),

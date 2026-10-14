@@ -8,11 +8,11 @@ ELI15 note on how the pieces fit and why we picked this shape.
 - **`cxm` binary** — the thing that actually *does* the work: talks to CXM, runs the cost query, prices a change. Skills shell out to it.
 - **Hooks** — auto-nudges wired into `.claude/settings.json`. When you edit a `*.tf` file or run `aws`, a hook runs `cxm hook …` and adds cost context without being asked.
 
-`cxm setup` installs all three.
+`cxm install` installs all three into every agent on the machine (`cxm setup` into one project).
 
 ## Why an installer is required (not just skills in a folder)
 
-Skills on their own are dead text. They call the binary, and the binary needs to be installed and logged in. Hooks need to be written into settings. So you need *something* that ships the binary, holds your login, and wires the hooks. That is the npm package + `cxm setup`.
+Skills on their own are dead text. They call the binary, and the binary needs to be installed and logged in. Hooks need to be written into settings. So you need *something* that ships the binary, holds your login, and wires the hooks. That is the npm package + `cxm install`.
 
 It is **not** a formal Claude Code "plugin" (no marketplace manifest). It's an npm package with an `init` step. Same result, and it has to ship via npm anyway because of the binary.
 
