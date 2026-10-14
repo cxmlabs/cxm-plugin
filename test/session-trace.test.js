@@ -81,7 +81,10 @@ test('a skill loaded by reading its file counts, and one with no successful comm
   assert.ok(!JSON.stringify(trace).includes('/home/u'));
 });
 
-test('a repo skill named cxm-* does not count as a CXM skill', () => {
+test('a repo skill named cxm-* does not count as a CXM skill, called or listed', () => {
   const lines = [assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Skill', input: { skill: 'cxm-dbt' } }]), result('t1', 2, 'ok')];
   assert.deepEqual(buildSessionTrace(lines, { sessionId: 's', ours: new Set(['cxm-waste']) }), []);
+  const listing = { type: 'attachment', attachment: { type: 'skill_listing', content: '- cxm-create-pr: Use when…\n- cxm-agent-plugin:cxm-waste: Use when…' } };
+  const [trace] = buildSessionTrace([listing, ...session.slice(1)], { sessionId: 's', ours: new Set(['cxm-waste', 'cxm-cost-drivers']) });
+  assert.deepEqual(trace.properties.cxm_skills_available, ['plugin:cxm-waste']);
 });
