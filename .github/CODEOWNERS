@@ -1,0 +1,28 @@
+# One team owns this repository end to end, with one exception.
+#
+# The default is everything to engineering. The CLI, the skills, the hooks and the release
+# tooling are one product maintained by one team, and a path-specific row is normally a
+# statement that some directory has a different set of people who understand it. That is not
+# why the rows below exist — the same people understand all of it.
+#
+# They exist because a push of a `v*` tag publishes: it fast-forwards the `release` branch
+# every marketplace install tracks, cuts a GitHub Release, and publishes the CLI to npm under
+# a name users run with `npx`. There is no staging registry in between. The path that grants
+# that power must not be a path an agent can edit and then approve for itself. So the release
+# path needs a human owner: the workflows, the two scripts they run as gates, the shim the
+# SessionStart hook installs onto a user's PATH, and this file. Weakening a gate and deleting
+# it are the same act, which is why the gate scripts are listed and not just the workflow that
+# calls them.
+#
+# Everything else stays with engineering, including the skills: a skill change is ordinary
+# product work.
+#
+# The last matching line wins, so the default comes first.
+
+*                                   @cxmlabs/engineering
+
+# The release path and the CI gates. A human owner approves every change below.
+/.github/                           @cxmlabs/sre
+/scripts/sync-version.mjs           @cxmlabs/sre
+/scripts/validate-manifests.mjs     @cxmlabs/sre
+/scripts/install-cxm-shim.sh        @cxmlabs/sre

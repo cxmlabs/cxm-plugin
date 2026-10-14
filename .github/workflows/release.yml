@@ -1,0 +1,61 @@
+# Publishing a version on one tag, two channels:
+#  - marketplace: fast-forward the `release` branch users track + cut a GitHub Release
+#    (both agents install the plugin straight from git, no registry upload for that).
+#  - npm: publish the `cxm` CLI so `npx @cloudexmachina/cxm …` works without repo access.
+# The npm step runs only when the repo variable NPM_PUBLISH is 'true', so the marketplace
+# release never depends on npm being configured.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write # npm trusted publishing (OIDC) and provenance
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Tag matches package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          [ "$tag" = "$pkg" ] || { echo "tag $GITHUB_REF_NAME != package.json $pkg"; exit 1; }
+
+      - name: Manifests carry the same version
+        run: node scripts/sync-version.mjs --check
+
+      - name: Manifests are valid JSON with the expected shape
+        run: node scripts/validate-manifests.mjs
+
+      - run: node --test
+        env:
+          CXM_TELEMETRY: '0' # test runs must not reach usage analytics
+
+      - name: Fast-forward the release branch
+        run: |
+          git push origin "$GITHUB_SHA:refs/heads/release"
+
+      - name: Cut the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes --title "cxm-agent-plugin $GITHUB_REF_NAME"
+
+      # Second channel: the npm CLI, through trusted publishing (OIDC, npm 11.5.1 or later) with no
+      # stored token. The first version is published by hand; see docs/releasing.md.
+      - name: Publish the CLI to npm
+        if: ${{ vars.NPM_PUBLISH == 'true' }}
+        run: |
+          npm install -g npm@11
+          npm publish --provenance

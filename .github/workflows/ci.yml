@@ -1,0 +1,46 @@
+# What a merge to main must survive. The release workflow runs the same four checks on
+# the tag; this runs them on the pull request, where a red one costs a push instead of a
+# published version. Keep the two lists in step — `.github/workflows/release.yml`.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A second push to a pull request cancels the run it supersedes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  tests:
+    name: Tests (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor `package.json` claims, and the current release. A feature that needs
+        # a newer Node turns 22 red, which is the engines field being wrong rather than
+        # the code.
+        node: ["22", "24"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      # No `npm ci`: the package declares no dependencies and no devDependencies, and
+      # every check below runs on the standard library.
+
+      # The two cheap checks first, before the suite. Both are stdlib and finish in a
+      # second, so a version that was bumped in one manifest and not the others goes red
+      # immediately rather than surfacing as an assertion inside the suite.
+      - name: Every manifest carries the package.json version
+        run: node scripts/sync-version.mjs --check
+      - name: The manifests parse and declare paths that exist
+        run: node scripts/validate-manifests.mjs
+
+      - run: node --test
+        env:
+          CXM_TELEMETRY: '0' # test runs must not reach usage analytics

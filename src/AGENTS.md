@@ -1,0 +1,70 @@
+<!-- bmad:context -->
+<!-- Verified 2026-10-02 against 5623e6e. Managed by bmad-project-context; edits inside this block are replaced on refresh. Keep anything you want preserved outside the markers. -->
+
+## src/
+
+The `cxm` CLI behind `bin/cxm.js`. It is a thin authenticated wrapper around the data APIs: it
+carries the session, shapes a query, and prints the answer. The analytics layer computes.
+`commands/` is one file per subcommand and holds the argument handling and the output; `lib/`
+holds everything a second caller would need. ESM, and the standard library only — `fetch`,
+`node:fs`, `node:crypto`. The zero-dependency rule is a policy, not an accident: see the root
+`AGENTS.md`.
+
+## Where things are
+
+- Config resolution in one place: `lib/config.js`. Do not read `~/.config/cxm/credentials.json`
+  anywhere else.
+- Every backend host: `lib/urls.js` (`deriveHosts`). Overrides, then `CXM_*_URL`, then hosts
+  derived from the single base URL. `lib/prompt.js` holds the default offered at setup. Those two
+  are the only files allowed a hostname, and `test/structure.test.js` holds the line.
+- The only HTTP client: `lib/http.js`. It carries the auth-header shape and the CubeJS
+  "Continue wait" re-poll, so a second `fetch` call elsewhere gets both wrong.
+- Anonymous command telemetry: `lib/telemetry.js`. `CXM_TELEMETRY=0` opts out.
+- The IaC and AWS CLI scanners the hooks run: `lib/tf-scan.js`, `lib/cfn-scan.js`,
+  `lib/aws-scan.js`. Pure functions over text, no network — that is what keeps a hook fast.
+
+## The compute boundary
+
+The wrapper does not compute. Joining two sources, aggregating rows, ranking, and deriving a
+figure all belong in the analytics layer, behind one query or one endpoint. Three reasons, and the
+first is the one that bites: a number computed on a laptop is a second implementation of a number
+the platform already publishes, and the two drift without either being wrong. The second is that
+every client — the dashboard, a future integration, this CLI — then needs its own copy. The third
+is bandwidth: a wrapper that fetches rows to reduce them fetched rows it did not need.
+
+What belongs here: authentication, argument handling, building the query, and formatting the
+answer. If a change adds a loop over result rows, the work belongs on the server.
+
+Two places break this rule today. Both predate it, and moving either one needs a change in the
+analytics layer first, so neither is a local fix:
+
+- `lib/pricing.js` pulls up to 100 rate rows and picks the cheapest hourly rate per term, then
+  projects a monthly cost and a savings percentage. A measure in the rate catalog would return
+  those three numbers directly.
+- `commands/resolve.js` runs three lookups in parallel — the ARN source map, the cost measure, and
+  the opportunities endpoint — and merges them into one object. One endpoint that resolves an ARN
+  would replace the merge.
+
+Do not copy either shape into new code, and do not grow them.
+
+## Conventions that differ from defaults
+
+- A new capability goes in `lib/` with its logic and in `commands/` with its interface, even when
+  only one command needs it today. The skills, the hooks and a future MCP wrapper are all callers
+  of the same `lib/`.
+- Name the capability, not the service behind it. The plugin ships as readable text, so a comment
+  naming an internal technology tells a customer what runs inside the platform. The query format
+  is the exception: a skill that cannot say `cubejs` cannot write a query, and the cube names are
+  the API surface. `test/structure.test.js` holds a word list.
+- Reach for `lib/http.js`, `lib/config.js` and `lib/urls.js` before writing a request, a config
+  read, or a URL. Each exists because the second hand-written copy was wrong.
+
+## Known pitfalls
+
+- A hook command is advisory and must always exit 0. `commands/hook.js` returns silently on
+  unparseable input, on an unknown hook name, and on empty stdin. A hook that throws or prints
+  anything but the one `hookSpecificOutput` JSON line corrupts the agent's context.
+- Hook output goes nowhere a user sees it, so a hook fault is silent. `test/hook.test.js` is the
+  only thing that catches it.
+
+<!-- /bmad:context -->

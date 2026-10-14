@@ -1,0 +1,20 @@
+{
+  "name": "cxm-agent-plugin",
+  "version": "0.1.0",
+  "license": "FSL-1.1-ALv2",
+  "description": "Ask your coding agent about your CloudExMachina cloud cost drivers, savings opportunities, and the cost of a change.",
+  "author": { "name": "Cloud ex Machina" },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "CloudExMachina",
+    "shortDescription": "Cloud cost drivers, savings opportunities, and cost of change.",
+    "longDescription": "Answers cloud cost and FinOps questions with live data from your CloudExMachina organization, and prices infrastructure changes before you apply them.",
+    "developerName": "Cloud ex Machina",
+    "category": "Productivity",
+    "capabilities": ["Read"],
+    "defaultPrompt": [
+      "What are my biggest cloud cost drivers?",
+      "What savings opportunities do I have?"
+    ]
+  }
+}

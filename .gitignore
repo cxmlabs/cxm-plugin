@@ -1,0 +1,14 @@
+node_modules/
+*.log
+.DS_Store
+.claude/
+.codex/
+# benchmark/results/ is committed on purpose — it is the shared run corpus a teammate continues from.
+benchmark/.clean-claude-cfg/
+benchmark/presentation.html
+benchmark/deck-v2.html
+_bmad/
+_bmad-output/
+# BMAD installs the same skills once per harness. Neither copy is tracked; `_bmad/` is the
+# state both read, and re-running the installer rebuilds them.
+.agents/skills/bmad-*/

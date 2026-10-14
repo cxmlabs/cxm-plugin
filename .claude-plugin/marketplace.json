@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cxm-marketplace",
+  "description": "Claude Code and Codex plugins by Cloud ex Machina",
+  "owner": {
+    "name": "Cloud ex Machina",
+    "email": "contact@cloudexmachina.com",
+    "url": "https://cloudexmachina.io"
+  },
+  "plugins": [
+    {
+      "name": "cxm-agent-plugin",
+      "description": "Ask your coding agent about your CloudExMachina cloud cost drivers, savings opportunities, and the cost of a change.",
+      "version": "0.1.0",
+      "source": "./",
+      "category": "Productivity"
+    }
+  ]
+}

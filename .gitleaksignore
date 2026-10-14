@@ -1,0 +1,5 @@
+# The PostHog project key is a public, write-only ingestion key. The AKIA values are fake test fixtures.
+src/lib/telemetry.js:generic-api-key:14
+test/errors.test.js:aws-access-token:8
+test/session-trace.test.js:aws-access-token:15
+test/session-trace.test.js:aws-access-token:58
