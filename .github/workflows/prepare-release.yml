@@ -35,7 +35,7 @@ jobs:
           # npm version also prints the version script's output, so read the result back from package.json.
           npm version "$LEVEL" --no-git-tag-version
           version="v$(node -p "require('./package.json').version")"
-          branch="release/${version}"
+          branch="bump/${version}"  # not release/: the `release` branch exists, and git refs cannot be both a branch and a folder
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$branch"
