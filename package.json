@@ -1,6 +1,6 @@
 {
   "name": "@cloudexmachina/cxm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Query your CloudExMachina cloud cost drivers and savings opportunities from your coding agent (Claude Code, Codex).",
   "type": "module",
   "bin": {
@@ -32,7 +32,13 @@
   },
   "homepage": "https://cloudexmachina.io",
   "author": "Cloud ex Machina",
-  "keywords": ["finops", "cloud-cost", "aws", "terraform", "cost-optimization"],
+  "keywords": [
+    "finops",
+    "cloud-cost",
+    "aws",
+    "terraform",
+    "cost-optimization"
+  ],
   "license": "FSL-1.1-ALv2",
   "publishConfig": {
     "access": "public"
