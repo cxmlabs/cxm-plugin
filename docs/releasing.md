@@ -108,11 +108,10 @@ whichever agent installs it.
 ## Checking a release landed
 
 ```bash
-claude plugin marketplace add https://github.com/cxmlabs/cxm-plugin.git
-claude plugin install cxm-agent-plugin@cxm-marketplace
-codex plugin marketplace add cxmlabs/cxm-plugin --ref main && codex plugin add cxm-agent-plugin@cxm-marketplace
+npx @cloudexmachina/cxm@latest --version          # the npm version
+npx @cloudexmachina/cxm@latest install --no-login  # moves Claude Code and Codex to it
+claude plugin list; codex plugin list              # both show the installed version
 ```
-
-Both print the resolved version. To try an unpushed change first, add the marketplace from a
+ To try an unpushed change first, add the marketplace from a
 local path — `claude plugin marketplace add "$PWD"` or `codex plugin marketplace add .` — install,
 then remove both when done.

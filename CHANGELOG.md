@@ -4,6 +4,13 @@ This project follows [Semantic Versioning](https://semver.org/). Before 1.0, a m
 change or remove commands and skills; a patch version only fixes. Only the latest version gets
 fixes, including security fixes.
 
+## Unreleased
+
+- `cxm install`: one command, `npx @cloudexmachina/cxm@latest install`, installs the plugin into
+  Claude Code and Codex, signs in, and on a re-run updates to the latest version.
+- Releases run in CI: a `patch|minor|major` dispatch opens the version-bump PR; merging it tags,
+  releases on GitHub, and stages the npm version for a 2FA approval.
+
 ## 0.1.0 — first public release
 
 - 16 skills for Claude Code and Codex: cost drivers, savings opportunities and their lifecycle,

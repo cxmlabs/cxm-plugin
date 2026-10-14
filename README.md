@@ -74,8 +74,16 @@ Ask your agent:
 
 ## Update
 
+Run the install again: it refreshes the marketplace and moves the plugin to the latest version.
+
 ```bash
-claude plugin marketplace update cxm-marketplace && claude plugin install cxm-agent-plugin@cxm-marketplace
+npx @cloudexmachina/cxm@latest install --no-login
+```
+
+By hand:
+
+```bash
+claude plugin marketplace update cxm-marketplace && claude plugin update cxm-agent-plugin@cxm-marketplace
 codex plugin marketplace upgrade cxm-marketplace && codex plugin add cxm-agent-plugin@cxm-marketplace
 ```
 
@@ -97,7 +105,8 @@ with `cxm setup --no-hooks`.
 
 ## Uninstall
 
-Run `cxm uninstall` first, while `cxm` still exists, then remove the plugin:
+Run `cxm uninstall` first, while `cxm` still exists (or `npx @cloudexmachina/cxm@latest uninstall`),
+then remove the plugin:
 
 ```bash
 cxm uninstall                   # the PATH symlink, your credentials, the Codex prompt, and in this repo what setup wrote
