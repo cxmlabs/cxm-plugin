@@ -83,9 +83,14 @@ workflow run. One-time setup:
    exists, and a token that bypasses 2FA is not an option. From a clean checkout of the `v0.1.0` tag, an
    org owner runs `npm publish --access public` and enters the 2FA code. Leave `NPM_PUBLISH` unset for
    this tag, so the workflow cuts the GitHub release and skips npm.
-3. **Then switch to trusted publishing.** On npmjs.com, add this repository and `release.yml` as the
-   package's trusted publisher, and set the repo variable `NPM_PUBLISH` to `true`. Every later version
-   publishes from CI through GitHub OIDC, with provenance and no stored token.
+3. **Then switch to trusted publishing.** On npmjs.com, the package's trusted publisher is this
+   repository, workflow `release.yml`, environment `npm`, with direct publish and dist-tag **not**
+   allowed. The GitHub environment `npm` accepts only `v*` tags. The repo variable `NPM_PUBLISH` is
+   `true`. Every later version is **staged** from CI through GitHub OIDC, with provenance and no
+   stored token.
+4. **Approve each staged version.** It goes live only when an npm org owner approves it with 2FA, on
+   npmjs.com or with `npm stage list` then `npm stage approve <id>`. `npm stage reject <id>` discards
+   it, and a rejected version number cannot be reused.
 
 `npx @cloudexmachina/cxm …` always resolves the latest published version; a global `npm i -g
 @cloudexmachina/cxm` pins until updated. A marketplace install ships its own `cxm` via a PATH shim
