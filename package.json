@@ -1,6 +1,6 @@
 {
   "name": "@cloudexmachina/cxm",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Query your CloudExMachina cloud cost drivers and savings opportunities from your coding agent (Claude Code, Codex).",
   "type": "module",
   "bin": {
@@ -33,7 +33,17 @@
   "bugs": "https://github.com/cxmlabs/cxm-plugin/issues",
   "homepage": "https://cloudexmachina.io",
   "author": "Cloud ex Machina",
-  "keywords": ["finops", "cloud-cost", "aws", "terraform", "cost-optimization", "claude-code", "codex", "coding-agent", "plugin"],
+  "keywords": [
+    "finops",
+    "cloud-cost",
+    "aws",
+    "terraform",
+    "cost-optimization",
+    "claude-code",
+    "codex",
+    "coding-agent",
+    "plugin"
+  ],
   "license": "FSL-1.1-ALv2",
   "publishConfig": {
     "access": "public"
