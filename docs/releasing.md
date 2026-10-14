@@ -37,7 +37,7 @@ A release runs in CI, because `main` only moves through a reviewed, green PR:
 
 1. **Start it.** In the Actions tab, run **prepare-release** and pick `patch`, `minor` or `major`
    (or `make patch|minor|major`, which starts the same workflow through `gh`). It bumps
-   `package.json` and the manifests on `release/vX.Y.Z`, and its run summary links the PR to open.
+   `package.json` and the manifests on `bump/vX.Y.Z`, and its run summary links the PR to open.
 2. **Open, review and merge the PR.** It holds only the version bump. The organization does not
    let workflows open pull requests, so a person opens it, and that starts CI.
 3. **The merge publishes.** **tag-release** sees a version on `main` with no tag, tags it, and
