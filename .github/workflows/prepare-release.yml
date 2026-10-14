@@ -32,7 +32,9 @@ jobs:
         env:
           LEVEL: ${{ inputs.level }}
         run: |
-          version="$(npm version "$LEVEL" --no-git-tag-version)"
+          # npm version also prints the version script's output, so read the result back from package.json.
+          npm version "$LEVEL" --no-git-tag-version
+          version="v$(node -p "require('./package.json').version")"
           branch="release/${version}"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
