@@ -30,15 +30,10 @@
     "type": "git",
     "url": "git+https://github.com/cxmlabs/cxm-plugin.git"
   },
+  "bugs": "https://github.com/cxmlabs/cxm-plugin/issues",
   "homepage": "https://cloudexmachina.io",
   "author": "Cloud ex Machina",
-  "keywords": [
-    "finops",
-    "cloud-cost",
-    "aws",
-    "terraform",
-    "cost-optimization"
-  ],
+  "keywords": ["finops", "cloud-cost", "aws", "terraform", "cost-optimization", "claude-code", "codex", "coding-agent", "plugin"],
   "license": "FSL-1.1-ALv2",
   "publishConfig": {
     "access": "public"
