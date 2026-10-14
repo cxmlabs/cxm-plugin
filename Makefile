@@ -4,7 +4,7 @@
 .PHONY: help test validate patch minor major version
 
 help:
-	@echo "make patch|minor|major   start prepare-release in CI: it opens the version-bump PR"
+	@echo "make patch|minor|major   start prepare-release in CI: it links the version-bump PR to open"
 	@echo "make validate            validate the plugin + marketplace manifests"
 	@echo "make test                run the test suite"
 	@echo "make version             show the current version"
@@ -24,4 +24,4 @@ validate:
 
 patch minor major:
 	gh workflow run prepare-release.yml -f level=$@
-	@echo "prepare-release started: review and merge its PR to publish."
+	@echo "prepare-release started: open the PR its run summary links, then merge it to publish."

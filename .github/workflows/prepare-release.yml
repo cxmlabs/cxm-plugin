@@ -1,6 +1,7 @@
 # Step 1 of a release, from the Actions tab: pick patch, minor or major. The workflow bumps the
-# version on a release branch and opens the PR. main only moves through a reviewed, green PR,
-# so the bump is a PR like any other change; merging it runs tag-release.yml.
+# version on a release branch and links the PR to open. main only moves through a reviewed, green
+# PR, so the bump is a PR like any other change; merging it runs tag-release.yml. The org does not
+# let workflows open pull requests, so a person opens it, which also starts CI on it.
 name: prepare-release
 
 on:
@@ -14,8 +15,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
-  actions: write # start CI on the branch: a PR opened with GITHUB_TOKEN triggers no workflow
 
 jobs:
   bump:
@@ -43,13 +42,13 @@ jobs:
           git push origin "$branch"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
-      - name: Open the release PR and run CI on it
+      - name: Link the release PR to open
         env:
-          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.bump.outputs.version }}
           BRANCH: ${{ steps.bump.outputs.branch }}
         run: |
-          gh pr create --base main --head "$BRANCH" \
-            --title "release: cxm-agent-plugin $VERSION" \
-            --body "Version bump only. Merging this PR tags \`$VERSION\` and publishes it (tag-release.yml)."
-          gh workflow run ci.yml --ref "$BRANCH"
+          title="release: cxm-agent-plugin $VERSION"
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$BRANCH?expand=1&title=$(jq -rn --arg t "$title" '$t|@uri')"
+          echo "### $VERSION is ready: [open the release PR]($url)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Merging it tags $VERSION and publishes it." >> "$GITHUB_STEP_SUMMARY"
+          echo "Open the release PR: $url"

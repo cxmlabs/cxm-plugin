@@ -73,8 +73,8 @@ separate private `cxm-plugin-benchmark` repository.
   `claude plugin validate . --strict` when the `claude` CLI is present.
 - `.github/workflows/ci.yml` runs the two cheap checks and then the suite on every pull request,
   on Node 22 and 24. A red 22 with a green 24 means the `engines` floor is wrong, not the code.
-- Release: run the **prepare-release** workflow (or `make patch|minor|major`). It opens the
-  version-bump PR; merging it tags and publishes (`docs/releasing.md`).
+- Release: run the **prepare-release** workflow (or `make patch|minor|major`). It pushes the
+  version-bump branch and links the PR to open; merging it tags and publishes (`docs/releasing.md`).
 - There is no linter or formatter configured; match the surrounding file instead. The parse sweep
   in `test/structure.test.js` is what covers files no test imports.
 

@@ -37,15 +37,14 @@ A release runs in CI, because `main` only moves through a reviewed, green PR:
 
 1. **Start it.** In the Actions tab, run **prepare-release** and pick `patch`, `minor` or `major`
    (or `make patch|minor|major`, which starts the same workflow through `gh`). It bumps
-   `package.json` and the manifests on `release/vX.Y.Z`, opens the PR "release: cxm-agent-plugin
-   vX.Y.Z", and starts CI on it.
-2. **Review and merge the PR.** It holds only the version bump.
+   `package.json` and the manifests on `release/vX.Y.Z`, and its run summary links the PR to open.
+2. **Open, review and merge the PR.** It holds only the version bump. The organization does not
+   let workflows open pull requests, so a person opens it, and that starts CI.
 3. **The merge publishes.** **tag-release** sees a version on `main` with no tag, tags it, and
    starts **release.yml** on the tag.
 
-A tag or a PR created with the workflow token starts no other workflow, so each workflow starts
-the next one explicitly (`gh workflow run`). Repository setting needed once: Actions may create
-pull requests (Settings → Actions → General).
+A tag pushed with the workflow token starts no other workflow, so tag-release starts release.yml
+explicitly (`gh workflow run`).
 
 Other targets: `make validate`, `make test`, `make version`. Both run with no agent installed:
 `scripts/validate-manifests.mjs` checks the Claude and the Codex manifests, and the Codex one has
