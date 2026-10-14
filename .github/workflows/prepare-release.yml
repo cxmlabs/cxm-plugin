@@ -1,0 +1,55 @@
+# Step 1 of a release, from the Actions tab: pick patch, minor or major. The workflow bumps the
+# version on a release branch and opens the PR. main only moves through a reviewed, green PR,
+# so the bump is a PR like any other change; merging it runs tag-release.yml.
+name: prepare-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: Semver level to bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write # start CI on the branch: a PR opened with GITHUB_TOKEN triggers no workflow
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      # `npm version` runs the `version` script, which copies the version into every manifest.
+      - name: Bump the version on a release branch
+        id: bump
+        env:
+          LEVEL: ${{ inputs.level }}
+        run: |
+          version="$(npm version "$LEVEL" --no-git-tag-version)"
+          branch="release/${version}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json
+          git commit -m "release: cxm-agent-plugin ${version}"
+          git push origin "$branch"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+      - name: Open the release PR and run CI on it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          BRANCH: ${{ steps.bump.outputs.branch }}
+        run: |
+          gh pr create --base main --head "$BRANCH" \
+            --title "release: cxm-agent-plugin $VERSION" \
+            --body "Version bump only. Merging this PR tags \`$VERSION\` and publishes it (tag-release.yml)."
+          gh workflow run ci.yml --ref "$BRANCH"

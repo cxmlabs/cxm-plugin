@@ -9,6 +9,8 @@ name: release
 on:
   push:
     tags: ['v*']
+  # tag-release starts it on the tag: a tag pushed with GITHUB_TOKEN triggers nothing.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -26,6 +28,9 @@ jobs:
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Runs on a version tag
+        run: '[[ "$GITHUB_REF" == refs/tags/v* ]] || { echo "run release.yml on a v* tag, not $GITHUB_REF"; exit 1; }'
 
       - name: Tag matches package.json
         run: |
