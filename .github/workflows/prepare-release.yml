@@ -1,0 +1,54 @@
+# Step 1 of a release, from the Actions tab: pick patch, minor or major. The workflow bumps the
+# version on a release branch and links the PR to open. main only moves through a reviewed, green
+# PR, so the bump is a PR like any other change; merging it runs tag-release.yml. The org does not
+# let workflows open pull requests, so a person opens it, which also starts CI on it.
+name: prepare-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: Semver level to bump
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      # `npm version` runs the `version` script, which copies the version into every manifest.
+      - name: Bump the version on a release branch
+        id: bump
+        env:
+          LEVEL: ${{ inputs.level }}
+        run: |
+          version="$(npm version "$LEVEL" --no-git-tag-version)"
+          branch="release/${version}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json
+          git commit -m "release: cxm-agent-plugin ${version}"
+          git push origin "$branch"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+      - name: Link the release PR to open
+        env:
+          VERSION: ${{ steps.bump.outputs.version }}
+          BRANCH: ${{ steps.bump.outputs.branch }}
+        run: |
+          title="release: cxm-agent-plugin $VERSION"
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$BRANCH?expand=1&title=$(jq -rn --arg t "$title" '$t|@uri')"
+          echo "### $VERSION is ready: [open the release PR]($url)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Merging it tags $VERSION and publishes it." >> "$GITHUB_STEP_SUMMARY"
+          echo "Open the release PR: $url"

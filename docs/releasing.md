@@ -33,14 +33,18 @@ hook, so the manifests are always part of the release commit.
 
 ## Cutting a release
 
-```bash
-make patch     # 0.1.0 -> 0.1.1   (also: make minor, make major)
-make release   # push the commit and the tag
-```
+A release runs in CI, because `main` only moves through a reviewed, green PR:
 
-`make patch` validates the manifests, runs the tests, bumps `package.json`, syncs the manifests,
-commits, and creates the `vX.Y.Z` tag. `npm version` refuses to run on a dirty tree, which is the
-guard we want. Nothing has left your machine until `make release`.
+1. **Start it.** In the Actions tab, run **prepare-release** and pick `patch`, `minor` or `major`
+   (or `make patch|minor|major`, which starts the same workflow through `gh`). It bumps
+   `package.json` and the manifests on `release/vX.Y.Z`, and its run summary links the PR to open.
+2. **Open, review and merge the PR.** It holds only the version bump. The organization does not
+   let workflows open pull requests, so a person opens it, and that starts CI.
+3. **The merge publishes.** **tag-release** sees a version on `main` with no tag, tags it, and
+   starts **release.yml** on the tag.
+
+A tag pushed with the workflow token starts no other workflow, so tag-release starts release.yml
+explicitly (`gh workflow run`).
 
 Other targets: `make validate`, `make test`, `make version`. Both run with no agent installed:
 `scripts/validate-manifests.mjs` checks the Claude and the Codex manifests, and the Codex one has
@@ -78,9 +82,14 @@ workflow run. One-time setup:
    exists, and a token that bypasses 2FA is not an option. From a clean checkout of the `v0.1.0` tag, an
    org owner runs `npm publish --access public` and enters the 2FA code. Leave `NPM_PUBLISH` unset for
    this tag, so the workflow cuts the GitHub release and skips npm.
-3. **Then switch to trusted publishing.** On npmjs.com, add this repository and `release.yml` as the
-   package's trusted publisher, and set the repo variable `NPM_PUBLISH` to `true`. Every later version
-   publishes from CI through GitHub OIDC, with provenance and no stored token.
+3. **Then switch to trusted publishing.** On npmjs.com, the package's trusted publisher is this
+   repository, workflow `release.yml`, environment `npm`, with direct publish and dist-tag **not**
+   allowed. The GitHub environment `npm` accepts only `v*` tags. The repo variable `NPM_PUBLISH` is
+   `true`. Every later version is **staged** from CI through GitHub OIDC, with provenance and no
+   stored token.
+4. **Approve each staged version.** It goes live only when an npm org owner approves it with 2FA, on
+   npmjs.com or with `npm stage list` then `npm stage approve <id>`. `npm stage reject <id>` discards
+   it, and a rejected version number cannot be reused.
 
 `npx @cloudexmachina/cxm …` always resolves the latest published version; a global `npm i -g
 @cloudexmachina/cxm` pins until updated. A marketplace install ships its own `cxm` via a PATH shim

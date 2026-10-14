@@ -9,6 +9,8 @@ name: release
 on:
   push:
     tags: ['v*']
+  # tag-release starts it on the tag: a tag pushed with GITHUB_TOKEN triggers nothing.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,6 +19,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # The npm trusted publisher is bound to this environment, which only v* tags may deploy to.
+    environment: npm
     steps:
       - uses: actions/checkout@v7
         with:
@@ -26,6 +30,9 @@ jobs:
         with:
           node-version: 22
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Runs on a version tag
+        run: '[[ "$GITHUB_REF" == refs/tags/v* ]] || { echo "run release.yml on a v* tag, not $GITHUB_REF"; exit 1; }'
 
       - name: Tag matches package.json
         run: |
@@ -52,10 +59,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release create "$GITHUB_REF_NAME" --generate-notes --title "cxm-agent-plugin $GITHUB_REF_NAME"
 
-      # Second channel: the npm CLI, through trusted publishing (OIDC, npm 11.5.1 or later) with no
-      # stored token. The first version is published by hand; see docs/releasing.md.
-      - name: Publish the CLI to npm
+      # Second channel: the npm CLI, through trusted publishing (OIDC) with no stored token. The
+      # trusted publisher allows staging only: the version goes live once an npm org owner approves
+      # it with 2FA (npmjs.com, or `npm stage approve <id>`). Staged publishing needs npm 11.15.0+.
+      - name: Stage the CLI on npm
         if: ${{ vars.NPM_PUBLISH == 'true' }}
         run: |
-          npm install -g npm@11
-          npm publish --provenance
+          npm install -g npm@latest
+          npm stage publish --provenance

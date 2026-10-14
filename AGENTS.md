@@ -19,7 +19,7 @@ separate private `cxm-plugin-benchmark` repository.
   before adding a package.
 - `package.json` is the only place the version is written. Never hand-edit the version in
   `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, or `.codex-plugin/plugin.json` —
-  `npm version` (via `make patch|minor|major`) runs `scripts/sync-version.mjs` to sync them, and
+  `npm version` (in the prepare-release workflow) runs `scripts/sync-version.mjs` to sync them, and
   CI and the release workflow both fail otherwise.
 - Never introduce a customer, partner, or vendor name into product-facing text — skill prompts
   under `skills/`, anything the CLI prints, anything a hook emits. Say "your team", "this
@@ -73,8 +73,8 @@ separate private `cxm-plugin-benchmark` repository.
   `claude plugin validate . --strict` when the `claude` CLI is present.
 - `.github/workflows/ci.yml` runs the two cheap checks and then the suite on every pull request,
   on Node 22 and 24. A red 22 with a green 24 means the `engines` floor is wrong, not the code.
-- Release: `make patch|minor|major` (validates, tests, bumps, commits, tags) then `make release`
-  to push. `npm version` refuses a dirty tree — that is the intended guard.
+- Release: run the **prepare-release** workflow (or `make patch|minor|major`). It pushes the
+  version-bump branch and links the PR to open; merging it tags and publishes (`docs/releasing.md`).
 - There is no linter or formatter configured; match the surrounding file instead. The parse sweep
   in `test/structure.test.js` is what covers files no test imports.
 
