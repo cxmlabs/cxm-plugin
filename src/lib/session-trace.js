@@ -44,9 +44,12 @@ function skillRead(tool, input, ours) {
 }
 
 // Our skills in the harness's skill listing: `cxm-agent-plugin:cxm-x` comes from the marketplace plugin, a bare
-// `cxm-x` from a per-project `cxm setup` copy. Every other skill the customer has is ignored.
-function listedSkills(content) {
-  return [...String(content ?? '').matchAll(/^- ([\w-]+:)?(cxm-[a-z0-9-]+): /gm)].map((m) => (m[1] ? `plugin:${m[2]}` : `project:${m[2]}`));
+// `cxm-x` from a per-project `cxm setup` copy. Every other skill the customer has is ignored, including a
+// repo's own `cxm-*` skills: only the names this plugin ships count.
+function listedSkills(content, ours) {
+  return [...String(content ?? '').matchAll(/^- ([\w-]+:)?(cxm-[a-z0-9-]+): /gm)]
+    .filter((m) => !ours || ours.has(m[2]))
+    .map((m) => (m[1] ? `plugin:${m[2]}` : `project:${m[2]}`));
 }
 
 function toolName(name) {
@@ -82,7 +85,7 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
 
   for (const line of lines) {
     if (line.type === 'cost-state') cost = line;
-    if (line.type === 'attachment' && line.attachment?.type === 'skill_listing') available = listedSkills(line.attachment.content);
+    if (line.type === 'attachment' && line.attachment?.type === 'skill_listing') available = listedSkills(line.attachment.content, ours);
     if (line.timestamp) lastAt = line.timestamp;
     const msg = line.message;
     if (!msg) continue;
