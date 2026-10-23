@@ -5,11 +5,11 @@ import { renderMermaidASCII } from '../vendor/mermaid-ascii.js';
 const BG = '#0F172A';
 const FAMILY = [
   [/key ?vault|entra|active directory|\biam\b|kms|secrets?|firewall|waf|defender|guardduty|shield/i, '#EAB308'],
-  [/rds|aurora|postgres|mysql|dynamo|database|\bdb\b|azure sql|sql database|cosmos|redshift/i, '#5B8DEF'],
-  [/s3|bucket|lake|storage|efs|glacier|blob/i, '#10B981'],
-  [/cache|valkey|redis|memcached|elasticache/i, '#EF4444'],
-  [/vpc|vnet|subnet|nat|gateway|load balancer|\b[an]lb\b|elb|cloudfront|front ?door|route ?53|dns|transit|private ?endpoint|expressroute|nsg|virtual.network/i, '#A78BFA'],
-  [/ecs|eks|aks|ec2|\bvm\b|virtual machine|lambda|functions?|fargate|app service|container apps?|api|service|worker|compute/i, '#F59E0B'],
+  [/rds|aurora|postgres|mysql|dynamo|database|\bdb\b|azure sql|sql database|cloud sql|cosmos|redshift|bigquery|spanner|firestore|bigtable/i, '#5B8DEF'],
+  [/s3|bucket|lake|storage|efs|glacier|blob|gcs|filestore/i, '#10B981'],
+  [/cache|redis|memcached|elasticache/i, '#EF4444'],
+  [/vpc|vnet|subnet|nat|gateway|load.balanc|\b[an]lb\b|elb|cloudfront|front ?door|route ?53|dns|transit|private ?endpoint|expressroute|interconnect|cloud cdn|nsg|virtual.network/i, '#A78BFA'],
+  [/ecs|eks|aks|gke|ec2|cloud run|compute engine|app engine|\bvm\b|virtual machine|lambda|functions?|fargate|app service|container apps?|api|service|worker|compute/i, '#F59E0B'],
   [/user|client|browser|internet/i, '#E2E8F0'],
 ];
 const ARROW = /[►◄▲▼]/;
