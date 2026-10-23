@@ -8,7 +8,7 @@ import { draw, needsRows, splitReply } from './viz.js';
 // `cxm` sub-commands we may name. Anything else is reported as `other`, so an argument can never leak.
 const CXM_COMMANDS = new Set([
   'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'api',
-  'analytics query', 'analytics schema', 'cube', 'wiki', 'viz',
+  'analytics query', 'analytics schema', 'cube', 'wiki', 'viz', 'viz chart', 'viz cube-chart', 'viz row', 'viz mermaid',
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
@@ -237,7 +237,7 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
       cxm_commands: count(cxmCalls.map((s) => s.cxm)),
       cxm_errors: cxmCalls.filter((s) => s.isError).length,
       cxm_slash_command: slashCxm,
-      // Blocks the main agent wrote for the reply renderer; `cxm_commands.viz` counts the text fallback.
+      // Blocks the main agent wrote for the reply renderer; `cxm_commands['viz <kind>']` counts the text fallback.
       viz_blocks: count(blocks.map((p) => p.kind)),
       viz_failed: count(blocks.map(drawFailure).filter(Boolean)),
       aws_cli_calls: count(spans.filter((s) => s.aws).map((s) => `${s.aws.service} ${s.aws.operation}`)),
