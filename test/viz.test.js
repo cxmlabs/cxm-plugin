@@ -52,8 +52,9 @@ const rows = [{ k: 'RDS', v: 30 }, { k: 'ECS', v: 10 }];
 
 test('pie, column and line charts draw their shape and their figures', () => {
   assert.match(plain(draw('chart', chart({ type: 'pie', data: rows }))), /RDS █{30,}.* 30 +75%/);
-  const pie = plain(draw('chart', chart({ type: 'pie', series: 's', data: [{ k: 'a', s: 'p', v: 1 }, { k: 'a', s: 'q', v: 9 }] })));
-  assert.ok(pie.split('\n').every((l) => [...l].length <= 100), 'each series of a pie scales to its own total');
+  const pie = draw('chart', chart({ type: 'pie', series: 's', data: [{ k: 'a', s: 'p', v: 1 }, { k: 'b', s: 'p', v: 1 }, { k: 'a', s: 'q', v: 3 }, { k: 'b', s: 'q', v: 6 }] }));
+  const [p, q] = pie.slice(1, 3).map((l) => l.find(([t]) => t.includes('█'))[0].trim().length);
+  assert.ok(q < p, 'each series of a pie scales to its own total: 3 of 9 is shorter than 1 of 2');
   const column = plain(draw('chart', chart({ type: 'column', data: rows })));
   assert.match(column, /30 +10 [\s\S]*^│ ███ {6}│$[\s\S]*RDS ECS/m);
   assert.match(column, /total 40/);
@@ -64,6 +65,8 @@ test('pie, column and line charts draw their shape and their figures', () => {
 test('signed rows show no share, and a negative column stands as tall as its size', () => {
   const bar = plain(draw('chart', chart({ data: [{ k: 'a', v: -5 }, { k: 'b', v: 10 }] })));
   assert.doesNotMatch(bar, /%/);
+  const pie = plain(draw('chart', chart({ type: 'pie', data: [{ k: 'a', v: -5 }, { k: 'b', v: 10 }] })));
+  assert.ok(pie.split('\n').every((l) => [...l].length <= 100), 'a signed pie bar stays inside the width');
   const column = plain(draw('chart', chart({ type: 'column', data: [{ k: 'a', v: -5 }, { k: 'b', v: -10 }] })));
   assert.match(column, /^│ +███ +│$/m, 'the bigger fall is the only full-height column');
 });
@@ -78,7 +81,7 @@ test('a row draws its blocks side by side, and stacks them when they do not fit'
 
 test('a chart refuses no rows, a value that is not a number, and an unknown type, and drops control characters', () => {
   assert.throws(() => draw('chart', chart({ data: [] })), /at least one "data" row/);
-  assert.throws(() => draw('chart', chart({ data: [{ k: 'a', v: 'n/a' }] })), /must be a number: "v" is "n\/a"/);
+  assert.throws(() => draw('chart', chart({ data: [{ k: 'a', v: 'n/a' }] })), /needs a number in "v": \{"k":"a","v":"n\/a"\}/);
   assert.throws(() => draw('chart', chart({ type: 'scatter', data: rows })), /Unknown chart type "scatter"/);
   const text = plain(draw('chart', chart({ title: 'x\u001b]0;owned\u0007', data: [{ k: 'a\u001b[2J', v: 1 }] })));
   assert.doesNotMatch(text, /[\u0000-\u0009\u000b-\u001f]/);
@@ -111,7 +114,8 @@ test('cxm viz reads a file, stdin or an inline body after its flags, and --color
 
 test('cxm viz names its kinds and refuses a bad width or a missing file', () => {
   assert.match(cli(['pie', '{}']).stderr, /kinds: chart, cube-chart, row, mermaid/);
-  assert.match(cli(['chart', '{}', '--width', 'abc']).stderr, /--width needs a number/);
+  assert.match(cli(['chart', '{}', '--width', '19']).stderr, /--width needs a number/);
+  assert.match(cli(['row', '[]']).stderr, /A row needs a non-empty array/);
   const missing = cli(['chart', 'nope.json']);
   assert.equal(missing.status, 1);
   assert.match(missing.stderr, /No such file: nope\.json/);

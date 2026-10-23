@@ -10,8 +10,8 @@ const LOWER = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const LABEL_MAX = 24;
 const TYPES = ['bar', 'line', 'column', 'pie'];
 // Labels come from cloud data; a control character in one would drive the terminal that prints it.
-const CONTROL = /[\x00-\x1f\x7f-\x9f]/g;
-const CONTROL_BUT_LINES = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
+const CONTROL = /[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
+const CONTROL_BUT_LINES = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 
 // The fenced blocks the renderer draws. `cube-chart` is a chart whose rows come from a query.
 const FENCE = /```(chart|cube-chart|row|mermaid)[ \t]*\n([\s\S]*?)```/g;
@@ -44,8 +44,8 @@ function formatX(v, xFormat) {
 function toSeries(spec) {
   const { x, y, data } = spec;
   if (!Array.isArray(data) || data.length === 0 || !x || !y) throw new Error('A chart needs "x", "y" and at least one "data" row');
-  const bad = data.find((r) => !Number.isFinite(Number(r?.[y] ?? 0)));
-  if (bad) throw new Error(`A chart value must be a number: "${y}" is ${JSON.stringify(bad[y])}`);
+  const bad = data.find((r) => r === null || typeof r !== 'object' || !Number.isFinite(Number(r[y] ?? 0)));
+  if (bad !== undefined) throw new Error(`A chart row needs a number in "${y}": ${JSON.stringify(bad)}`);
   const xs = [...new Set(data.map((r) => String(r[x])))];
   const names = spec.series ? [...new Set(data.map((r) => String(r[spec.series])))] : [spec.yName ?? y];
   const value = (xv, name) => Number(data.find((r) => String(r[x]) === xv && (!spec.series || String(r[spec.series]) === name))?.[y] ?? 0);
@@ -53,7 +53,7 @@ function toSeries(spec) {
 }
 
 const blocks = (v, max, width) => {
-  const eighths = Math.round(Math.min(1, v / (max || 1)) * width * 8);
+  const eighths = Math.round((v / (max || 1)) * width * 8);
   return '█'.repeat(Math.floor(eighths / 8)) + EIGHTHS[eighths % 8];
 };
 const shade = (light, deep, k) =>
@@ -70,14 +70,15 @@ function barLines({ labels, series }, spec, room) {
   const shares = single && values.every((v) => v >= 0);
   const barW = Math.max(8, Math.min(46, room - labelW - valueW - (shares ? 8 : 3)));
   const totals = series.map((s) => sum(s.data));
-  const max = Math.max(...values.map(Math.abs));
+  // A pie bar is a share of its own series, so it scales to that series' size.
+  const sizes = series.map((s) => (spec.type === 'pie' ? sum(s.data.map(Math.abs)) : Math.max(...values.map(Math.abs))));
   const lines = [];
   labels.forEach((label, i) =>
     series.forEach((s, j) => {
       const v = s.data[i];
       const line = [
         [`${(j === 0 ? label : '').padStart(labelW)} `, MUTED],
-        [blocks(Math.abs(v), spec.type === 'pie' ? totals[j] : max, barW).padEnd(barW), PALETTE[(single ? i : j) % PALETTE.length]],
+        [blocks(Math.abs(v), sizes[j], barW).padEnd(barW), PALETTE[(single ? i : j) % PALETTE.length]],
         [` ${fmt(v, spec.yFormat).padStart(valueW)}`],
       ];
       if (shares) line.push([`  ${String(Math.round((v / (totals[0] || 1)) * 100)).padStart(3)}%`, FAINT]);
@@ -236,7 +237,7 @@ function layout(blocks, width) {
 // Draws one fenced block. Throws on a body it cannot read, so a caller can show the raw block.
 export function draw(kind, body, { width = 100 } = {}) {
   if (kind === 'mermaid') return frame({ lines: drawDiagram(body.replace(CONTROL_BUT_LINES, ''), width - 4) });
-  const spec = JSON.parse(body, (_, v) => (typeof v === 'string' ? v.replace(CONTROL, '') : v));
+  const spec = JSON.parse(body, (_, v) => (typeof v === 'string' ? v.replace(CONTROL, (c) => (/\s/.test(c) ? ' ' : '')) : v));
   if (kind === 'row') {
     const items = Array.isArray(spec) ? spec : spec?.items;
     if (!Array.isArray(items) || items.length === 0) throw new Error('A row needs a non-empty array of items');

@@ -31,7 +31,7 @@ export async function viz(argv) {
   const [kind, ...rest] = argv;
   const arg = rest.find((a, i) => (a === '-' || !a.startsWith('--')) && rest[i - 1] !== '--width');
   if (!KINDS.includes(kind) || !arg) throw new Error(`viz needs a kind and a body, e.g. cxm viz chart '<json>' (kinds: ${KINDS.join(', ')}; body: inline, a file, or - for stdin)`);
-  const width = flag(argv, '--width') === undefined ? process.stdout.columns || 100 : Number(flag(argv, '--width'));
+  const width = argv.includes('--width') ? Number(flag(argv, '--width')) : process.stdout.columns || 100;
   if (!(width >= 20)) throw new Error('--width needs a number of columns, 20 or more');
   const lines = draw(kind, await withRows(kind, readInput(arg)), { width });
   console.log(argv.includes('--color') ? ansi(lines) : plain(lines));
