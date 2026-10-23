@@ -35,6 +35,9 @@ test('a CXM session becomes one metadata-only trace with no content, arguments o
   assert.equal(trace.properties.input_tokens, 40);
   assert.equal(trace.properties.session_cost_usd, 0.12);
   assert.deepEqual(trace.properties.viz_blocks, { chart: 1 });
+  const subagent = { ...assistant('s1', 9, [{ type: 'text', text: '```mermaid\nflowchart LR\n```' }]), isSidechain: true };
+  const [withSubagent] = buildSessionTrace([...session, subagent], { sessionId: 'sess-1', reason: 'exit' });
+  assert.deepEqual(withSubagent.properties.viz_blocks, { chart: 1 }, 'a block a subagent wrote is not in the reply');
   assert.deepEqual(trace.properties.cxm_skills_used, ['cxm-cost-drivers']);
   assert.deepEqual(trace.properties.cxm_skills_available, ['plugin:cxm-cost-drivers', 'project:cxm-waste']);
   assert.deepEqual(trace.properties.cxm_install, ['plugin', 'project']);
@@ -64,6 +67,7 @@ test('full mode shares content, redacted and truncated', () => {
 test('command names come from an allowlist, never from arguments', () => {
   assert.equal(cxmCommand('cxm analytics schema costs'), 'analytics schema');
   assert.equal(cxmCommand('node /p/bin/cxm.js price --service ec2'), 'price');
+  assert.equal(cxmCommand("cxm viz chart '{}'"), 'viz');
   assert.equal(cxmCommand('cxm my-secret-thing'), 'other');
   assert.equal(cxmCommand('echo cxmfoo'), null);
   assert.deepEqual(awsCall('AWS_PROFILE=x aws ec2 describe-instances --filters y'), { service: 'ec2', operation: 'describe-instances' });

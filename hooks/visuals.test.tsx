@@ -22,9 +22,26 @@ for (const surface of ['terminal', 'desktop'] as const) {
   })
 }
 
-test('a block that does not parse shows as written', async ($) => {
+test('a block that does not parse shows as written, with a note', async ($) => {
   const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props('```chart\n{not json\n```') })
-  expect(await ui.find({ type: 'Markdown', text: /\{not json/ })).toBeDefined()
+  expect(await ui.find({ type: 'Markdown', text: /\{not json[\s\S]*Not drawn/ })).toBeDefined()
+})
+
+test('a queried chart gets its rows from cxm viz --rows once, and a failed query shows the block with its reason', async ($, on) => {
+  const runs: (readonly string[])[] = []
+  on('process.run', ($, e) => {
+    runs.push(e.argv)
+    const ok = !e.init?.stdin?.includes('broken')
+    return { value: { exitCode: ok ? 0 : 1, stdout: ok ? CHART : '', stderr: ok ? '' : 'cxm: run cxm login\n', isStdoutTruncated: false, isStderrTruncated: false } }
+  })
+  const query = (measure: string) => '```cube-chart\n{"type":"bar","x":"service","y":"cost","query":{"measures":["' + measure + '"]}}\n```'
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props(query('costs.total')) })
+  expect(await ui.find({ type: 'Text', text: /\$1,854/ })).toBeDefined()
+  expect(runs.map((argv) => argv.slice(2))).toEqual([['viz', 'cube-chart', '-', '--rows']])
+  const failed = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props(query('broken')) })
+  expect(await failed.find({ type: 'Markdown', text: /Not drawn: cxm: run cxm login/ })).toBeDefined()
+  await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props(query('broken')) })
+  expect(runs.length).toBe(2)
 })
 
 test('the system prompt tells the agent the visuals are on where a surface draws, and not where none does', async ($, on) => {
