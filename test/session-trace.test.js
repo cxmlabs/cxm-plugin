@@ -35,6 +35,7 @@ test('a CXM session becomes one metadata-only trace with no content, arguments o
   assert.equal(trace.properties.input_tokens, 40);
   assert.equal(trace.properties.session_cost_usd, 0.12);
   assert.deepEqual(trace.properties.viz_blocks, { chart: 1 });
+  assert.deepEqual(trace.properties.viz_failed, { 'chart invalid': 1 }, 'a chart with no rows shows as source');
   const subagent = { ...assistant('s1', 9, [{ type: 'text', text: '```mermaid\nflowchart LR\n```' }]), isSidechain: true };
   const [withSubagent] = buildSessionTrace([...session, subagent], { sessionId: 'sess-1', reason: 'exit' });
   assert.deepEqual(withSubagent.properties.viz_blocks, { chart: 1 }, 'a block a subagent wrote is not in the reply');

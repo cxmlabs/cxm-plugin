@@ -13,6 +13,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     })
     const ui = await $.ui.mount({ plugin: PLUGIN, surface, component: 'AssistantMessage', props: props('Top spend:\n```chart\n' + CHART + '\n```\nDone.') })
     expect(await ui.find({ type: 'Text', text: /\$1,854/ })).toBeDefined()
+    expect((await ui.find({ type: 'Text', text: /█/ }))?.props.color).toBe('#5B8DEF')
     expect(await ui.find({ type: 'Text', text: /Total +\$3,427/ })).toBeDefined()
     await ui.unmount()
 
