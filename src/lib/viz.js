@@ -1,19 +1,20 @@
-// Draws the chart, row and diagram blocks of an agent reply as lines of colored text runs. One
-// drawing serves every tier: the reply renderer turns the runs into styled text, `cxm viz` prints them.
-// Pure and import-free but for diagram.js, because the reply renderer runs with no Node.
+// Draws chart, row and diagram blocks as lines of [text, fg, bg, bold] runs, for every tier; no Node APIs.
 import { drawDiagram } from './diagram.js';
 
-// A run is [text, foreground, background, bold]; empty strings mean the surface default.
-export const PALETTE = ['#5B8DEF', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#14B8A6', '#EC4899', '#64748B'];
+const PALETTE = ['#5B8DEF', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#14B8A6', '#EC4899', '#64748B'];
 const MUTED = '#94A3B8';
 const FAINT = '#64748B';
 const BORDER = '#334155';
 const EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
 const LOWER = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const LABEL_MAX = 24;
+const TYPES = ['bar', 'line', 'column', 'pie'];
+// Labels come from cloud data; a control character in one would drive the terminal that prints it.
+const CONTROL = /[\x00-\x1f\x7f-\x9f]/g;
+const CONTROL_BUT_LINES = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/g;
 
 // The fenced blocks the renderer draws. `cube-chart` is a chart whose rows come from a query.
-export const FENCE = /```(chart|cube-chart|row|mermaid)[ \t]*\n([\s\S]*?)```/g;
+const FENCE = /```(chart|cube-chart|row|mermaid)[ \t]*\n([\s\S]*?)```/g;
 
 const len = (s) => [...s].length;
 const widthOf = (runs) => runs.reduce((n, [t]) => n + len(t), 0);
@@ -27,7 +28,7 @@ function number(v) {
   const text = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dec && dec !== '0' ? `.${dec}` : '');
   return v < 0 ? `-${text}` : text;
 }
-export const fmt = (v, format) => (format === 'currency' ? (v < 0 ? `-$${number(-v)}` : `$${number(v)}`) : format === 'percent' ? `${number(v)}%` : number(v));
+const fmt = (v, format) => (format === 'currency' ? (v < 0 ? `-$${number(-v)}` : `$${number(v)}`) : format === 'percent' ? `${number(v)}%` : number(v));
 const signed = (v, format) => `${v > 0 ? '+' : ''}${fmt(v, format)}`;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -39,10 +40,12 @@ function formatX(v, xFormat) {
   return `${m[2]}-${m[3]} ${m[4] ?? '00'}:${m[5] ?? '00'}`;
 }
 
-// Dex's chart block: `x`, `y` and `series` name keys of the `data` rows.
-export function toSeries(spec) {
+// The chat's chart block: `x`, `y` and `series` name keys of the `data` rows.
+function toSeries(spec) {
   const { x, y, data } = spec;
-  if (!Array.isArray(data) || !x || !y) throw new Error('A chart needs "x", "y" and "data" rows');
+  if (!Array.isArray(data) || data.length === 0 || !x || !y) throw new Error('A chart needs "x", "y" and at least one "data" row');
+  const bad = data.find((r) => !Number.isFinite(Number(r?.[y] ?? 0)));
+  if (bad) throw new Error(`A chart value must be a number: "${y}" is ${JSON.stringify(bad[y])}`);
   const xs = [...new Set(data.map((r) => String(r[x])))];
   const names = spec.series ? [...new Set(data.map((r) => String(r[spec.series])))] : [spec.yName ?? y];
   const value = (xv, name) => Number(data.find((r) => String(r[x]) === xv && (!spec.series || String(r[spec.series]) === name))?.[y] ?? 0);
@@ -50,7 +53,7 @@ export function toSeries(spec) {
 }
 
 const blocks = (v, max, width) => {
-  const eighths = Math.round((v / (max || 1)) * width * 8);
+  const eighths = Math.round(Math.min(1, v / (max || 1)) * width * 8);
   return '█'.repeat(Math.floor(eighths / 8)) + EIGHTHS[eighths % 8];
 };
 const shade = (light, deep, k) =>
@@ -63,19 +66,21 @@ function barLines({ labels, series }, spec, room) {
   const values = series.flatMap((s) => s.data);
   const valueW = Math.max(...values.map((v) => len(fmt(v, spec.yFormat))));
   const single = series.length === 1;
-  const barW = Math.max(8, Math.min(46, room - labelW - valueW - (single ? 8 : 3)));
+  // A share of a signed total reads as nonsense (-100%, 200%), so signed rows show none.
+  const shares = single && values.every((v) => v >= 0);
+  const barW = Math.max(8, Math.min(46, room - labelW - valueW - (shares ? 8 : 3)));
   const totals = series.map((s) => sum(s.data));
-  const max = spec.type === 'pie' ? totals[0] : Math.max(...values.map(Math.abs));
+  const max = Math.max(...values.map(Math.abs));
   const lines = [];
   labels.forEach((label, i) =>
     series.forEach((s, j) => {
       const v = s.data[i];
       const line = [
         [`${(j === 0 ? label : '').padStart(labelW)} `, MUTED],
-        [blocks(Math.abs(v), max, barW).padEnd(barW), PALETTE[(single ? i : j) % PALETTE.length]],
+        [blocks(Math.abs(v), spec.type === 'pie' ? totals[j] : max, barW).padEnd(barW), PALETTE[(single ? i : j) % PALETTE.length]],
         [` ${fmt(v, spec.yFormat).padStart(valueW)}`],
       ];
-      if (single) line.push([`  ${String(Math.round((v / (totals[0] || 1)) * 100)).padStart(3)}%`, FAINT]);
+      if (shares) line.push([`  ${String(Math.round((v / (totals[0] || 1)) * 100)).padStart(3)}%`, FAINT]);
       lines.push(line);
     }),
   );
@@ -119,9 +124,9 @@ function columnsOf(levels, height, w, gap) {
 function columnLines({ labels, series }, spec, room) {
   const data = series[0].data;
   const height = spec.height ?? 4;
-  const max = Math.max(...data);
+  const max = Math.max(...data.map(Math.abs));
   const w = Math.min(Math.max(3, ...labels.map(len), ...data.map((v) => len(fmt(v, spec.yFormat)))), Math.max(3, Math.floor(room / data.length) - 1));
-  const levels = data.map((v) => Math.max(1, Math.round((v / (max || 1)) * height * 8)));
+  const levels = data.map((v) => Math.max(1, Math.round((Math.abs(v) / (max || 1)) * height * 8)));
   const bars = columnsOf(levels, height, w, ' ').map((cells) => cells.map(([t], i) => [t, PALETTE[i % PALETTE.length]]));
   return [
     [[data.map((v) => cut(fmt(v, spec.yFormat), w).padStart(w)).join(' ')]],
@@ -154,7 +159,7 @@ function lineLines({ labels, series }, spec, room) {
 }
 
 // A table block: numbers right-aligned, and a bold total row unless `total` is false.
-export function tableBlock({ title, columns, rows, total, format }) {
+function tableBlock({ title, columns, rows, total, format }) {
   const numeric = columns.map((_, i) => rows.length > 0 && rows.every((r) => typeof r[i] === 'number'));
   const sums = columns.map((_, i) => (numeric[i] ? sum(rows.map((r) => r[i])) : null));
   const withTotal = total !== false && sums.some((v) => v !== null);
@@ -180,6 +185,7 @@ const asTable = (spec, { labels, series }) =>
 // The blocks one chart spec draws: the chart, and its table beside it when `table` is set.
 function chartBlocks(spec, room) {
   if (!Array.isArray(spec.data)) throw new Error('This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first');
+  if (!TYPES.includes(spec.type ?? 'bar')) throw new Error(`Unknown chart type "${spec.type}" (types: ${TYPES.join(', ')})`);
   const parsed = toSeries(spec);
   parsed.labels = parsed.labels.map((l) => cut(l, LABEL_MAX));
   const inner = (spec.table ? Math.floor(room * 0.6) : room) - 4;
@@ -229,13 +235,15 @@ function layout(blocks, width) {
 
 // Draws one fenced block. Throws on a body it cannot read, so a caller can show the raw block.
 export function draw(kind, body, { width = 100 } = {}) {
-  if (kind === 'mermaid') return frame({ lines: drawDiagram(body, width - 4) });
-  const spec = JSON.parse(body);
+  if (kind === 'mermaid') return frame({ lines: drawDiagram(body.replace(CONTROL_BUT_LINES, ''), width - 4) });
+  const spec = JSON.parse(body, (_, v) => (typeof v === 'string' ? v.replace(CONTROL, '') : v));
   if (kind === 'row') {
-    const items = Array.isArray(spec) ? spec : spec.items;
+    const items = Array.isArray(spec) ? spec : spec?.items;
+    if (!Array.isArray(items) || items.length === 0) throw new Error('A row needs a non-empty array of items');
     const room = Math.floor(width / items.length) - 1;
     return layout(items.flatMap((item) => itemBlocks(item, room)), width);
   }
+  if (spec === null || typeof spec !== 'object' || Array.isArray(spec)) throw new Error('A chart is one JSON object');
   return layout(chartBlocks(spec, width), width);
 }
 

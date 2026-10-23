@@ -1,5 +1,4 @@
-// Draws a mermaid flowchart in box-drawing characters, each node tinted by its service family.
-// The layout is beautiful-mermaid's text renderer, vendored; this file only colors and fits it.
+// Colors the vendored mermaid text renderer's flowchart by service family, and fits it to the width.
 import { renderMermaidASCII } from '../vendor/mermaid-ascii.js';
 
 const BG = '#0F172A';
@@ -17,9 +16,8 @@ const LINE = /[─│├┤┬┴┼┌┐└┘╭╮╰╯]/;
 const tint = (hex, pct) =>
   '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * pct + parseInt(BG.slice(i, i + 2), 16) * (1 - pct)).toString(16).padStart(2, '0')).join('');
 
-// Dex's cloud diagrams draw icon nodes, `id@{ img: ".../aws/rds.svg", label: "…" }`. The text
-// renderer has no icons, so each becomes a labelled box and its icon name picks the color.
-export function fromIcons(src) {
+// The text renderer has no icons: each `id@{ img, label }` node becomes a labelled box, colored by its icon name.
+function fromIcons(src) {
   const icons = {};
   const text = src.replace(/(\w+)@\{([^}]*)\}/g, (_, id, attrs) => {
     icons[id] = (attrs.match(/img:\s*"[^"]*\/([\w-]+)\/([\w.-]+)\.svg"/) ?? []).slice(1).join(' ');
@@ -29,7 +27,7 @@ export function fromIcons(src) {
 }
 
 const NODE = /(\w+)\s*[[({]+"?([^"\])}]+?)"?[\])}]+(?::::(\w+))?/g;
-const EDGE = /(\w+)(?:\s*[[({]+[^\])}\n]*[\])}]+)?\s*(?:-{2,}|={2,}|-\.+-)>?\s*(?:\|"?([^|"]*)"?\|)?\s*(\w+)/g;
+const EDGE = /(\w+)(?:\s*[[({]+[^\])}\n]*[\])}]+)?\s*(?:-{2,}|={2,}|-\.+-)>?\s*(?:\|"?([^|"]*)"?\|)?\s*(?=(\w+))/g;
 
 function labelsOf(src) {
   const labels = {};
@@ -40,7 +38,10 @@ function labelsOf(src) {
   }
   for (const m of src.matchAll(/^\s*class\s+([\w,]+)\s+(\w+)/gm)) for (const id of m[1].split(',')) nodeClass[id] = m[2];
   const classes = {};
-  for (const m of src.matchAll(/classDef\s+(\w+)\s+([^\n]+)/g)) classes[m[1]] = (m[2].match(/(?:stroke|fill|color):\s*(#[0-9a-fA-F]{6})/) ?? [])[1];
+  for (const m of src.matchAll(/classDef\s+(\w+)\s+([^\n]+)/g)) {
+    const hex = m[2].match(/(?:stroke|fill|color):\s*#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/)?.[1];
+    if (hex) classes[m[1]] = `#${hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex}`;
+  }
   return { labels, hue: (id, hint = '') => classes[nodeClass[id]] ?? FAMILY.find(([re]) => re.test(`${labels[id] ?? ''} ${hint} ${id}`))?.[1] };
 }
 

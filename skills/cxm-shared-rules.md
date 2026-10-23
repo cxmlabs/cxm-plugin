@@ -36,4 +36,4 @@ Draw a picture when it shows the shape faster than text: a breakdown (bar), a tr
 - For a chart from a query, put the query in place of `data` and use the `cube-chart` kind: `{"type":"line","x":"<dataset>.<time>.month","y":"<dataset>.<measure>","query":{…}}`.
 - A diagram is a mermaid `flowchart LR` with `subgraph` groups and `-->|label|` edges. Name the service in each node label (`RDS`, `ECS`, `Key Vault`): the label sets the node's color.
 - **When your instructions say "CXM rich visuals are on"**, write the block in the reply as a fenced block of its kind (` ```chart `, ` ```cube-chart `, ` ```mermaid `). It is drawn in place.
-- **Otherwise**, run `cxm viz <chart|cube-chart|mermaid> '<body>'` (`-` reads stdin, for a multi-line diagram) and paste its output unchanged into the reply in a plain ` ``` ` block. Never paste the JSON or the mermaid source.
+- **Otherwise**, pass the block on stdin through a quoted heredoc, `cxm viz <chart|cube-chart|mermaid> - <<'EOF'` … `EOF`, never inline (a quote in a label breaks the shell), and paste its output unchanged into the reply in a plain ` ``` ` block. Never paste the JSON or the mermaid source.
