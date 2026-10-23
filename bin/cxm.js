@@ -34,6 +34,7 @@ const { reportOpportunity } = await import('../src/commands/report.js');
 const { context } = await import('../src/commands/wiki.js');
 const { scan } = await import('../src/commands/scan.js');
 const { resolve } = await import('../src/commands/resolve.js');
+const { viz } = await import('../src/commands/viz.js');
 
 // Written for an agent. A person runs `setup` and `login`. A skill runs the rest, so this names
 // each capability and its arguments. It does not teach a workflow.
@@ -65,6 +66,8 @@ Everything else
         [--savings-monthly + --current-monthly/--region/--resource-type/--description]
                                                 Record a finding in the platform
   api <METHOD> <path> [--body '<json>']         Call a REST endpoint the datasets do not cover
+  viz <chart|cube-chart|row|mermaid> '<body>' | <file> | - [--width n] [--color]
+                                                Draw one chart or diagram block as text
   --version, -v                                 Print the CLI version
 
 The datasets and the REST API are the interface. This command only carries your session.`;
@@ -92,6 +95,7 @@ const tree = {
   scan: (a) => scan(a),
   'report-opportunity': (a) => reportOpportunity(a),
   api: (a) => api(a),
+  viz: (a) => viz(a),
 };
 
 // Pre-rename names. Each one routes to the handler it always used, so old call sites still work.

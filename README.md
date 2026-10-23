@@ -162,6 +162,18 @@ cxm analytics schema <dataset>         # the fields of one dataset
 cxm analytics query '<cubejs-json>'    # the agent writes this
 ```
 
+## Charts and diagrams
+
+The agent draws a chart or an architecture diagram in the conversation when a picture answers
+faster than text: horizontal bars for a breakdown, a trend line, a change up and down, a
+flowchart of your services. Without a renderer in the reply, the agent prints the same drawing
+as text with `cxm viz`. To see it in color, run it yourself:
+
+```bash
+cxm viz chart '{"type":"bar","x":"service","y":"cost","yFormat":"currency","data":[{"service":"RDS","cost":1854},{"service":"ECS","cost":1573}]}' --color
+cxm viz mermaid diagram.mmd --color
+```
+
 ## How it works
 
 - **Auth**: OAuth 2.0 authorization-code + PKCE with a loopback redirect. The plugin sends the

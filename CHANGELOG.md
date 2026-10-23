@@ -6,6 +6,11 @@ fixes, including security fixes.
 
 ## Unreleased
 
+- Charts and diagrams: the agent draws bar, line, column, pie and diverging charts, with totals
+  and an optional table, and mermaid architecture diagrams colored by service family. It accepts
+  the chart and cloud-diagram blocks of the CloudExMachina chat. `cxm viz` prints one as text;
+  `--color` adds colors in a terminal.
+
 - `cxm install`: one command, `npx @cloudexmachina/cxm@latest install`, installs the plugin into
   Claude Code and Codex, signs in, and on a re-run updates to the latest version.
 - Releases run in CI: a `patch|minor|major` dispatch opens the version-bump PR; merging it tags,
