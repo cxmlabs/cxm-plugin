@@ -3,11 +3,12 @@
 // A session that never used CXM produces nothing: we do not observe the customer's other work.
 
 import { createHash } from 'node:crypto';
+import { splitReply } from './viz.js';
 
 // `cxm` sub-commands we may name. Anything else is reported as `other`, so an argument can never leak.
 const CXM_COMMANDS = new Set([
   'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'api',
-  'analytics query', 'analytics schema', 'cube', 'wiki',
+  'analytics query', 'analytics schema', 'cube', 'wiki', 'viz',
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
@@ -225,6 +226,8 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
       cxm_commands: count(cxmCalls.map((s) => s.cxm)),
       cxm_errors: cxmCalls.filter((s) => s.isError).length,
       cxm_slash_command: slashCxm,
+      // Blocks the main agent wrote for the reply renderer; `cxm_commands.viz` counts the text fallback.
+      viz_blocks: count([...generations.values()].filter((g) => !g.sidechain).flatMap((g) => splitReply(g.text.join('\n')).flatMap((p) => p.kind ?? []))),
       aws_cli_calls: count(spans.filter((s) => s.aws).map((s) => `${s.aws.service} ${s.aws.operation}`)),
       subagent_turns: [...generations.values()].filter((g) => g.sidechain).length,
       input_tokens: tokens.input,

@@ -110,6 +110,8 @@ test('cxm viz reads a file, stdin or an inline body after its flags, and --color
   const piped = cli(['chart', '-', '--color'], chart({ data: rows }));
   assert.equal(piped.status, 0, piped.stderr);
   assert.match(piped.stdout, /\x1b\[38;2;91;141;239m█+\x1b\[0m/);
+  const withData = '{"x":"a","y":"b","query":{},"data":[{"a":1,"b":2}]}';
+  assert.equal(cli(['cube-chart', withData, '--rows']).stdout, withData, 'a block with rows needs no query');
 });
 
 test('cxm viz names its kinds and refuses a bad width or a missing file', () => {

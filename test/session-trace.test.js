@@ -19,7 +19,7 @@ const session = [
   result('t2', 5, 'rows for arn:aws:ec2:secret'),
   assistant('m3', 6, [{ type: 'tool_use', id: 't3', name: 'Bash', input: { command: 'aws ce get-cost-and-usage --time-period X' } }]),
   result('t3', 7, 'AccessDenied', true),
-  assistant('m4', 8, [{ type: 'text', text: 'EC2 drives the bill.' }]),
+  assistant('m4', 8, [{ type: 'text', text: 'EC2 drives the bill.\n```chart\n{"x":"service"}\n```' }]),
   { type: 'cost-state', totalCostUSD: 0.12 },
 ];
 
@@ -34,6 +34,7 @@ test('a CXM session becomes one metadata-only trace with no content, arguments o
   assert.equal(trace.properties.tool_errors, 1);
   assert.equal(trace.properties.input_tokens, 40);
   assert.equal(trace.properties.session_cost_usd, 0.12);
+  assert.deepEqual(trace.properties.viz_blocks, { chart: 1 });
   assert.deepEqual(trace.properties.cxm_skills_used, ['cxm-cost-drivers']);
   assert.deepEqual(trace.properties.cxm_skills_available, ['plugin:cxm-cost-drivers', 'project:cxm-waste']);
   assert.deepEqual(trace.properties.cxm_install, ['plugin', 'project']);

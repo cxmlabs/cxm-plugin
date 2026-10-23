@@ -8,6 +8,7 @@
   "homepage": "https://cloudexmachina.io",
   "repository": "https://github.com/cxmlabs/cxm-plugin",
   "license": "FSL-1.1-ALv2",
+  "hooks": "./hooks/visuals.json",
   "keywords": [
     "finops",
     "cloud-cost",
