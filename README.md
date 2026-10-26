@@ -148,6 +148,7 @@ A pre-existing file there that CXM did not install makes setup fail rather than 
 | Cost hooks (marketplace) | `hooks/hooks.json` | `hooks/hooks.json` (trust required) |
 | Cost hooks (`cxm setup`) | `.claude/settings.json` | `.codex/hooks.json` (trust required) |
 | `cxm` binary | Same CLI and authenticated CXM data | Same CLI and authenticated CXM data |
+| Charts and diagrams | drawn in color in the reply (`hooks/visuals.js`) | plain text from `cxm viz` |
 
 ## The CLI is for the agent, not for you
 
@@ -166,8 +167,10 @@ cxm analytics query '<cubejs-json>'    # the agent writes this
 
 The agent draws a chart or an architecture diagram in the conversation when a picture answers
 faster than text: horizontal bars for a breakdown, a trend line, a change up and down, a
-flowchart of your services. Without a renderer in the reply, the agent prints the same drawing
-as text with `cxm viz`. To see it in color, run it yourself:
+flowchart of your services. In Claude Code the plugin draws it in color in the reply. Codex and older Claude Code versions get the same drawing as plain text,
+printed by `cxm viz`. To turn the in-reply drawing off, set *Draw charts and diagrams in the
+reply* to off in `/plugin configure cxm-agent-plugin@cxm-marketplace`. To see a drawing in color in a
+terminal, run `cxm viz` yourself:
 
 ```bash
 cxm viz chart '{"type":"bar","x":"service","y":"cost","yFormat":"currency","data":[{"service":"RDS","cost":1854},{"service":"ECS","cost":1573}]}' --color

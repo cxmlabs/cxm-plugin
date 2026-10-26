@@ -19,7 +19,7 @@ const session = [
   result('t2', 5, 'rows for arn:aws:ec2:secret'),
   assistant('m3', 6, [{ type: 'tool_use', id: 't3', name: 'Bash', input: { command: 'aws ce get-cost-and-usage --time-period X' } }]),
   result('t3', 7, 'AccessDenied', true),
-  assistant('m4', 8, [{ type: 'text', text: 'EC2 drives the bill.' }]),
+  assistant('m4', 8, [{ type: 'text', text: 'EC2 drives the bill.\n```chart\n{"x":"service"}\n```\n```chart\n{not json\n```\n```cube-chart\n{"query":{}}\n```\n```chart\n{"x":"s","y":"c","data":[{"s":"EC2","c":1}]}\n```' }]),
   { type: 'cost-state', totalCostUSD: 0.12 },
 ];
 
@@ -34,6 +34,11 @@ test('a CXM session becomes one metadata-only trace with no content, arguments o
   assert.equal(trace.properties.tool_errors, 1);
   assert.equal(trace.properties.input_tokens, 40);
   assert.equal(trace.properties.session_cost_usd, 0.12);
+  assert.deepEqual(trace.properties.viz_blocks, { chart: 3, 'cube-chart': 1 });
+  assert.deepEqual(trace.properties.viz_failed, { 'chart invalid': 1, 'chart unparseable': 1 }, 'a drawable chart and a queried one are not failures');
+  const subagent = { ...assistant('s1', 9, [{ type: 'text', text: '```mermaid\nflowchart LR\n```' }]), isSidechain: true };
+  const [withSubagent] = buildSessionTrace([...session, subagent], { sessionId: 'sess-1', reason: 'exit' });
+  assert.deepEqual(withSubagent.properties.viz_blocks, { chart: 3, 'cube-chart': 1 }, 'a block a subagent wrote is not in the reply');
   assert.deepEqual(trace.properties.cxm_skills_used, ['cxm-cost-drivers']);
   assert.deepEqual(trace.properties.cxm_skills_available, ['plugin:cxm-cost-drivers', 'project:cxm-waste']);
   assert.deepEqual(trace.properties.cxm_install, ['plugin', 'project']);
@@ -63,6 +68,8 @@ test('full mode shares content, redacted and truncated', () => {
 test('command names come from an allowlist, never from arguments', () => {
   assert.equal(cxmCommand('cxm analytics schema costs'), 'analytics schema');
   assert.equal(cxmCommand('node /p/bin/cxm.js price --service ec2'), 'price');
+  assert.equal(cxmCommand("cxm viz chart '{}'"), 'viz chart');
+  assert.equal(cxmCommand('cxm viz foo'), 'viz');
   assert.equal(cxmCommand('cxm my-secret-thing'), 'other');
   assert.equal(cxmCommand('echo cxmfoo'), null);
   assert.deepEqual(awsCall('AWS_PROFILE=x aws ec2 describe-instances --filters y'), { service: 'ec2', operation: 'describe-instances' });

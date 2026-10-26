@@ -106,3 +106,10 @@ separate private `cxm-plugin-benchmark` repository.
   ship goes in `skills/`, which both harnesses load from.
 
 <!-- /bmad:context -->
+
+## Claude-only reply renderer
+
+`hooks/visuals.js` is a Claude Code hooks module, named from `.claude-plugin/plugin.json` through
+`hooks/visuals.json`. Codex reads `hooks/hooks.json` only, so keep command hooks there and keep
+`modules` out of it. `claude plugin test .` runs `hooks/visuals.test.tsx`; CI has no `claude`, so
+run it before you push a change to the module or to `src/lib/viz.js`.

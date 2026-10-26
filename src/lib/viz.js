@@ -16,6 +16,13 @@ const CONTROL_BUT_LINES = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e
 // The fenced blocks the renderer draws. `cube-chart` is a chart whose rows come from a query.
 const FENCE = /```(chart|cube-chart|row|mermaid)[ \t]*\n([\s\S]*?)```/g;
 
+// True for a chart that names a query and holds no rows yet. Throws on a body that does not parse.
+export function needsRows(kind, body) {
+  if (kind !== 'chart' && kind !== 'cube-chart') return false;
+  const spec = parseBlock(body);
+  return Boolean(spec?.query) && !spec.data;
+}
+
 const len = (s) => [...s].length;
 const widthOf = (runs) => runs.reduce((n, [t]) => n + len(t), 0);
 const padEnd = (runs, w) => (widthOf(runs) < w ? [...runs, [' '.repeat(w - widthOf(runs))]] : runs);
@@ -245,7 +252,7 @@ export function parseBlock(body, reviver) {
   try {
     return JSON.parse(body, reviver);
   } catch {
-    throw new Error('This block is not valid JSON');
+    throw new SyntaxError('This block is not valid JSON');
   }
 }
 

@@ -34,7 +34,11 @@ skill, a `cxm` command or `/cxm`). When the session ends, the plugin reads the s
   whether it failed, and its latency;
 - for the session: its duration, turn count, total tokens and the cost the agent reported;
 - which CXM skills the agent could see, which it loaded, and which it used (a `cxm` command succeeded
-  after loading it). Only CXM skills are named; your other skills are never listed.
+  after loading it). Only CXM skills are named; your other skills are never listed;
+- how many chart and diagram blocks the agent wrote, per kind (`chart`, `cube-chart`, `row`,
+  `mermaid`), never their content;
+- how many blocks could not be drawn as written, with a fixed reason (`unparseable` or `invalid`).
+  A chart query that fails when the reply is drawn is not counted.
 
 By default the session trace contains **no content**: no prompt, no answer, no file path or file
 content, no command argument, no query, no tool output, no resource id. Sessions that did not use CXM

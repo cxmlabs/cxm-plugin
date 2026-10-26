@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { draw, plain, splitReply } from '../src/lib/viz.js';
+import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
 const runs = (lines) => lines.flat();
@@ -117,6 +117,9 @@ test('a label inside a longer label colors only its own box', () => {
 test('the reply splits into text and the blocks it draws', () => {
   const parts = splitReply('Top cost:\n```chart\n{}\n```\nDone.\n```js\nx\n```\n```row\n[]\n```\n```cube-chart\n{}\n```');
   assert.deepEqual(parts.map((p) => p.kind ?? 'text'), ['text', 'chart', 'text', 'row', 'text', 'cube-chart']);
+  assert.equal(needsRows('cube-chart', '{"query":{"filters":[{"values":["data"]}]}}'), true);
+  assert.equal(needsRows('chart', '{"query":{},"data":[]}'), false);
+  assert.equal(needsRows('mermaid', 'flowchart LR'), false);
 });
 
 const cli = (args, input) => spawnSync(process.execPath, ['bin/cxm.js', 'viz', ...args], { encoding: 'utf8', input, env: { ...process.env, CXM_TELEMETRY: '0' } });
@@ -128,6 +131,8 @@ test('cxm viz reads a file, stdin or an inline body after its flags, and --color
   const piped = cli(['chart', '-', '--color'], chart({ data: rows }));
   assert.equal(piped.status, 0, piped.stderr);
   assert.match(piped.stdout, /\x1b\[38;2;91;141;239m█+\x1b\[0m/);
+  const withData = '{"x":"a","y":"b","query":{},"data":[{"a":1,"b":2}]}';
+  assert.equal(cli(['cube-chart', '-', '--rows'], withData).stdout, withData, 'a block with rows needs no query');
 });
 
 test('cxm viz names its kinds and refuses a bad width or a missing file', () => {

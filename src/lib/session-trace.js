@@ -3,11 +3,12 @@
 // A session that never used CXM produces nothing: we do not observe the customer's other work.
 
 import { createHash } from 'node:crypto';
+import { draw, needsRows, splitReply } from './viz.js';
 
 // `cxm` sub-commands we may name. Anything else is reported as `other`, so an argument can never leak.
 const CXM_COMMANDS = new Set([
   'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'api',
-  'analytics query', 'analytics schema', 'cube', 'wiki',
+  'analytics query', 'analytics schema', 'cube', 'wiki', 'viz', 'viz chart', 'viz cube-chart', 'viz row', 'viz mermaid',
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
@@ -16,6 +17,16 @@ const MAX_EVENTS = 400;
 const MAX_CHARS = 4000;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const SECRET = /\b(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|phc_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b|((?:secret|token|password|passwd|api[_-]?key)["'\s:=]+)[^\s"',}]{8,}/gi;
+
+// Why a block would show as source, not drawn: its kind and a fixed reason, never its content.
+function drawFailure({ kind, body }) {
+  try {
+    if (!needsRows(kind, body)) draw(kind, body);
+    return null;
+  } catch (err) {
+    return `${kind} ${err instanceof SyntaxError ? 'unparseable' : 'invalid'}`;
+  }
+}
 
 export const hashId = (value) => createHash('sha256').update(String(value)).digest('hex').slice(0, 32);
 
@@ -200,6 +211,7 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
   const truncated = children.length > MAX_EVENTS;
   const firstAt = lines.find((l) => l.timestamp)?.timestamp;
 
+  const blocks = [...generations.values()].filter((g) => !g.sidechain).flatMap((g) => splitReply(g.text.join('\n')).filter((p) => p.kind));
   const trace = {
     event: '$ai_trace',
     timestamp: lastAt,
@@ -225,6 +237,9 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
       cxm_commands: count(cxmCalls.map((s) => s.cxm)),
       cxm_errors: cxmCalls.filter((s) => s.isError).length,
       cxm_slash_command: slashCxm,
+      // Blocks the main agent wrote for the reply renderer; `cxm_commands['viz <kind>']` counts the text fallback.
+      viz_blocks: count(blocks.map((p) => p.kind)),
+      viz_failed: count(blocks.map(drawFailure).filter(Boolean)),
       aws_cli_calls: count(spans.filter((s) => s.aws).map((s) => `${s.aws.service} ${s.aws.operation}`)),
       subagent_turns: [...generations.values()].filter((g) => g.sidechain).length,
       input_tokens: tokens.input,
