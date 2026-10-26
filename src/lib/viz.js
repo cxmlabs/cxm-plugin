@@ -9,7 +9,7 @@ const EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
 const LOWER = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const LABEL_MAX = 24;
 const TYPES = ['bar', 'line', 'column', 'pie'];
-// Labels come from cloud data; a control character in one would drive the terminal that prints it.
+// Labels come from cloud data; a control character in one would send a command to the terminal that prints it.
 const CONTROL = /[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 const CONTROL_BUT_LINES = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 
@@ -49,7 +49,7 @@ function toSeries(spec) {
   if (bad !== undefined) throw new Error(`A chart row needs a number in "${y}" (row ${data.indexOf(bad) + 1})`);
   const keys = data.map((r) => `${r[x]}\u0000${spec.series ? r[spec.series] : ''}`);
   const twice = keys.findIndex((k, i) => keys.indexOf(k) !== i);
-  if (twice !== -1) throw new Error(`A chart has two rows for "${data[twice][x]}"; give one row per "${x}"${spec.series ? ` and "${spec.series}"` : ''}`);
+  if (twice !== -1) throw new Error(`A chart has two rows for one "${x}" (row ${twice + 1}); give one row per "${x}"${spec.series ? ` and "${spec.series}"` : ''}`);
   const xs = [...new Set(data.map((r) => String(r[x])))];
   const names = spec.series ? [...new Set(data.map((r) => String(r[spec.series])))] : [spec.yName ?? y];
   const value = (xv, name) => Number(data.find((r) => String(r[x]) === xv && (!spec.series || String(r[spec.series]) === name))?.[y] ?? 0);
@@ -90,7 +90,7 @@ function barLines({ labels, series }, spec, room) {
   );
   lines.push([]);
   if (single) lines.push([[`${' '.repeat(labelW)} ${spec.totalLabel} ${fmt(totals[0], spec.yFormat)}`, FAINT]]);
-  else lines.push(series.flatMap((s, j) => [['■ ', PALETTE[j % PALETTE.length]], [`${s.name} ${fmt(totals[j], spec.yFormat)}  `, FAINT]]));
+  else lines.push([...series.flatMap((s, j) => [['■ ', PALETTE[j % PALETTE.length]], [`${s.name} ${fmt(totals[j], spec.yFormat)}  `, FAINT]]), [spec.top ? `of top ${spec.top}` : '', FAINT]]);
   return lines;
 }
 
@@ -114,7 +114,7 @@ function divergingLines({ labels, series }, spec, room) {
       [` ${signed(v, spec.yFormat).padStart(valueW)}`, color],
     ];
   });
-  return [...lines, [], [[`net ${signed(sum(data), spec.yFormat)}`, FAINT]]];
+  return [...lines, [], [[`net${spec.top ? ` of top ${spec.top}` : ''} ${signed(sum(data), spec.yFormat)}`, FAINT]]];
 }
 
 function columnsOf(levels, height, w, gap) {
@@ -184,15 +184,15 @@ function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' 
 }
 
 const asTable = (spec, { labels, series }) =>
-  tableBlock({ title: 'Values', columns: ['', ...series.map((s) => s.name)], rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]), format: spec.yFormat, totalLabel: spec.totalLabel.replace('t', 'T') });
+  tableBlock({ title: 'Values', columns: ['', ...series.map((s) => s.name)], rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]), format: spec.yFormat, totalLabel: `T${spec.totalLabel.slice(1)}` });
 
 // The blocks one chart spec draws: the chart, and its table beside it when `table` is set.
 function chartBlocks(spec, room) {
   if (!Array.isArray(spec.data)) throw new Error('This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first');
   if (!TYPES.includes(spec.type ?? 'bar')) throw new Error(`Unknown chart type "${spec.type}" (types: ${TYPES.join(', ')})`);
   // A query that hit its limit returned the top rows only, so their sum is not the whole.
-  const partial = spec.query?.limit && spec.data.length >= spec.query.limit;
-  spec = { ...spec, totalLabel: partial ? `total of top ${spec.data.length}` : 'total' };
+  const top = spec.query?.limit && spec.data.length >= spec.query.limit ? spec.data.length : 0;
+  spec = { ...spec, top, totalLabel: top ? `total of top ${top}` : 'total' };
   const parsed = toSeries(spec);
   parsed.labels = parsed.labels.map((l) => cut(l, LABEL_MAX));
   const inner = (spec.table ? Math.floor(room * 0.6) : room) - 4;
@@ -240,10 +240,26 @@ function layout(blocks, width) {
   return Array.from({ length: height }, (_, r) => even.flatMap((f, i) => [...(i ? [[' ']] : []), ...f[r]]));
 }
 
+// JSON.parse with a message that never quotes the body.
+export function parseBlock(body, reviver) {
+  try {
+    return JSON.parse(body, reviver);
+  } catch {
+    throw new Error('This block is not valid JSON');
+  }
+}
+
 // Draws one fenced block. Throws on a body it cannot read, so a caller can show the raw block.
 export function draw(kind, body, { width = 100 } = {}) {
-  if (kind === 'mermaid') return frame({ lines: drawDiagram(body.replace(CONTROL_BUT_LINES, ''), width - 4) });
-  const spec = JSON.parse(body, (_, v) => (typeof v === 'string' ? v.replace(CONTROL, (c) => (/\s/.test(c) ? ' ' : '')) : v));
+  // The parser messages quote the body, and the CLI sends an error message with usage analytics.
+  if (kind === 'mermaid') {
+    try {
+      return frame({ lines: drawDiagram(body.replace(CONTROL_BUT_LINES, ''), width - 4) });
+    } catch {
+      throw new Error('This mermaid block cannot be drawn: check its first line (e.g. "flowchart LR") and its syntax');
+    }
+  }
+  const spec = parseBlock(body, (_, v) => (typeof v === 'string' ? v.replace(CONTROL, (c) => (/\s/.test(c) ? ' ' : '')) : v));
   if (kind === 'row') {
     const items = Array.isArray(spec) ? spec : spec?.items;
     if (!Array.isArray(items) || items.length === 0) throw new Error('A row needs a non-empty array of items');

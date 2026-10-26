@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { requireSession } from '../lib/config.js';
 import { cubeLoad } from '../lib/http.js';
-import { ansi, draw, plain } from '../lib/viz.js';
+import { ansi, draw, parseBlock, plain } from '../lib/viz.js';
 
 const KINDS = ['chart', 'cube-chart', 'row', 'mermaid'];
 
@@ -21,7 +21,7 @@ function readInput(arg) {
 // A cube-chart names a query instead of rows; run it once, then draw it as a chart.
 async function withRows(kind, body) {
   if (kind !== 'chart' && kind !== 'cube-chart') return body;
-  const spec = JSON.parse(body);
+  const spec = parseBlock(body);
   if (!spec?.query || spec.data) return body;
   const data = await cubeLoad(await requireSession(), spec.query);
   return JSON.stringify({ ...spec, data });
