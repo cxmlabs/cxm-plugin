@@ -66,6 +66,14 @@ function findBox(grid, r, c, width) {
   return null;
 }
 
+// Where `label` fills a box row on its own, so `API` never matches inside `API Gateway`.
+function labelAt(line, label) {
+  for (let c = line.indexOf(label); c >= 0; c = line.indexOf(label, c + 1)) {
+    if (/[│├┤┼]$/.test(line.slice(0, c).trimEnd()) && /^[│├┤┼]/.test(line.slice(c + label.length).trimStart())) return c;
+  }
+  return -1;
+}
+
 function colorGrid(text, src, icons) {
   const grid = text.split('\n').map((l) => [...l]);
   const fg = grid.map((row) => row.map((ch) => (ARROW.test(ch) ? '#5B8DEF' : LINE.test(ch) ? '#475569' : '#E2E8F0')));
@@ -79,7 +87,7 @@ function colorGrid(text, src, icons) {
     if (!color) continue;
     const group = groups.has(id);
     for (let r = 0; r < grid.length; r++) {
-      const c = grid[r].join('').indexOf(label);
+      const c = labelAt(grid[r].join(''), label);
       const box = c < 0 ? null : findBox(grid, r, c, label.length);
       if (!box) continue;
       const { top, bot, L, R } = box;

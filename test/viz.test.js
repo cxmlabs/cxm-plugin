@@ -63,6 +63,13 @@ test('pie, column and line charts draw their shape and their figures', () => {
   assert.match(line, /max 9[\s\S]*min 5[\s\S]*now 9 · total 14[\s\S]*Jan 2026 → Feb 2026/);
 });
 
+test('a query that hit its limit labels its total as the top rows only', () => {
+  const text = plain(draw('chart', chart({ table: true, query: { limit: 2 }, data: rows })));
+  assert.match(text, /total of top 2 40/);
+  assert.match(text, /Total of top 2 +40/);
+  assert.match(plain(draw('chart', chart({ query: { limit: 5 }, data: rows }))), /^│ +total 40/m);
+});
+
 test('signed rows show no share, and a negative column stands as tall as its size', () => {
   const bar = plain(draw('chart', chart({ data: [{ k: 'a', v: -5 }, { k: 'b', v: 10 }] })));
   assert.doesNotMatch(bar, /%/);
@@ -95,6 +102,11 @@ test('a diagram takes a classDef color in short hex, and its edge list keeps eve
   const list = plain(draw('mermaid', 'flowchart LR\n  A[Users of the shop] --> B[Orders API of the shop] --> C[(Orders database of the shop)]', { width: 20 }));
   assert.match(list, /Users of the shop → Orders API of the shop/);
   assert.match(list, /Orders API of the shop → Orders database of the shop/);
+});
+
+test('a label inside a longer label colors only its own box', () => {
+  const lines = draw('mermaid', 'flowchart LR\n  G[API Gateway] --> A[API]', { width: 120 });
+  assert.notEqual(runOf(lines, 'API Gateway')[2], runs(lines).find(([t]) => t === 'API')[2]);
 });
 
 test('the reply splits into text and the blocks it draws', () => {
