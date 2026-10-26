@@ -21,6 +21,7 @@ function readInput(arg) {
 // A cube-chart names a query instead of rows; run it once, then draw it as a chart.
 async function withRows(kind, body) {
   if (!needsRows(kind, body)) return body;
+  // needsRows already parsed the body, so this parse cannot fail.
   const spec = JSON.parse(body);
   const data = await cubeLoad(await requireSession(), spec.query);
   return JSON.stringify({ ...spec, data });
