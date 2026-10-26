@@ -167,8 +167,7 @@ cxm analytics query '<cubejs-json>'    # the agent writes this
 
 The agent draws a chart or an architecture diagram in the conversation when a picture answers
 faster than text: horizontal bars for a breakdown, a trend line, a change up and down, a
-flowchart of your services. In Claude Code the plugin draws it in color in the reply, with no
-setting to change. Codex and older Claude Code versions get the same drawing as plain text,
+flowchart of your services. In Claude Code the plugin draws it in color in the reply. Codex and older Claude Code versions get the same drawing as plain text,
 printed by `cxm viz`. To turn the in-reply drawing off, set *Draw charts and diagrams in the
 reply* to off in `/plugin configure cxm-agent-plugin@cxm-marketplace`. To see a drawing in color in a
 terminal, run `cxm viz` yourself:

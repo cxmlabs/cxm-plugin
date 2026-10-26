@@ -51,7 +51,8 @@ export const register = (on, options) => {
   });
 
   on('ui.render', { component: 'AssistantMessage' }, ($, e, next) => {
-    const parts = splitReply(e.props.text);
+    // A message with no text yet renders as Claude Code draws it.
+    const parts = splitReply(typeof e.props?.text === 'string' ? e.props.text : '');
     if (!parts.some((p) => p.kind)) return next(e);
     const t = $.ui.resolve(e);
     const width = (e.viewport?.columns ?? 100) - 4;
