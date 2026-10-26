@@ -189,7 +189,7 @@ const asTable = (spec, { labels, series }) =>
 // The blocks one chart spec draws: the chart, and its table beside it when `table` is set.
 function chartBlocks(spec, room) {
   if (!Array.isArray(spec.data)) throw new Error('This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first');
-  if (!TYPES.includes(spec.type ?? 'bar')) throw new Error(`Unknown chart type "${spec.type}" (types: ${TYPES.join(', ')})`);
+  if (!TYPES.includes(spec.type ?? 'bar')) throw new Error(`Unknown chart type (types: ${TYPES.join(', ')})`);
   // A query that hit its limit returned the top rows only, so their sum is not the whole.
   const top = spec.query?.limit && spec.data.length >= spec.query.limit ? spec.data.length : 0;
   spec = { ...spec, top, totalLabel: top ? `total of top ${top}` : 'total' };

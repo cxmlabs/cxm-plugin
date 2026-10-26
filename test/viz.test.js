@@ -95,7 +95,7 @@ test('a row draws its blocks side by side, and stacks them when they do not fit'
 test('a chart refuses no rows, a value that is not a number, and an unknown type, and drops control characters', () => {
   assert.throws(() => draw('chart', chart({ data: [] })), /at least one "data" row/);
   assert.throws(() => draw('chart', chart({ data: [{ k: 'a', v: 'n/a' }] })), /needs a number in "v" \(row 1\)/);
-  assert.throws(() => draw('chart', chart({ type: 'scatter', data: rows })), /Unknown chart type "scatter"/);
+  assert.throws(() => draw('chart', chart({ type: 'scatter', data: rows })), /Unknown chart type \(types:/);
   const text = plain(draw('chart', chart({ title: 'x\u001b]0;owned\u0007', data: [{ k: 'a\u001b[2J', v: 1 }] })));
   assert.doesNotMatch(text, /[\u0000-\u0009\u000b-\u001f]/);
   assert.doesNotMatch(plain(draw('mermaid', 'flowchart LR\n  A[a\u001b[2J] --> B')), /\u001b/);
@@ -141,7 +141,12 @@ test('cxm viz names its kinds and refuses a bad width or a missing file', () => 
 
 test('a chart refuses a repeated key and never echoes a row in its error', () => {
   assert.throws(() => draw('chart', chart({ data: [{ s: 'RDS', c: 100 }, { s: 'RDS', c: 50 }, { s: 'ECS', c: 10 }] , x: 's', y: 'c' })), (err) => /two rows for one "s" \(row 2\)/.test(err.message) && !/RDS/.test(err.message));
-  assert.throws(() => draw('chart', '{"prod-payments-db'), (err) => /not valid JSON/.test(err.message) && !/prod/.test(err.message));
+  assert.throws(() => draw('chart', 'prod-payments-db'), (err) => /not valid JSON/.test(err.message) && !/prod/.test(err.message));
+  assert.throws(() => draw('chart', chart({ type: 'prod-payments-db', data: [{ k: 'a', v: 1 }] })), (err) => /Unknown chart type/.test(err.message) && !/prod/.test(err.message));
+  const cli = spawnSync(process.execPath, ['bin/cxm.js', 'viz', 'cube-chart', 'prod-payments-db'], { encoding: 'utf8', env: { ...process.env, CXM_TELEMETRY: '0' } });
+  assert.equal(cli.status, 1);
+  assert.match(cli.stderr, /not valid JSON/);
+  assert.doesNotMatch(cli.stderr, /prod/);
   assert.throws(() => draw('mermaid', 'graph prod-payments-db'), (err) => /cannot be drawn/.test(err.message) && !/prod/.test(err.message));
   assert.throws(() => draw('chart', chart({ x: 'k', y: 'v', data: [{ k: 'a', v: 'private-label' }] })), (err) => /row 1/.test(err.message) && !/private-label/.test(err.message));
 });
