@@ -10,7 +10,8 @@ fixes, including security fixes.
   and an optional table, and mermaid architecture diagrams colored by service family. It accepts
   the chart and cloud-diagram blocks of the CloudExMachina chat. `cxm viz` prints one as text;
   `--color` adds colors in a terminal. In Claude Code the plugin draws the blocks in color in the
-  reply; a `cube-chart` block runs its query with your session first.
+  reply; a `cube-chart` block runs its query with your session first. The `rich_visuals` setting
+  turns the in-reply drawing off.
 
 - `cxm install`: one command, `npx @cloudexmachina/cxm@latest install`, installs the plugin into
   Claude Code and Codex, signs in, and on a re-run updates to the latest version.

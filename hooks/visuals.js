@@ -42,7 +42,9 @@ function block($, t, part, width) {
   );
 }
 
-export const register = (on) => {
+export const register = (on, options) => {
+  // Off: no section, so the agent prints with `cxm viz`, and blocks show as written.
+  if (options.rich_visuals === false) return;
   on('prompt.compose', async ($, e, next) => {
     const result = await next(e);
     return e.surfaces.length ? { sections: [...result.sections, SECTION] } : result;

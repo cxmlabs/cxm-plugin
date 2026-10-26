@@ -9,6 +9,14 @@
   "repository": "https://github.com/cxmlabs/cxm-plugin",
   "license": "FSL-1.1-ALv2",
   "hooks": "./hooks/visuals.json",
+  "userConfig": {
+    "rich_visuals": {
+      "type": "boolean",
+      "title": "Draw charts and diagrams in the reply",
+      "description": "Draw chart and diagram blocks in color in the reply. Off: the agent prints them as plain text with cxm viz.",
+      "default": true
+    }
+  },
   "keywords": [
     "finops",
     "cloud-cost",

@@ -53,3 +53,15 @@ test('the system prompt tells the agent the visuals are on where a surface draws
   const headless = await $.prompt.compose({ ...facts, surfaces: [] })
   expect(headless.sections.map((s) => s.id)).toEqual(['intro'])
 })
+
+test('with rich_visuals off, a chart block shows as written and the agent is not told visuals are on', { options: { rich_visuals: false } }, async ($, on) => {
+  on('ui.render', { component: 'AssistantMessage' }, ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine: {e.props.text}</Text>
+  })
+  on('prompt.compose', () => ({ sections: [{ id: 'intro', text: 'engine', scope: 'shared' as const }] }))
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props('```chart\n' + CHART + '\n```') })
+  expect(await ui.find({ type: 'Text', text: /^engine: ```chart/ })).toBeDefined()
+  const facts = { model: 'claude-opus-5-5', promptModel: 'claude-opus-5-5', tools: [], outputStyle: null, traits: [], sections: [], surfaces: ['terminal'] as const }
+  expect((await $.prompt.compose(facts)).sections.map((s) => s.id)).toEqual(['intro'])
+})
