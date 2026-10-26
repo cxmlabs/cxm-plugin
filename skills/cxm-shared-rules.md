@@ -29,7 +29,8 @@ measures, dimensions and segments. You write the query. No example in a skill is
 
 Draw a picture when it shows the shape faster than text: a breakdown (bar), a trend (line, or
 `column` for a few periods), a change up and down (bar with `"diverging": true`), an architecture
-(mermaid `flowchart`). One picture per answer at most. Keep the one-line answer above it.
+(mermaid `flowchart`). One picture per answer at most. Keep the one-line answer above it. Draw only in
+the chat answer: never in a ticket, a finding report, a file or a command argument.
 
 - A chart block is single-line JSON: `{"type":"bar|line|column|pie","title":"…","x":"<key>","y":"<key>","yName":"…","series":"<key>","yFormat":"currency|number|percent","xFormat":"month|date","table":true,"data":[{…}]}`.
   `x`, `y` and `series` name keys of the `data` rows. `title` and `yName` are plain words, never a dataset field. `"table": true` puts the values beside the chart; then do not repeat them in a markdown table.

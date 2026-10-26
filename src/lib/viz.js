@@ -89,7 +89,7 @@ function barLines({ labels, series }, spec, room) {
     }),
   );
   lines.push([]);
-  if (single) lines.push([[`${' '.repeat(labelW)} total ${fmt(totals[0], spec.yFormat)}`, FAINT]]);
+  if (single) lines.push([[`${' '.repeat(labelW)} ${spec.totalLabel} ${fmt(totals[0], spec.yFormat)}`, FAINT]]);
   else lines.push(series.flatMap((s, j) => [['■ ', PALETTE[j % PALETTE.length]], [`${s.name} ${fmt(totals[j], spec.yFormat)}  `, FAINT]]));
   return lines;
 }
@@ -137,7 +137,7 @@ function columnLines({ labels, series }, spec, room) {
     ...bars,
     [[labels.map((x) => cut(x, w).padStart(w)).join(' '), MUTED]],
     [],
-    [[`total ${fmt(sum(data), spec.yFormat)}`, FAINT]],
+    [[`${spec.totalLabel} ${fmt(sum(data), spec.yFormat)}`, FAINT]],
   ];
 }
 
@@ -156,19 +156,19 @@ function lineLines({ labels, series }, spec, room) {
       const note = r === 0 ? `  max ${fmt(Math.max(...s.data), spec.yFormat)}` : r === height - 1 ? `  min ${fmt(Math.min(...s.data), spec.yFormat)}` : '';
       lines.push([[`${(r === Math.floor(height / 2) ? s.name : '').padStart(nameW)} `, MUTED], [cells.map(([t]) => t).join(''), PALETTE[i % PALETTE.length]], [note, FAINT]]);
     });
-    lines.push([[`${' '.repeat(nameW)} now ${fmt(s.data.at(-1), spec.yFormat)} · total ${fmt(sum(s.data), spec.yFormat)}`, FAINT]]);
+    lines.push([[`${' '.repeat(nameW)} now ${fmt(s.data.at(-1), spec.yFormat)} · ${spec.totalLabel} ${fmt(sum(s.data), spec.yFormat)}`, FAINT]]);
   });
   lines.push([[`${' '.repeat(nameW)} ${labels[0]} → ${labels.at(-1)}`, FAINT]]);
   return lines;
 }
 
 // A table block: numbers right-aligned, and a bold total row unless `total` is false.
-function tableBlock({ title, columns, rows, total, format }) {
+function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' }) {
   const numeric = columns.map((_, i) => rows.length > 0 && rows.every((r) => typeof r[i] === 'number'));
   const sums = columns.map((_, i) => (numeric[i] ? sum(rows.map((r) => r[i])) : null));
   const withTotal = total !== false && sums.some((v) => v !== null);
   const cells = rows.map((r) => r.map((v) => (typeof v === 'number' ? fmt(v, format) : String(v ?? ''))));
-  const totalRow = columns.map((_, i) => (sums[i] !== null ? fmt(sums[i], format) : i === 0 ? 'Total' : ''));
+  const totalRow = columns.map((_, i) => (sums[i] !== null ? fmt(sums[i], format) : i === 0 ? totalLabel : ''));
   const w = columns.map((h, i) => Math.max(len(h), ...cells.map((r) => len(r[i] ?? '')), withTotal ? len(totalRow[i]) : 0));
   const line = (r) => r.map((v, i) => (numeric[i] ? v.padStart(w[i]) : v.padEnd(w[i]))).join('  ');
   const rule = [[w.map((n) => '─'.repeat(n)).join('  '), BORDER]];
@@ -184,12 +184,15 @@ function tableBlock({ title, columns, rows, total, format }) {
 }
 
 const asTable = (spec, { labels, series }) =>
-  tableBlock({ title: 'Values', columns: ['', ...series.map((s) => s.name)], rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]), format: spec.yFormat });
+  tableBlock({ title: 'Values', columns: ['', ...series.map((s) => s.name)], rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]), format: spec.yFormat, totalLabel: spec.totalLabel.replace('t', 'T') });
 
 // The blocks one chart spec draws: the chart, and its table beside it when `table` is set.
 function chartBlocks(spec, room) {
   if (!Array.isArray(spec.data)) throw new Error('This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first');
   if (!TYPES.includes(spec.type ?? 'bar')) throw new Error(`Unknown chart type "${spec.type}" (types: ${TYPES.join(', ')})`);
+  // A query that hit its limit returned the top rows only, so their sum is not the whole.
+  const partial = spec.query?.limit && spec.data.length >= spec.query.limit;
+  spec = { ...spec, totalLabel: partial ? `total of top ${spec.data.length}` : 'total' };
   const parsed = toSeries(spec);
   parsed.labels = parsed.labels.map((l) => cut(l, LABEL_MAX));
   const inner = (spec.table ? Math.floor(room * 0.6) : room) - 4;
