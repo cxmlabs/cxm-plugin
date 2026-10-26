@@ -1,0 +1,16 @@
+# The per-repository facts the shared lifecycle skills read. Schema: tach docs/cxm-config.md.
+version = 1
+
+[repo]
+base_branch = "main"
+
+[linear]
+team = "CLO"
+accepted_teams = ["CLO", "CPL", "CXM", "FIN"]
+
+[commands]
+test = ["node --test"]
+lint = ["node scripts/validate-manifests.mjs", "node scripts/sync-version.mjs --check"]
+
+[docs]
+style = "AGENTS.md"
