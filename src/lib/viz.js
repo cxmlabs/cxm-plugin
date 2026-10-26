@@ -1,4 +1,4 @@
-// Draws chart, row and diagram blocks as lines of [text, fg, bg, bold] runs, for every tier; no Node APIs.
+// Draws chart, row and diagram blocks as lines of [text, fg, bg, bold] runs. It imports no Node module.
 import { drawDiagram } from './diagram.js';
 
 const PALETTE = ['#5B8DEF', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#14B8A6', '#EC4899', '#64748B'];
@@ -52,7 +52,11 @@ function toSeries(spec) {
   const { x, y, data } = spec;
   if (!Array.isArray(data) || data.length === 0 || !x || !y) throw new Error('A chart needs "x", "y" and at least one "data" row');
   const bad = data.find((r) => r === null || typeof r !== 'object' || !Number.isFinite(Number(r[y] ?? 0)));
-  if (bad !== undefined) throw new Error(`A chart row needs a number in "${y}": ${JSON.stringify(bad)}`);
+  // The row's values never go in the message: an error message is sent with usage analytics.
+  if (bad !== undefined) throw new Error(`A chart row needs a number in "${y}" (row ${data.indexOf(bad) + 1})`);
+  const keys = data.map((r) => `${r[x]}\u0000${spec.series ? r[spec.series] : ''}`);
+  const twice = keys.findIndex((k, i) => keys.indexOf(k) !== i);
+  if (twice !== -1) throw new Error(`A chart has two rows for "${data[twice][x]}"; give one row per "${x}"${spec.series ? ` and "${spec.series}"` : ''}`);
   const xs = [...new Set(data.map((r) => String(r[x])))];
   const names = spec.series ? [...new Set(data.map((r) => String(r[spec.series])))] : [spec.yName ?? y];
   const value = (xv, name) => Number(data.find((r) => String(r[x]) === xv && (!spec.series || String(r[spec.series]) === name))?.[y] ?? 0);
@@ -67,7 +71,7 @@ const shade = (light, deep, k) =>
   '#' + [1, 3, 5].map((i) => Math.round(parseInt(light.slice(i, i + 2), 16) * (1 - k) + parseInt(deep.slice(i, i + 2), 16) * k).toString(16).padStart(2, '0')).join('');
 const sum = (a) => a.reduce((s, v) => s + v, 0);
 
-// One line per category; `pie` scales each bar to the total, so the bars read as shares.
+// One line per category; `pie` scales each bar to its series' total, so the bars read as shares.
 function barLines({ labels, series }, spec, room) {
   const labelW = Math.max(...labels.map(len));
   const values = series.flatMap((s) => s.data);
@@ -77,7 +81,6 @@ function barLines({ labels, series }, spec, room) {
   const shares = single && values.every((v) => v >= 0);
   const barW = Math.max(8, Math.min(46, room - labelW - valueW - (shares ? 8 : 3)));
   const totals = series.map((s) => sum(s.data));
-  // A pie bar is a share of its own series, so it scales to that series' size.
   const sizes = series.map((s) => (spec.type === 'pie' ? sum(s.data.map(Math.abs)) : Math.max(...values.map(Math.abs))));
   const lines = [];
   labels.forEach((label, i) =>

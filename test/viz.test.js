@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
@@ -81,7 +82,7 @@ test('a row draws its blocks side by side, and stacks them when they do not fit'
 
 test('a chart refuses no rows, a value that is not a number, and an unknown type, and drops control characters', () => {
   assert.throws(() => draw('chart', chart({ data: [] })), /at least one "data" row/);
-  assert.throws(() => draw('chart', chart({ data: [{ k: 'a', v: 'n/a' }] })), /needs a number in "v": \{"k":"a","v":"n\/a"\}/);
+  assert.throws(() => draw('chart', chart({ data: [{ k: 'a', v: 'n/a' }] })), /needs a number in "v" \(row 1\)/);
   assert.throws(() => draw('chart', chart({ type: 'scatter', data: rows })), /Unknown chart type "scatter"/);
   const text = plain(draw('chart', chart({ title: 'x\u001b]0;owned\u0007', data: [{ k: 'a\u001b[2J', v: 1 }] })));
   assert.doesNotMatch(text, /[\u0000-\u0009\u000b-\u001f]/);
@@ -124,4 +125,20 @@ test('cxm viz names its kinds and refuses a bad width or a missing file', () => 
   const missing = cli(['chart', 'nope.json']);
   assert.equal(missing.status, 1);
   assert.match(missing.stderr, /No such file: nope\.json/);
+});
+
+test('a chart refuses a repeated key and never echoes a row in its error', () => {
+  assert.throws(() => draw('chart', chart({ data: [{ s: 'RDS', c: 100 }, { s: 'RDS', c: 50 }, { s: 'ECS', c: 10 }] , x: 's', y: 'c' })), /two rows for "RDS"/);
+  assert.throws(() => draw('chart', chart({ x: 'k', y: 'v', data: [{ k: 'a', v: 'private-label' }] })), (err) => /row 1/.test(err.message) && !/private-label/.test(err.message));
+});
+
+test('cxm viz cube-chart runs its query only when the block has no rows', () => {
+  const env = { ...process.env, CXM_TELEMETRY: '0', CXM_CONFIG_DIR: mkdtempSync(join(tmpdir(), 'cxm-viz-')) };
+  const run = (body) => spawnSync(process.execPath, ['bin/cxm.js', 'viz', 'cube-chart', '-'], { encoding: 'utf8', input: body, env });
+  const query = run('{"x":"a","y":"b","query":{"measures":["m"]}}');
+  assert.equal(query.status, 1);
+  assert.match(query.stderr, /Not logged in/);
+  const given = run('{"x":"a","y":"b","query":{"measures":["m"]},"data":[{"a":"p","b":1}]}');
+  assert.equal(given.status, 0, given.stderr);
+  assert.match(given.stdout, /p █/);
 });
