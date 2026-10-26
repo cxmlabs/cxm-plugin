@@ -1,0 +1,12 @@
+flowchart LR
+  subgraph acct["Account prod"]
+    subgraph vpc["VPC main"]
+      alb@{ img: "https://assets.example/icons/cloud/aws/elastic-load-balancing.svg", label: "Public ALB", pos: "b", h: 54, constraint: "on" }
+      api@{ img: "https://assets.example/icons/cloud/aws/elastic-container-service.svg", label: "Orders API", pos: "b", h: 54, constraint: "on" }
+      db@{ img: "https://assets.example/icons/cloud/aws/rds.svg", label: "Orders DB", pos: "b", h: 54, constraint: "on" }
+    end
+  end
+  alb -->|"https"| api
+  api -->|"sql queries"| db
+  style acct fill:transparent
+  style vpc fill:transparent,stroke-dasharray:6 4

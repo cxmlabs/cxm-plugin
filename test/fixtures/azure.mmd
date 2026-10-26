@@ -1,0 +1,10 @@
+graph TB
+  U[Users] -->|HTTPS| FD[Azure Front Door]
+  FD -->|WAF rules| AGW[Application Gateway]
+  subgraph VNET[Production VNet]
+    AGW -->|ingress| AKS[AKS cluster]
+    AKS -->|private endpoint| SQL[(Azure SQL)]
+    AKS -->|cache reads| RC[(Redis Cache)]
+    AKS -->|secrets| KV[Key Vault]
+  end
+  AKS -->|exports| BLOB[(Blob Storage)]

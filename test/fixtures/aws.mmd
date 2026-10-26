@@ -1,0 +1,10 @@
+graph LR
+  U[Users] --> CF[CloudFront]
+  CF --> ALB[Application Load Balancer]
+  subgraph VPC[Production VPC]
+    ALB --> API[ECS API service]
+    API --> RDS[(Aurora PostgreSQL)]
+    API --> VK[(Valkey cache)]
+    API --> NAT[NAT gateway]
+  end
+  NAT --> S3[(S3 data lake)]
