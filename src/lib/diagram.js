@@ -16,7 +16,7 @@ const LINE = /[─│├┤┬┴┼┌┐└┘╭╮╰╯]/;
 const tint = (hex, pct) =>
   '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * pct + parseInt(BG.slice(i, i + 2), 16) * (1 - pct)).toString(16).padStart(2, '0')).join('');
 
-// The text renderer has no icons: each `id@{ img, label }` node becomes a labelled box, colored by its icon name.
+// The text renderer has no icons: each `id@{ img, label }` node becomes a labelled box, colored by its label, icon name or id.
 function fromIcons(src) {
   const icons = {};
   const text = src.replace(/(\w+)@\{([^}]*)\}/g, (_, id, attrs) => {
