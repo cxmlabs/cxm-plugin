@@ -41,7 +41,8 @@ export function chooseAgents(argv, status) {
   const only = flag(argv, '--agent');
   if (only && !AGENTS[only]) throw new Error(`Unknown agent "${only}". Use: ${Object.keys(AGENTS).join(', ')}`);
   const wanted = only ? [only] : Object.keys(AGENTS);
-  return { ready: wanted.filter((a) => status(a) === 'ready'), outdated: wanted.filter((a) => status(a) === 'outdated') };
+  const found = Object.fromEntries(wanted.map((a) => [a, status(a)]));
+  return { ready: wanted.filter((a) => found[a] === 'ready'), outdated: wanted.filter((a) => found[a] === 'outdated') };
 }
 
 // npx puts the current project's node_modules/.bin first on PATH, and an agent found there is a
