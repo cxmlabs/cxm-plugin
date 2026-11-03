@@ -2,6 +2,7 @@
 // it finds, then signs in. It runs each agent's own plugin commands, the ones the README lists, and
 // never edits an agent's files itself.
 import { spawnSync } from 'node:child_process';
+import { delimiter } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { login } from './login.js';
 
@@ -40,11 +41,26 @@ export function chooseAgents(argv, status) {
   const only = flag(argv, '--agent');
   if (only && !AGENTS[only]) throw new Error(`Unknown agent "${only}". Use: ${Object.keys(AGENTS).join(', ')}`);
   const wanted = only ? [only] : Object.keys(AGENTS);
-  return { ready: wanted.filter((a) => status(a) === 'ready'), outdated: wanted.filter((a) => status(a) === 'outdated') };
+  const found = Object.fromEntries(wanted.map((a) => [a, status(a)]));
+  return { ready: wanted.filter((a) => found[a] === 'ready'), outdated: wanted.filter((a) => found[a] === 'outdated') };
 }
 
-const ok = (bin, args) => spawnSync(bin, args, { stdio: 'ignore' }).status === 0;
-const agentStatus = (bin) => (!ok(bin, ['--version']) ? 'missing' : ok(bin, ['plugin', '--help']) ? 'ready' : 'outdated');
+// npx puts the current project's node_modules/.bin first on PATH, and an agent found there is a
+// project's pinned copy, maybe one too old for plugins, not the one the user runs.
+const agentPath = (path = '') => path.split(delimiter).filter((dir) => !/[\\/]node_modules[\\/]\.bin[\\/]?$/.test(dir)).join(delimiter);
+
+// Input never comes from the terminal: an agent with no `plugin` command reads the words as a prompt
+// and opens a chat that waits for it.
+export const spawnAgent = (cmd, { out = 'inherit', ...opts } = {}) =>
+  spawnSync(cmd[0], cmd.slice(1), { env: { ...process.env, PATH: agentPath(process.env.PATH) }, encoding: 'utf8', ...opts, stdio: ['ignore', out, out] });
+
+// Ready only when `plugin --help` offers marketplaces: an old agent prints its general help and exits 0.
+export function agentStatus(bin, spawn = spawnAgent) {
+  if (spawn([bin, '--version'], { out: 'ignore' }).status !== 0) return 'missing';
+  const help = spawn([bin, 'plugin', '--help'], { out: 'pipe', timeout: 15000 });
+  if (help.error) throw new Error(`\`${bin} plugin --help\` did not finish: ${help.error.message}`);
+  return help.status === 0 && /marketplace/.test(help.stdout) ? 'ready' : 'outdated';
+}
 const show = (cmd) => cmd.join(' ');
 
 async function confirm(question) {
@@ -54,7 +70,7 @@ async function confirm(question) {
   return answer === '' || answer === 'y' || answer === 'yes';
 }
 
-export async function install(argv, { run = (cmd) => spawnSync(cmd[0], cmd.slice(1), { stdio: 'inherit' }).status, status = agentStatus } = {}) {
+export async function install(argv, { run = (cmd) => spawnAgent(cmd).status, status = agentStatus } = {}) {
   const { ready: agents, outdated } = chooseAgents(argv, status);
   for (const a of outdated) console.log(`${AGENTS[a].label} is too old for plugins: skipped. Update it (${AGENTS[a].upgradeHint}), then run this again.`);
   if (!agents.length) {
