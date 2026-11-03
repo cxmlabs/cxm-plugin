@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { test } from 'node:test';
-import { AGENTS, agentPath, agentStatus, chooseAgents, install, spawnAgent } from '../src/commands/install.js';
+import { AGENTS, agentStatus, chooseAgents, install, spawnAgent } from '../src/commands/install.js';
 
 test('installs into the agents that support plugins, narrowed by --agent; an old agent is skipped', () => {
   assert.deepEqual(chooseAgents([], (a) => (a === 'claude' ? 'ready' : 'missing')), { ready: ['claude'], outdated: [] });
@@ -30,25 +29,30 @@ test('runs each agent\'s own commands, refreshes and upgrades on a re-run, and f
   await assert.rejects(install(['--yes', '--no-login'], { run: codexFails, status: () => 'ready' }), /Installed, except:\nCodex/);
 });
 
-// A fake agent: `--version` works; `plugin --help` lists marketplaces only when `plugins` is set; any
-// other call reads a line of input, as an old agent waits on a chat prompt.
-function fakeAgent(dir, { plugins }) {
+// A fake `claude`: `--version` works and `plugin --help` lists marketplaces only when `plugins` is set.
+// An old one fails every other call; a current one fails only when it reads a line of input.
+function fakeClaude(dir, { plugins }) {
   mkdirSync(dir, { recursive: true });
   const help = plugins ? 'Commands:\n  marketplace  Manage marketplaces' : 'Usage: claude [options] [prompt]';
-  const path = join(dir, 'fakeagent');
-  writeFileSync(path, `#!/bin/sh\ncase "$1 $2" in\n"--version "*) echo 1.0;;\n"plugin --help") echo "${help}";;\n*) read line; echo "read:$line";;\nesac\n`);
+  const path = join(dir, 'claude');
+  writeFileSync(path, `#!/bin/sh\ncase "$1 $2" in\n"--version "*) echo 1.0;;\n"plugin --help") echo "${help}";;\n*) ${plugins ? 'read line && exit 1; exit 0' : 'exit 1'};;\nesac\n`);
   chmodSync(path, 0o755);
 }
 
-test('an agent too old for plugins is outdated, a node_modules/.bin copy is skipped, and no command reads the terminal', () => {
+test('install skips a node_modules/.bin copy of an agent, calls an old one outdated, and never passes it input', async (t) => {
   const root = mkdtempSync(join(tmpdir(), 'cxm-install-'));
-  fakeAgent(join(root, 'project', 'node_modules', '.bin'), { plugins: false });
-  fakeAgent(join(root, 'bin'), { plugins: true });
-  const PATH = [join(root, 'project', 'node_modules', '.bin'), join(root, 'bin')].join(delimiter);
-  const onPath = (dirs) => (cmd, { out, ...opts }) => spawnSync(cmd[0], cmd.slice(1), { encoding: 'utf8', ...opts, stdio: ['ignore', out, out], env: { ...process.env, PATH: dirs } });
-  const spawn = onPath(agentPath(PATH));
-  assert.equal(agentStatus('fakeagent', spawn), 'ready', 'the node_modules/.bin copy is not the one asked');
-  assert.equal(agentStatus('fakeagent', onPath(join(root, 'project', 'node_modules', '.bin'))), 'outdated');
-  const run = spawnAgent([join(root, 'bin', 'fakeagent'), 'plugin', 'install', 'x'], { out: 'pipe', timeout: 5000 });
-  assert.equal(run.stdout, 'read:\n', 'input is empty, never the terminal');
+  const [project, old, bin] = [join(root, 'project', 'node_modules', '.bin'), join(root, 'old'), join(root, 'bin')];
+  fakeClaude(project, { plugins: false });
+  fakeClaude(old, { plugins: false });
+  fakeClaude(bin, { plugins: true });
+  const { PATH } = process.env;
+  t.after(() => { process.env.PATH = PATH; });
+
+  process.env.PATH = old;
+  assert.equal(agentStatus('claude'), 'outdated');
+  process.env.PATH = [project, bin].join(delimiter);
+  await install(['--yes', '--no-login', '--agent', 'claude']);
+  assert.equal(spawnAgent(['claude', 'plugin', 'install', 'x'], { input: 'y\n' }).status, 0, 'the agent never gets input');
+  const timesOut = (cmd) => (cmd[1] === '--version' ? { status: 0 } : { status: null, error: new Error('spawnSync claude ETIMEDOUT') });
+  assert.throws(() => agentStatus('claude', timesOut), /did not finish: spawnSync claude ETIMEDOUT/);
 });
