@@ -29,15 +29,20 @@ const padEnd = (runs, w) => (widthOf(runs) < w ? [...runs, [' '.repeat(w - width
 const cut = (s, max) => (len(s) > max ? `${[...s].slice(0, max - 1).join('')}…` : s);
 
 // Intl may be absent where the reply renderer runs, so group the thousands by hand.
-function number(v, digits = Math.abs(v) >= 100 ? 0 : 1) {
-  const [int, dec] = Math.abs(v).toFixed(digits).split('.');
-  const text = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dec && dec !== '0' ? `.${dec}` : '');
-  return v < 0 ? `-${text}` : text;
+function number(v, digits = v >= 100 ? 0 : 1) {
+  const [int, dec] = v.toFixed(digits).split('.');
+  return int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dec && dec !== '0' ? `.${dec}` : '');
 }
 // Whole dollars from $10, so a column of amounts lines up; cents only below.
-const dollars = (v) => number(v, v >= 10 ? 0 : 2);
-const fmt = (v, format) => (format === 'currency' ? (v < 0 ? `-$${dollars(-v)}` : `$${dollars(v)}`) : format === 'percent' ? `${number(v)}%` : number(v));
-const signed = (v, format) => `${v > 0 ? '+' : ''}${fmt(v, format)}`;
+const dollars = (v) => number(v, Math.round(v * 100) >= 1000 ? 0 : 2);
+const nonZero = (text) => /[1-9]/.test(text);
+// A value that rounds to zero shows no sign, so it never reads "-$0.00" or "+0%".
+function fmt(v, format) {
+  const a = Math.abs(v);
+  const text = format === 'currency' ? `$${dollars(a)}` : format === 'percent' ? `${number(a)}%` : number(a);
+  return v < 0 && nonZero(text) ? `-${text}` : text;
+}
+const signed = (v, format) => `${v > 0 && nonZero(fmt(v, format)) ? '+' : ''}${fmt(v, format)}`;
 // A rise reads red and a fall green, as on a bill.
 const RISE = '#F87171';
 const FALL = '#4ADE80';
@@ -178,12 +183,18 @@ function lineLines({ labels, series }, spec, room) {
 // name or { name, format, signed, total }; a signed column shows +/− in red and green, its total too.
 function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' }) {
   const cols = columns.map((c) => (typeof c === 'string' ? { name: c } : c));
-  const numeric = cols.map((_, i) => rows.length > 0 && rows.every((r) => typeof r[i] === 'number'));
-  // A sum of percentages means nothing, so a percent column has no total unless it asks for one.
-  const sums = cols.map((c, i) => (numeric[i] && c.total !== false && (c.total || (c.format ?? format) !== 'percent') ? sum(rows.map((r) => r[i])) : null));
+  // A blank cell stays blank and leaves its column numeric, as a missing chart value does.
+  const blank = (v) => v === null || v === undefined || v === '';
+  const numeric = cols.map((_, i) => rows.some((r) => typeof r[i] === 'number') && rows.every((r) => typeof r[i] === 'number' || blank(r[i])));
+  // A sum of percentages means nothing, so a percent column has no total.
+  const sums = cols.map((c, i) => (numeric[i] && c.total !== false && (c.format ?? format) !== 'percent' ? sum(rows.map((r) => r[i] || 0)) : null));
   const withTotal = total !== false && sums.some((v) => v !== null);
   const show = (v, c) => (c.signed ? signed(v, c.format ?? format) : fmt(v, c.format ?? format));
-  const cell = (v, i) => (typeof v === 'number' ? [show(v, cols[i]), cols[i].signed ? signColor(v) : ''] : [String(v ?? ''), '']);
+  const cell = (v, i) => {
+    if (typeof v !== 'number') return [String(v ?? ''), ''];
+    const text = show(v, cols[i]);
+    return [text, cols[i].signed && nonZero(text) ? signColor(v) : ''];
+  };
   const cells = rows.map((r) => cols.map((_, i) => cell(r[i], i)));
   const totalRow = cols.map((c, i) => (sums[i] !== null ? cell(sums[i], i) : [i === 0 ? totalLabel : '', '']));
   const w = cols.map((c, i) => Math.max(len(c.name), ...cells.map((r) => len(r[i][0])), withTotal ? len(totalRow[i][0]) : 0));
@@ -209,20 +220,24 @@ function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' 
   };
 }
 
+// A query returns its measures as numeric strings, so a table cell reads one as the number.
+const cellValue = (v) => (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : v);
+
 // The side table: `true` shows the charted values; a list names more keys of the rows, one per
-// column, each a key or { key, name, format, signed, total }. A diverging chart's values are signed.
+// column, each a key or { key, name, format, signed }. A diverging chart's values are signed.
 function asTable(spec, { labels, series }) {
+  const base = { title: 'Values', format: spec.yFormat, totalLabel: `T${spec.totalLabel.slice(1)}` };
   if (spec.table === true) {
     const cols = ['', ...series.map((s) => (spec.diverging ? { name: s.name, signed: true } : s.name))];
-    return tableBlock({ title: 'Values', columns: cols, rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]), format: spec.yFormat, totalLabel: `T${spec.totalLabel.slice(1)}` });
+    return tableBlock({ ...base, columns: cols, rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]) });
   }
   if (!Array.isArray(spec.table) || spec.table.length === 0) throw new Error('"table" is true or a list of row keys');
   const cols = spec.table.map((c) => (typeof c === 'string' ? { key: c } : c));
   if (cols.some((c) => typeof c?.key !== 'string')) throw new Error('Each "table" column is a row key or an object with a "key"');
-  const first = new Map();
-  for (const r of spec.data) if (!first.has(String(r[spec.x]))) first.set(String(r[spec.x]), r);
-  const rows = [...first.values()].map((r) => [cut(formatX(r[spec.x], spec.xFormat), LABEL_MAX), ...cols.map((c) => r[c.key] ?? '')]);
-  return tableBlock({ title: spec.tableTitle ?? 'Values', columns: ['', ...cols.map((c) => ({ name: c.key, ...c }))], rows, format: spec.yFormat, totalLabel: `T${spec.totalLabel.slice(1)}` });
+  // A series chart holds one row per x and series, so a list of row keys has no single row per x.
+  if (spec.series) throw new Error('A "table" list needs one row per "x": use "table": true on a chart with "series"');
+  const rows = spec.data.map((r) => [cut(formatX(r[spec.x], spec.xFormat), LABEL_MAX), ...cols.map((c) => cellValue(r[c.key]))]);
+  return tableBlock({ ...base, columns: ['', ...cols.map((c) => ({ name: c.key, ...c }))], rows });
 }
 
 // The blocks one chart spec draws: the chart, and its table beside it when `table` is set.
