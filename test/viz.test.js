@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { familyOf } from '../src/lib/diagram.js';
+import { familyOf, parseFlowchart } from '../src/lib/diagram.js';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -92,6 +92,37 @@ test('a side table shows the listed row keys, signed columns in red and green wi
   assert.notEqual(last('+$32'), last('-$234'), 'a fall has the other color');
   assert.equal(last('-$202'), last('-$234'), 'the signed total is colored');
   assert.throws(() => draw('chart', chart({ table: [{ name: 'x' }], data: rows })), /row key or an object with a "key"/);
+  const queried = months.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])));
+  const query = { measures: ['sep', 'oct', 'delta', 'pct'] };
+  assert.equal(plain(draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, query, data: queried }), { width: 140 })), text, 'a query row holds its measures as strings');
+  assert.match(plain(draw('chart', chart({ table: ['id'], query: { measures: ['v'] }, data: [{ k: 'a', v: '1', id: '2024' }] }))), /a +2024 /, 'a dimension stays text');
+  assert.match(plain(draw('chart', chart({ table: ['n'], data: [{ k: 'a', v: 1, n: 3 }, { k: 'b', v: 2 }] }))), /b +│[\s\S]*Total +3/, 'a blank cell keeps the column numeric');
+  assert.throws(() => draw('chart', chart({ series: 'm', table: ['v'], data: [{ k: 'a', m: 'x', v: 1 }, { k: 'a', m: 'y', v: 2 }] })), /one row per "x"/);
+});
+
+test('a diverging chart signs its "table": true values, and a value that rounds to zero has no sign', () => {
+  const lines = draw('chart', chart({ diverging: true, yFormat: 'currency', table: true, data: [{ k: 'a', v: 87.8 }, { k: 'b', v: -9.996 }, { k: 'c', v: -0.001 }, { k: 'd', v: 0.001 }] }), { width: 140 });
+  const text = plain(lines);
+  assert.match(text, /a +\+\$88 +│/);
+  assert.match(text, /b +-\$10 +│/);
+  assert.match(text, /c +\$0 +│/);
+  assert.match(text, /d +\$0 +│/);
+  assert.equal(runs(lines).find(([t]) => /^c +\$0$/.test(t))[1], '', 'a zero in the table has no sign color');
+});
+
+test('a listed table skips the x key it already shows, and a whole small amount has no cents', () => {
+  const text = plain(draw('chart', chart({ yFormat: 'currency', table: ['k', 'v'], data: [{ k: 'A', v: 0 }, { k: 'B', v: 1 }, { k: 'C', v: 3.3 }] }), { width: 100 }));
+  assert.equal((text.match(/│ B /g) || []).length, 2, 'B once in the chart and once in the table');
+  assert.match(text, /\$0 /);
+  assert.match(text, /\$3\.30/);
+  assert.doesNotMatch(text, /\$1\.00|\$0\.00/);
+});
+
+test('a row puts as many blocks on a line as fit, then wraps the rest', () => {
+  const text = plain(draw('row', JSON.stringify([{ title: 'One', ...JSON.parse(chart({ data: rows, table: true })) }, { title: 'Two', ...JSON.parse(chart({ data: rows })) }]), { width: 60 }));
+  const tops = text.split('\n').filter((l) => l.startsWith('╭'));
+  assert.equal(tops.length, 2, 'two lines of frames');
+  assert.equal((tops[0].match(/╭/g) || []).length, 2, 'the chart and its table share the first line');
 });
 
 test('a comparison draws its overview and its change side by side in one row', () => {
@@ -139,7 +170,34 @@ test('a diagram reads chains, fan-outs and text links, joins a two-line label, a
   const text = plain(draw('mermaid', src, { width: 160 }));
   for (const label of ['Load balancer · public', 'Users', 'Bots', 'API service', 'Orders DB', 'Operators', 'Network']) assert.ok(text.includes(label), label);
   assert.doesNotMatch(text, /<br/);
-  assert.match(text, /calls/);
+  assert.doesNotMatch(text, /│ net +│/, 'a link to a group draws no box of its own');
+  const links = (s) => parseFlowchart(s).edges.map((e) => `${e.from}>${e.to}${e.label ? `:${e.label}` : ''}`);
+  assert.deepEqual(links(src), ['u>lb', 'b>lb', 'lb>api:calls', 'api>db:sql', 'ops>net']);
+  const twoGroups = `${src}\n  subgraph jobs["Jobs"]\n    q[Queue]\n  end`;
+  assert.match(plain(draw('mermaid', twoGroups, { width: 120 })), /Operators → Network \(group\)/, 'a link between groups names the group');
+  const terse = 'graph TD; a-1:::hot-->b-2[B] -.-> c-->d %% note\n  style a-1 fill:#f00\n  d ==> idle\n  subgraph outer[Outer]\n    subgraph idle[Idle group]\n    end\n  end';
+  assert.deepEqual(links(terse), ['a-1>b-2', 'b-2>c', 'c>d', 'd>idle']);
+  const { label, group } = parseFlowchart(terse).nodes.get('idle');
+  assert.deepEqual([label, group], ['Idle group', 'outer'], 'an empty group is a node of its parent');
+  const bare = parseFlowchart('flowchart\n  a --> b');
+  assert.deepEqual([bare.dir, ...bare.nodes.keys()], ['TB', 'a', 'b'], 'a header with no direction is not a node');
+});
+
+test('a diagram that no layout draws whole is a list that wraps a long line at a space and keeps every label', () => {
+  const src = 'flowchart LR\n  subgraph g["A rather long group title for one box"]\n    a[Alpha]\n  end\n  b[Beta] -->|a label longer than twenty-four characters| a';
+  assert.match(plain(draw('mermaid', src, { width: 100 })), /▌ A rather long group title for one box/, 'a layout that fits but cuts the title is not kept');
+  const text = plain(draw('mermaid', src, { width: 34 }));
+  assert.match(text, /▌ A rather long group title\s+│\n│ +for one box/);
+  assert.match(text, /Beta → Alpha {2}a label longer +│\n│ +than twenty-four +│\n│ +characters/);
+  assert.ok(text.split('\n').every((row) => [...row].length <= 34));
+});
+
+test('a mermaid block of another kind draws as the text renderer draws it', () => {
+  const src = '%% a note\nsequenceDiagram\n  Alice->>Bob: Hello';
+  const text = plain(draw('mermaid', src, { width: 60 }));
+  assert.match(text, /│ Alice │ +│ Bob │/);
+  assert.doesNotMatch(text, /sequenceDiagram/);
+  assert.throws(() => draw('mermaid', src, { width: 12 }), /cannot be drawn/);
 });
 
 test('several groups draw one frame each, titled by their path, then the links between them', () => {
@@ -151,7 +209,17 @@ test('several groups draw one frame each, titled by their path, then the links b
   assert.match(text, /╭─ Account prod › VPC main ─/);
   assert.match(text, /╭─ Edge ─/);
   assert.match(text, /Links between groups +│\n│ +CloudFront → ECS API/);
-  assert.match(text, /ECS API[^\n]*►[^\n]*RDS orders|ECS API[\s\S]*▼[\s\S]*RDS orders/, 'a link inside a group is drawn');
+  assert.match(text, /ECS API ├──►│ RDS orders/, 'a link inside a group is drawn');
+  const narrow = plain(draw('mermaid', src, { width: 40 }));
+  assert.match(narrow, /╭─ Account prod › VPC main ─+╮ │\n│ │ ┌/, 'a frame that does not fit beside the last goes under it');
+  assert.ok(narrow.split('\n').every((row) => [...row].length <= 40));
+});
+
+test('a layout that fuses two link labels or runs a wall through one is not kept', () => {
+  const src = 'flowchart TB\n  q[SQS jobs] --> l[Lambda deploy]\n  e[EventBridge rule] -->|invoke| l\n  l -->|UpdateFunctionCode| f[Lambdas using image]\n  l -->|UpdateService| s[ECS services]';
+  const text = plain(draw('mermaid', src, { width: 100 }));
+  assert.doesNotMatch(text, /invoke─?Update|Update\w*─invoke/);
+  assert.match(text, /EventBridge rule → Lambda deploy +invoke/);
 });
 
 test('among generic words, the last one in a label wins', () => {
