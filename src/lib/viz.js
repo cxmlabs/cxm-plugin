@@ -188,7 +188,15 @@ function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' 
   const totalRow = cols.map((c, i) => (sums[i] !== null ? cell(sums[i], i) : [i === 0 ? totalLabel : '', '']));
   const w = cols.map((c, i) => Math.max(len(c.name), ...cells.map((r) => len(r[i][0])), withTotal ? len(totalRow[i][0]) : 0));
   const pad = (t, i) => (numeric[i] ? t.padStart(w[i]) : t.padEnd(w[i]));
-  const line = (r, bold) => r.flatMap(([t, fg], i) => [...(i ? [['  ']] : []), [pad(t, i), fg, '', bold]]);
+  // Neighbour cells of one style stay one run, so only a colored cell splits the line.
+  const line = (r, bold) =>
+    r.reduce((out, [t, fg], i) => {
+      const text = (i ? '  ' : '') + pad(t, i);
+      const last = out.at(-1);
+      if (last && last[1] === fg) last[0] += text;
+      else out.push([text, fg, '', bold]);
+      return out;
+    }, []);
   const rule = [[w.map((n) => '─'.repeat(n)).join('  '), BORDER]];
   return {
     title,

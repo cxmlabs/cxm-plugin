@@ -84,7 +84,7 @@ test('a side table shows the listed row keys, signed columns in red and green wi
   assert.match(text, /Sep +Oct +Δ +Δ %/);
   assert.match(text, /RDS +\$2,042 +\$1,808 +-\$234 +-11\.5%/);
   assert.match(text, /Total +\$2,155 +\$1,953 +-\$202 +│/, 'the percent column has no total');
-  const last = (t) => runs(lines).filter(([r]) => r.trim() === t).at(-1)[1];
+  const last = (t) => runs(lines).filter(([r]) => r.includes(t)).at(-1)[1];
   assert.equal(last('+$32'), last('+28.3%'), 'a rise is one color in both table columns');
   assert.notEqual(last('+$32'), last('-$234'), 'a fall has the other color');
   assert.equal(last('-$202'), last('-$234'), 'the signed total is colored');
