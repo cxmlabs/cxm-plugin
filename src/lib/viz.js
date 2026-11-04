@@ -33,8 +33,8 @@ function number(v, digits = v >= 100 ? 0 : 1) {
   const [int, dec] = v.toFixed(digits).split('.');
   return int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dec && dec !== '0' ? `.${dec}` : '');
 }
-// Whole dollars from $10, so a column of amounts lines up; cents only below.
-const dollars = (v) => number(v, Math.round(v * 100) >= 1000 ? 0 : 2);
+// Whole dollars from $10 and for a whole amount ($0, $1); cents only on a fraction below $10.
+const dollars = (v) => number(v, Math.round(v * 100) >= 1000 || Math.round(v * 100) % 100 === 0 ? 0 : 2);
 const nonZero = (text) => /[1-9]/.test(text);
 // A value that rounds to zero shows no sign, so it never reads "-$0.00" or "+0%".
 function fmt(v, format) {
@@ -232,8 +232,10 @@ function asTable(spec, { labels, series }) {
     return tableBlock({ ...base, columns: cols, rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]) });
   }
   if (!Array.isArray(spec.table) || spec.table.length === 0) throw new Error('"table" is true or a list of row keys');
-  const cols = spec.table.map((c) => (typeof c === 'string' ? { key: c } : c));
-  if (cols.some((c) => typeof c?.key !== 'string')) throw new Error('Each "table" column is a row key or an object with a "key"');
+  const listed = spec.table.map((c) => (typeof c === 'string' ? { key: c } : c));
+  if (listed.some((c) => typeof c?.key !== 'string')) throw new Error('Each "table" column is a row key or an object with a "key"');
+  // The first column already shows `x`, so a listed `x` would repeat it.
+  const cols = listed.filter((c) => c.key !== spec.x);
   // A series chart holds one row per x and series, so a list of row keys has no single row per x.
   if (spec.series) throw new Error('A "table" list needs one row per "x": use "table": true on a chart with "series"');
   // A query returns its measures as strings; only those turn into numbers, never a dimension such as an account ID.

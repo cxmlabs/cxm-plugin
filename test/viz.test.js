@@ -102,9 +102,17 @@ test('a diverging chart signs its "table": true values, and a value that rounds 
   const text = plain(lines);
   assert.match(text, /a +\+\$88 +│/);
   assert.match(text, /b +-\$10 +│/);
-  assert.match(text, /c +\$0\.00 +│/);
-  assert.match(text, /d +\$0\.00 +│/);
-  assert.equal(runs(lines).filter(([t]) => t.includes('$0.00')).at(-1)[1], '', 'a zero in the table has no sign color');
+  assert.match(text, /c +\$0 +│/);
+  assert.match(text, /d +\$0 +│/);
+  assert.equal(runs(lines).find(([t]) => /^c +\$0$/.test(t))[1], '', 'a zero in the table has no sign color');
+});
+
+test('a listed table skips the x key it already shows, and a whole small amount has no cents', () => {
+  const text = plain(draw('chart', chart({ yFormat: 'currency', table: ['k', 'v'], data: [{ k: 'A', v: 0 }, { k: 'B', v: 1 }, { k: 'C', v: 3.3 }] }), { width: 100 }));
+  assert.equal((text.match(/│ B /g) || []).length, 2, 'B once in the chart and once in the table');
+  assert.match(text, /\$0 /);
+  assert.match(text, /\$3\.30/);
+  assert.doesNotMatch(text, /\$1\.00|\$0\.00/);
 });
 
 test('a row puts as many blocks on a line as fit, then wraps the rest', () => {
