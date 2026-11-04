@@ -5,17 +5,17 @@ const BG = '#0F172A';
 // Service families: a service name (`ecs`, `sqs`) wins over a generic word (`image`, `queue`), so
 // "ECS services using the image" is compute. Within each pass, the first family that matches wins.
 const FAMILY = [
-  [/key ?vault|entra|active directory|\biam\b|kms|secrets? manager|firewall|\bwaf\b|defender|guardduty|shield|\bsso\b|cognito|okta/i, /secrets?|identity|\bauth|security/i, '#EAB308'],
-  [/rds|aurora|postgres|mysql|dynamo|azure sql|cloud sql|cosmos|redshift|bigquery|spanner|firestore|bigtable/i, /database|\bdb\b|sql/i, '#5B8DEF'],
+  [/key ?vault|entra|active directory|azure ad\b|\biam\b|kms|secrets? manager|firewall|\bwaf\b|defender|guardduty|shield|\bsso\b|cognito|okta/i, /secrets?|identity|\bauth|security/i, '#EAB308'],
+  [/\brds\b|aurora|postgres|mysql|dynamo|azure sql|cloud sql|cosmos|redshift|bigquery|spanner|firestore|bigtable/i, /database|\bdb\b|sql/i, '#5B8DEF'],
   [/\bs3\b|\befs\b|glacier|blob|\bgcs\b|filestore/i, /bucket|lake|storage/i, '#10B981'],
   [/redis|memcached|elasticache/i, /cache/i, '#EF4444'],
-  [/\bsns\b|\bsqs\b|eventbridge|event ?hubs?|service ?bus|pub\/?sub|kinesis|kafka|\bmsk\b/i, /queue|topic|stream|webhook|notification|event/i, '#EC4899'],
-  [/github|gitlab|bitbucket|\becr\b|\bacr\b|codepipeline|codebuild|digger|terraform|argo ?cd|helm/i, /registry|pipeline|\bci\b|deploy|image|iac/i, '#14B8A6'],
-  [/cloudwatch|grafana|datadog|prometheus|sentry|posthog|x-?ray/i, /\blogs?\b|monitor|metric|alarm|trace|observab/i, '#84CC16'],
-  [/\bglue\b|\bemr\b|\bdbt\b|airflow|spark|databricks|cube ?js|cubestore|synapse/i, /warehouse|analytics|\betl\b/i, '#06B6D4'],
-  [/\baws account|subscription|management group|landing zone|\bou\b/i, /\baccount|tenant|organi[sz]ation|\borg\b|project/i, '#818CF8'],
-  [/\bvpc\b|vnet|subnet|\bnat\b|load.balanc|\b[an]lb\b|\belb\b|cloudfront|front ?door|route ?53|transit gateway|private ?endpoint|expressroute|interconnect|cloud cdn|\bnsg\b|api gateway/i, /gateway|\bdns\b|\bcdn\b|ingress|vpn|network/i, '#A78BFA'],
-  [/\becs\b|\beks\b|\baks\b|\bgke\b|\bec2\b|cloud run|compute engine|app engine|lambda|fargate|app service|container apps?|kubernetes|\bk8s\b|azure functions?|cloud functions?/i, /\bvm\b|virtual machine|function|\bapi\b|service|worker|compute|cluster|\btask|\bapp\b|server/i, '#F59E0B'],
+  [/\bsns\b|\bsqs\b|eventbridge|event ?hubs?|service ?bus|pub\/?sub|kinesis|kafka|\bmsk\b/i, /queue|topic|\bstream|webhook|notification|\bevent/i, '#EC4899'],
+  [/github|gitlab|bitbucket|\becr\b|\bacr\b|codepipeline|codebuild|cloud ?build|azure ?devops|terraform|argo ?cd|\bhelm\b/i, /registry|pipeline|\bci\b|deploy|image|iac/i, '#14B8A6'],
+  [/cloudwatch|grafana|datadog|prometheus|sentry|posthog|x-?ray/i, /\blog(s|ging)?\b|monitor|metric|alarm|trace|observab/i, '#84CC16'],
+  [/\bglue\b|\bemr\b|\bdbt\b|airflow|\bspark\b|databricks|cube ?js|synapse/i, /warehouse|analytics|\betl\b/i, '#06B6D4'],
+  [/\baws account|subscription|management group|resource group|landing zone|\bou\b/i, /\baccount|tenant|organi[sz]ation|\borg\b|project/i, '#818CF8'],
+  [/\bvpc\b|vnet|subnet|\bnat\b|load.balanc|\b[an]lb\b|\belb\b|cloudfront|front ?door|route ?53|transit|internet gateway|private ?endpoint|expressroute|interconnect|cloud cdn|\bnsg\b|api gateway/i, /gateway|\bdns\b|\bcdn\b|ingress|vpn|network/i, '#A78BFA'],
+  [/\becs\b|\beks\b|\baks\b|\bgke\b|\bec2\b|cloud run|compute engine|app engine|lambda|fargate|app service|container apps?|kubernetes|\bk8s\b|azure functions?|cloud functions?/i, /\bvm\b|virtual machine|function|\bapi\b|service|worker|compute|cluster|\btask|\bapp\b|\bservers?\b/i, '#F59E0B'],
   [/internet/i, /user|client|browser|customer|operator|developer|team/i, '#E2E8F0'],
 ];
 // The family color a label names, or undefined when it names none.

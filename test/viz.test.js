@@ -144,7 +144,10 @@ test('a diagram reads chains, fan-outs and text links, joins a two-line label, a
 
 test('several groups draw one frame each, titled by their path, then the links between them', () => {
   const src = 'flowchart LR\n  subgraph acct["Account prod"]\n    subgraph vpc["VPC main"]\n      api[ECS API] --> db[(RDS orders)]\n    end\n  end\n  subgraph edge["Edge"]\n    cdn[CloudFront]\n  end\n  cdn --> api';
-  const text = plain(draw('mermaid', src, { width: 120 }));
+  const lines = draw('mermaid', src, { width: 120 });
+  const text = plain(lines);
+  const frame = (title) => lines.flat()[lines.flat().findIndex(([t]) => t === title) - 1][1];
+  assert.equal(frame('Account prod › VPC main'), familyOf('VPC main'), 'a frame takes the color of its group');
   assert.match(text, /╭─ Account prod › VPC main ─/);
   assert.match(text, /╭─ Edge ─/);
   assert.match(text, /Links between groups +│\n│ +CloudFront → ECS API/);
@@ -156,8 +159,12 @@ test('a node takes the color of the service it names, before a generic word', ()
   const differ = (a, b) => assert.notEqual(familyOf(a), familyOf(b), `${a} / ${b}`);
   same('SQS jobs', 'Service Bus orders');
   same('GitHub repo', 'ECR push');
-  same('AWS account prod', 'tenant cava');
+  same('AWS account prod', 'tenant acme');
   same('All ECS services using the image', 'Cloud Run api');
+  same('Cloud Build', 'GitHub repo');
+  same('Internet Gateway', 'NAT gateway');
+  same('Upstream API', 'ECS api');
+  differ('Dashboards', 'RDS orders');
   differ('SQS jobs', 'ECS api');
   differ('CloudWatch logs', 'S3 logs bucket');
   assert.equal(familyOf('Shop front page'), undefined);
