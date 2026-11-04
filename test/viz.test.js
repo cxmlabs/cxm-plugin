@@ -92,6 +92,37 @@ test('a side table shows the listed row keys, signed columns in red and green wi
   assert.notEqual(last('+$32'), last('-$234'), 'a fall has the other color');
   assert.equal(last('-$202'), last('-$234'), 'the signed total is colored');
   assert.throws(() => draw('chart', chart({ table: [{ name: 'x' }], data: rows })), /row key or an object with a "key"/);
+  const queried = months.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])));
+  const query = { measures: ['sep', 'oct', 'delta', 'pct'] };
+  assert.equal(plain(draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, query, data: queried }), { width: 140 })), text, 'a query row holds its measures as strings');
+  assert.match(plain(draw('chart', chart({ table: ['id'], query: { measures: ['v'] }, data: [{ k: 'a', v: '1', id: '2024' }] }))), /a +2024 /, 'a dimension stays text');
+  assert.match(plain(draw('chart', chart({ table: ['n'], data: [{ k: 'a', v: 1, n: 3 }, { k: 'b', v: 2 }] }))), /b +│[\s\S]*Total +3/, 'a blank cell keeps the column numeric');
+  assert.throws(() => draw('chart', chart({ series: 'm', table: ['v'], data: [{ k: 'a', m: 'x', v: 1 }, { k: 'a', m: 'y', v: 2 }] })), /one row per "x"/);
+});
+
+test('a diverging chart signs its "table": true values, and a value that rounds to zero has no sign', () => {
+  const lines = draw('chart', chart({ diverging: true, yFormat: 'currency', table: true, data: [{ k: 'a', v: 87.8 }, { k: 'b', v: -9.996 }, { k: 'c', v: -0.001 }, { k: 'd', v: 0.001 }] }), { width: 140 });
+  const text = plain(lines);
+  assert.match(text, /a +\+\$88 +│/);
+  assert.match(text, /b +-\$10 +│/);
+  assert.match(text, /c +\$0 +│/);
+  assert.match(text, /d +\$0 +│/);
+  assert.equal(runs(lines).find(([t]) => /^c +\$0$/.test(t))[1], '', 'a zero in the table has no sign color');
+});
+
+test('a listed table skips the x key it already shows, and a whole small amount has no cents', () => {
+  const text = plain(draw('chart', chart({ yFormat: 'currency', table: ['k', 'v'], data: [{ k: 'A', v: 0 }, { k: 'B', v: 1 }, { k: 'C', v: 3.3 }] }), { width: 100 }));
+  assert.equal((text.match(/│ B /g) || []).length, 2, 'B once in the chart and once in the table');
+  assert.match(text, /\$0 /);
+  assert.match(text, /\$3\.30/);
+  assert.doesNotMatch(text, /\$1\.00|\$0\.00/);
+});
+
+test('a row puts as many blocks on a line as fit, then wraps the rest', () => {
+  const text = plain(draw('row', JSON.stringify([{ title: 'One', ...JSON.parse(chart({ data: rows, table: true })) }, { title: 'Two', ...JSON.parse(chart({ data: rows })) }]), { width: 60 }));
+  const tops = text.split('\n').filter((l) => l.startsWith('╭'));
+  assert.equal(tops.length, 2, 'two lines of frames');
+  assert.equal((tops[0].match(/╭/g) || []).length, 2, 'the chart and its table share the first line');
 });
 
 test('a comparison draws its overview and its change side by side in one row', () => {
