@@ -333,7 +333,8 @@ export function draw(kind, body, { width = 100 } = {}) {
   if (kind === 'row') {
     const items = Array.isArray(spec) ? spec : spec?.items;
     if (!Array.isArray(items) || items.length === 0) throw new Error('A row needs a non-empty array of items');
-    const room = Math.floor(width / items.length) - 1;
+    // Each item may use the whole width: a bar has a set maximum, and blocks that do not fit wrap.
+    const room = width;
     return layout(items.flatMap((item) => itemBlocks(item, room)), width);
   }
   if (spec === null || typeof spec !== 'object' || Array.isArray(spec)) throw new Error('A chart is one JSON object');
