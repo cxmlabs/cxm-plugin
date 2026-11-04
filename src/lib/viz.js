@@ -42,7 +42,10 @@ function fmt(v, format) {
   const text = format === 'currency' ? `$${dollars(a)}` : format === 'percent' ? `${number(a)}%` : number(a);
   return v < 0 && nonZero(text) ? `-${text}` : text;
 }
-const signed = (v, format) => `${v > 0 && nonZero(fmt(v, format)) ? '+' : ''}${fmt(v, format)}`;
+function signed(v, format) {
+  const text = fmt(v, format);
+  return v > 0 && nonZero(text) ? `+${text}` : text;
+}
 // A rise reads red and a fall green, as on a bill.
 const RISE = '#F87171';
 const FALL = '#4ADE80';
@@ -220,9 +223,6 @@ function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' 
   };
 }
 
-// A query returns its measures as numeric strings, so a table cell reads one as the number.
-const cellValue = (v) => (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : v);
-
 // The side table: `true` shows the charted values; a list names more keys of the rows, one per
 // column, each a key or { key, name, format, signed }. A diverging chart's values are signed.
 function asTable(spec, { labels, series }) {
@@ -236,7 +236,10 @@ function asTable(spec, { labels, series }) {
   if (cols.some((c) => typeof c?.key !== 'string')) throw new Error('Each "table" column is a row key or an object with a "key"');
   // A series chart holds one row per x and series, so a list of row keys has no single row per x.
   if (spec.series) throw new Error('A "table" list needs one row per "x": use "table": true on a chart with "series"');
-  const rows = spec.data.map((r) => [cut(formatX(r[spec.x], spec.xFormat), LABEL_MAX), ...cols.map((c) => cellValue(r[c.key]))]);
+  // A query returns its measures as strings; only those turn into numbers, never a dimension such as an account ID.
+  const measures = new Set(spec.query?.measures ?? []);
+  const value = (r, key) => (measures.has(key) && typeof r[key] === 'string' && r[key] !== '' ? Number(r[key]) : r[key]);
+  const rows = spec.data.map((r) => [cut(formatX(r[spec.x], spec.xFormat), LABEL_MAX), ...cols.map((c) => value(r, c.key))]);
   return tableBlock({ ...base, columns: ['', ...cols.map((c) => ({ name: c.key, ...c }))], rows });
 }
 

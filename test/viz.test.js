@@ -90,17 +90,20 @@ test('a side table shows the listed row keys, signed columns in red and green wi
   assert.equal(last('-$202'), last('-$234'), 'the signed total is colored');
   assert.throws(() => draw('chart', chart({ table: [{ name: 'x' }], data: rows })), /row key or an object with a "key"/);
   const queried = months.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])));
-  assert.equal(plain(draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, data: queried }), { width: 140 })), text, 'a query row holds numeric strings');
+  const query = { measures: ['sep', 'oct', 'delta', 'pct'] };
+  assert.equal(plain(draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, query, data: queried }), { width: 140 })), text, 'a query row holds its measures as strings');
+  assert.match(plain(draw('chart', chart({ table: ['id'], query: { measures: ['v'] }, data: [{ k: 'a', v: '1', id: '2024' }] }))), /a +2024 /, 'a dimension stays text');
   assert.match(plain(draw('chart', chart({ table: ['n'], data: [{ k: 'a', v: 1, n: 3 }, { k: 'b', v: 2 }] }))), /b +│[\s\S]*Total +3/, 'a blank cell keeps the column numeric');
   assert.throws(() => draw('chart', chart({ series: 'm', table: ['v'], data: [{ k: 'a', m: 'x', v: 1 }, { k: 'a', m: 'y', v: 2 }] })), /one row per "x"/);
 });
 
 test('a diverging chart signs its "table": true values, and a value that rounds to zero has no sign', () => {
-  const lines = draw('chart', chart({ diverging: true, yFormat: 'currency', table: true, data: [{ k: 'a', v: 87.8 }, { k: 'b', v: -9.996 }, { k: 'c', v: -0.001 }] }), { width: 140 });
+  const lines = draw('chart', chart({ diverging: true, yFormat: 'currency', table: true, data: [{ k: 'a', v: 87.8 }, { k: 'b', v: -9.996 }, { k: 'c', v: -0.001 }, { k: 'd', v: 0.001 }] }), { width: 140 });
   const text = plain(lines);
   assert.match(text, /a +\+\$88 +│/);
   assert.match(text, /b +-\$10 +│/);
   assert.match(text, /c +\$0\.00 +│/);
+  assert.match(text, /d +\$0\.00 +│/);
   assert.equal(runs(lines).filter(([t]) => t.includes('$0.00')).at(-1)[1], '', 'a zero in the table has no sign color');
 });
 
