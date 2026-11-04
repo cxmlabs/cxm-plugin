@@ -19,7 +19,16 @@ const FAMILY = [
   [/internet/i, /user|client|browser|customer|operator|developer|team/i, '#E2E8F0'],
 ];
 // The family color a label names, or undefined when it names none.
-export const familyOf = (text) => (FAMILY.find(([strong]) => strong.test(text)) ?? FAMILY.find(([, weak]) => weak.test(text)))?.[2];
+// Among generic words the last one wins, as a label ends with its noun: "Auth DB" is a database.
+function lastWeak(text) {
+  let best;
+  for (const family of FAMILY) {
+    const flags = family[1].flags.includes('g') ? family[1].flags : `${family[1].flags}g`;
+    for (const m of text.matchAll(new RegExp(family[1].source, flags))) if (!best || m.index > best.at) best = { at: m.index, color: family[2] };
+  }
+  return best?.color;
+}
+export const familyOf = (text) => FAMILY.find(([strong]) => strong.test(text))?.[2] ?? lastWeak(text);
 const ARROW = /[►◄▲▼]/;
 const LINE = /[─│├┤┬┴┼┌┐└┘╭╮╰╯]/;
 const tint = (hex, pct) =>
@@ -308,7 +317,7 @@ function groupedView(model, icons, width) {
   const lines = [];
   const block = (items, depth, title, color) => {
     const pad = '  '.repeat(depth);
-    if (title) lines.push([[pad], ['▌ ', color], [title, '#F8FAFC', '', true]]);
+    if (title) lines.push([[pad], ['▌ ', color], [title, color, '', true]]);
     for (const item of items) {
       if (item.node) lines.push([[`${pad}${title ? '  ' : ''}`], ['■ ', nameRun(item.node)[1]], [nameRun(item.node)[0]]]);
       else {
@@ -380,7 +389,7 @@ function sectionFrame(title, color, lines, height = 0) {
   while (body.length < height - 2) body.push([[' '.repeat(inner)]]);
   const top = title ? `─ ${title} ${'─'.repeat(Math.max(0, inner - [...title].length - 1))}` : '─'.repeat(inner + 2);
   return [
-    [['╭', color], [title ? '─ ' : '', color], [title, '#F8FAFC', '', true], [title ? ` ${'─'.repeat(Math.max(0, inner - [...title].length - 1))}` : top, color], ['╮', color]],
+    [['╭', color], [title ? '─ ' : '', color], [title, color, '', true], [title ? ` ${'─'.repeat(Math.max(0, inner - [...title].length - 1))}` : top, color], ['╮', color]],
     ...body.map((runs) => [['│ ', color], ...runs, [' │', color]]),
     [[`╰${'─'.repeat(inner + 2)}╯`, color]],
   ];

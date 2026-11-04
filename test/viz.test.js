@@ -154,6 +154,13 @@ test('several groups draw one frame each, titled by their path, then the links b
   assert.match(text, /ECS API[^\n]*►[^\n]*RDS orders|ECS API[\s\S]*▼[\s\S]*RDS orders/, 'a link inside a group is drawn');
 });
 
+test('among generic words, the last one in a label wins', () => {
+  assert.equal(familyOf('Auth DB'), familyOf('orders database'));
+  assert.equal(familyOf('Analytics API'), familyOf('ECS api'));
+  assert.equal(familyOf('Monitoring service'), familyOf('ECS api'));
+  assert.notEqual(familyOf('Auth DB'), familyOf('Auth API'));
+});
+
 test('a node takes the color of the service it names, before a generic word', () => {
   const same = (a, b) => assert.equal(familyOf(a), familyOf(b), `${a} / ${b}`);
   const differ = (a, b) => assert.notEqual(familyOf(a), familyOf(b), `${a} / ${b}`);
