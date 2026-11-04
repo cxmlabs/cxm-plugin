@@ -75,6 +75,29 @@ test('a query that hit its limit labels its total as the top rows only', () => {
   assert.match(plain(draw('chart', chart({ series: 'g', query: { limit: 2 }, data: two }))), /y 2 +of top 2/);
 });
 
+const months = [{ k: 'RDS', sep: 2042, oct: 1808 }, { k: 'KMS', sep: 113, oct: 145 }].map((r) => ({ ...r, delta: r.oct - r.sep, pct: ((r.oct - r.sep) / r.sep) * 100 }));
+
+test('a side table shows the listed row keys, signed columns in red and green with their total, and no total for percents', () => {
+  const table = [{ key: 'sep', name: 'Sep' }, { key: 'oct', name: 'Oct' }, { key: 'delta', name: 'Δ', signed: true }, { key: 'pct', name: 'Δ %', format: 'percent', signed: true }];
+  const lines = draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, data: months }), { width: 140 });
+  const text = plain(lines);
+  assert.match(text, /Sep +Oct +Δ +Δ %/);
+  assert.match(text, /RDS +\$2,042 +\$1,808 +-\$234 +-11\.5%/);
+  assert.match(text, /Total +\$2,155 +\$1,953 +-\$202 +│/, 'the percent column has no total');
+  const last = (t) => runs(lines).filter(([r]) => r.trim() === t).at(-1)[1];
+  assert.equal(last('+$32'), last('+28.3%'), 'a rise is one color in both table columns');
+  assert.notEqual(last('+$32'), last('-$234'), 'a fall has the other color');
+  assert.equal(last('-$202'), last('-$234'), 'the signed total is colored');
+  assert.throws(() => draw('chart', chart({ table: [{ name: 'x' }], data: rows })), /row key or an object with a "key"/);
+});
+
+test('a comparison draws its overview and its change side by side in one row', () => {
+  const periods = months.flatMap((r) => [{ k: r.k, m: 'Sep', v: r.sep }, { k: r.k, m: 'Oct', v: r.oct }]);
+  const text = plain(draw('row', JSON.stringify([{ type: 'bar', title: 'Sep vs Oct', x: 'k', y: 'v', series: 'm', data: periods }, { type: 'bar', diverging: true, title: 'Change', x: 'k', y: 'delta', data: months }]), { width: 140 }));
+  assert.match(text.split('\n')[1], /Sep vs Oct.*│ │.*Change/);
+  assert.match(text, /■ Sep 2,155 +■ Oct 1,953/);
+});
+
 test('signed rows show no share, and a negative column stands as tall as its size', () => {
   const bar = plain(draw('chart', chart({ data: [{ k: 'a', v: -5 }, { k: 'b', v: 10 }] })));
   assert.doesNotMatch(bar, /%/);

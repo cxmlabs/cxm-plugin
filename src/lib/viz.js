@@ -7,7 +7,7 @@ const FAINT = '#64748B';
 const BORDER = '#334155';
 const EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
 const LOWER = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-const LABEL_MAX = 24;
+const LABEL_MAX = 28;
 const TYPES = ['bar', 'line', 'column', 'pie'];
 // Labels come from cloud data; a control character in one would send a command to the terminal that prints it.
 const CONTROL = /[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
@@ -29,14 +29,19 @@ const padEnd = (runs, w) => (widthOf(runs) < w ? [...runs, [' '.repeat(w - width
 const cut = (s, max) => (len(s) > max ? `${[...s].slice(0, max - 1).join('')}…` : s);
 
 // Intl may be absent where the reply renderer runs, so group the thousands by hand.
-function number(v) {
-  const digits = Math.abs(v) >= 100 ? 0 : 1;
+function number(v, digits = Math.abs(v) >= 100 ? 0 : 1) {
   const [int, dec] = Math.abs(v).toFixed(digits).split('.');
   const text = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (dec && dec !== '0' ? `.${dec}` : '');
   return v < 0 ? `-${text}` : text;
 }
-const fmt = (v, format) => (format === 'currency' ? (v < 0 ? `-$${number(-v)}` : `$${number(v)}`) : format === 'percent' ? `${number(v)}%` : number(v));
+// Whole dollars from $10, so a column of amounts lines up; cents only below.
+const dollars = (v) => number(v, v >= 10 ? 0 : 2);
+const fmt = (v, format) => (format === 'currency' ? (v < 0 ? `-$${dollars(-v)}` : `$${dollars(v)}`) : format === 'percent' ? `${number(v)}%` : number(v));
 const signed = (v, format) => `${v > 0 ? '+' : ''}${fmt(v, format)}`;
+// A rise reads red and a fall green, as on a bill.
+const RISE = '#F87171';
+const FALL = '#4ADE80';
+const signColor = (v) => (v > 0 ? RISE : v < 0 ? FALL : '');
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function formatX(v, xFormat) {
@@ -169,29 +174,48 @@ function lineLines({ labels, series }, spec, room) {
   return lines;
 }
 
-// A table block: numbers right-aligned, and a bold total row unless `total` is false.
+// A table block: numbers right-aligned, and a bold total row unless `total` is false. A column is a
+// name or { name, format, signed, total }; a signed column shows +/− in red and green, its total too.
 function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' }) {
-  const numeric = columns.map((_, i) => rows.length > 0 && rows.every((r) => typeof r[i] === 'number'));
-  const sums = columns.map((_, i) => (numeric[i] ? sum(rows.map((r) => r[i])) : null));
+  const cols = columns.map((c) => (typeof c === 'string' ? { name: c } : c));
+  const numeric = cols.map((_, i) => rows.length > 0 && rows.every((r) => typeof r[i] === 'number'));
+  // A sum of percentages means nothing, so a percent column has no total unless it asks for one.
+  const sums = cols.map((c, i) => (numeric[i] && c.total !== false && (c.total || (c.format ?? format) !== 'percent') ? sum(rows.map((r) => r[i])) : null));
   const withTotal = total !== false && sums.some((v) => v !== null);
-  const cells = rows.map((r) => r.map((v) => (typeof v === 'number' ? fmt(v, format) : String(v ?? ''))));
-  const totalRow = columns.map((_, i) => (sums[i] !== null ? fmt(sums[i], format) : i === 0 ? totalLabel : ''));
-  const w = columns.map((h, i) => Math.max(len(h), ...cells.map((r) => len(r[i] ?? '')), withTotal ? len(totalRow[i]) : 0));
-  const line = (r) => r.map((v, i) => (numeric[i] ? v.padStart(w[i]) : v.padEnd(w[i]))).join('  ');
+  const show = (v, c) => (c.signed ? signed(v, c.format ?? format) : fmt(v, c.format ?? format));
+  const cell = (v, i) => (typeof v === 'number' ? [show(v, cols[i]), cols[i].signed ? signColor(v) : ''] : [String(v ?? ''), '']);
+  const cells = rows.map((r) => cols.map((_, i) => cell(r[i], i)));
+  const totalRow = cols.map((c, i) => (sums[i] !== null ? cell(sums[i], i) : [i === 0 ? totalLabel : '', '']));
+  const w = cols.map((c, i) => Math.max(len(c.name), ...cells.map((r) => len(r[i][0])), withTotal ? len(totalRow[i][0]) : 0));
+  const pad = (t, i) => (numeric[i] ? t.padStart(w[i]) : t.padEnd(w[i]));
+  const line = (r, bold) => r.flatMap(([t, fg], i) => [...(i ? [['  ']] : []), [pad(t, i), fg, '', bold]]);
   const rule = [[w.map((n) => '─'.repeat(n)).join('  '), BORDER]];
   return {
     title,
     lines: [
-      [[line(columns), MUTED, '', true]],
+      [[cols.map((c, i) => pad(c.name, i)).join('  '), MUTED, '', true]],
       rule,
-      ...cells.map((r) => [[line(r)]]),
-      ...(withTotal ? [rule, [[line(totalRow), '', '', true]]] : []),
+      ...cells.map((r) => line(r, false)),
+      ...(withTotal ? [rule, line(totalRow, true)] : []),
     ],
   };
 }
 
-const asTable = (spec, { labels, series }) =>
-  tableBlock({ title: 'Values', columns: ['', ...series.map((s) => s.name)], rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]), format: spec.yFormat, totalLabel: `T${spec.totalLabel.slice(1)}` });
+// The side table: `true` shows the charted values; a list names more keys of the rows, one per
+// column, each a key or { key, name, format, signed, total }. A diverging chart's values are signed.
+function asTable(spec, { labels, series }) {
+  if (spec.table === true) {
+    const cols = ['', ...series.map((s) => (spec.diverging ? { name: s.name, signed: true } : s.name))];
+    return tableBlock({ title: 'Values', columns: cols, rows: labels.map((x, i) => [x, ...series.map((s) => s.data[i])]), format: spec.yFormat, totalLabel: `T${spec.totalLabel.slice(1)}` });
+  }
+  if (!Array.isArray(spec.table) || spec.table.length === 0) throw new Error('"table" is true or a list of row keys');
+  const cols = spec.table.map((c) => (typeof c === 'string' ? { key: c } : c));
+  if (cols.some((c) => typeof c?.key !== 'string')) throw new Error('Each "table" column is a row key or an object with a "key"');
+  const first = new Map();
+  for (const r of spec.data) if (!first.has(String(r[spec.x]))) first.set(String(r[spec.x]), r);
+  const rows = [...first.values()].map((r) => [cut(formatX(r[spec.x], spec.xFormat), LABEL_MAX), ...cols.map((c) => r[c.key] ?? '')]);
+  return tableBlock({ title: spec.tableTitle ?? 'Values', columns: ['', ...cols.map((c) => ({ name: c.key, ...c }))], rows, format: spec.yFormat, totalLabel: `T${spec.totalLabel.slice(1)}` });
+}
 
 // The blocks one chart spec draws: the chart, and its table beside it when `table` is set.
 function chartBlocks(spec, room) {
