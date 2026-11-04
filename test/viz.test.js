@@ -33,13 +33,15 @@ test('a diverging chart puts rises right in red and falls left in green, with th
   assert.ok(parseInt(fall.slice(3, 5), 16) > parseInt(fall.slice(1, 3), 16), 'a fall is green');
 });
 
-test('a diagram tints each node by its family and fits the width: left to right, then top to bottom, then an edge list', () => {
+test('a diagram tints each node by its family and fits the width: left to right, then top to bottom, then a list', () => {
   const wide = draw('mermaid', fixture('aws.mmd'), { width: 160 });
   assert.match(plain(wide), /Users ├──►│ CloudFront/);
   assert.notEqual(runOf(wide, 'Aurora PostgreSQL')[2], '', 'a database node has a fill');
   assert.notEqual(runOf(wide, 'Aurora PostgreSQL')[2], runOf(wide, 'ECS API service')[2], 'two families, two fills');
   assert.match(plain(draw('mermaid', fixture('aws.mmd'), { width: 80 })), /Users[\s│]+└─+┬─+┘/);
-  assert.match(plain(draw('mermaid', fixture('aws.mmd'), { width: 40 })), /^│ Users → CloudFront/m);
+  const list = plain(draw('mermaid', fixture('aws.mmd'), { width: 40 }));
+  assert.match(list, /▌ Production VPC +│\n│ +■ ECS API service/);
+  assert.match(list, /Links[\s\S]*Users → CloudFront/);
 });
 
 test("a Dex cloud diagram's icon nodes become labelled boxes colored by the icon, and edge labels keep their spaces", () => {
@@ -124,12 +126,28 @@ test('a chart refuses no rows, a value that is not a number, and an unknown type
   assert.doesNotMatch(plain(draw('mermaid', 'flowchart LR\n  A[a\u001b[2J] --> B')), /\u001b/);
 });
 
-test('a diagram takes a classDef color in short hex, and its edge list keeps every edge of a chain', () => {
+test('a diagram takes a classDef color in short hex, and its list keeps every edge of a chain', () => {
   const lines = draw('mermaid', 'flowchart LR\n  A[Users] --> B[Orders]\n  classDef hot fill:#f00\n  class B hot');
   assert.ok(runs(lines).some(([, fg]) => fg === '#ff0000'), 'the class color wins over the family color');
-  const list = plain(draw('mermaid', 'flowchart LR\n  A[Users of the shop] --> B[Orders API of the shop] --> C[(Orders database of the shop)]', { width: 20 }));
-  assert.match(list, /Users of the shop → Orders API of the shop/);
-  assert.match(list, /Orders API of the shop → Orders database of the shop/);
+  const list = plain(draw('mermaid', 'flowchart LR\n  A[Users of the shop] --> B[Orders API of the shop] --> C[(Orders database of the shop)]', { width: 60 }));
+  assert.match(list, /Users of the shop[\s\S]*▼[\s\S]*Orders API of the shop[\s\S]*▼[\s\S]*Orders database of the shop/, 'both links of the chain');
+});
+
+test('a diagram reads chains, fan-outs and text links, joins a two-line label, and sends a link to a group to its first node', () => {
+  const src = 'flowchart LR\n  subgraph net["Network"]\n    lb["Load balancer<br/>public"]\n  end\n  u[Users] & b[Bots] --> lb\n  lb -- calls --> api[API service] -->|"sql"| db[(Orders DB)]\n  ops[Operators] --> net';
+  const text = plain(draw('mermaid', src, { width: 160 }));
+  for (const label of ['Load balancer · public', 'Users', 'Bots', 'API service', 'Orders DB', 'Operators', 'Network']) assert.ok(text.includes(label), label);
+  assert.doesNotMatch(text, /<br/);
+  assert.match(text, /calls/);
+});
+
+test('several groups draw one frame each, titled by their path, then the links between them', () => {
+  const src = 'flowchart LR\n  subgraph acct["Account prod"]\n    subgraph vpc["VPC main"]\n      api[ECS API] --> db[(RDS orders)]\n    end\n  end\n  subgraph edge["Edge"]\n    cdn[CloudFront]\n  end\n  cdn --> api';
+  const text = plain(draw('mermaid', src, { width: 120 }));
+  assert.match(text, /╭─ Account prod › VPC main ─/);
+  assert.match(text, /╭─ Edge ─/);
+  assert.match(text, /Links between groups +│\n│ +CloudFront → ECS API/);
+  assert.match(text, /ECS API[^\n]*►[^\n]*RDS orders|ECS API[\s\S]*▼[\s\S]*RDS orders/, 'a link inside a group is drawn');
 });
 
 test('a label inside a longer label colors only its own box', () => {
