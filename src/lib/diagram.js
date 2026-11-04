@@ -362,10 +362,49 @@ function drawOther(text, icons, width) {
 }
 
 // The best drawing of a model that fits the width with every label whole, else null.
+// The links that close a cycle, found by a depth-first walk in source order. A layered layout
+// routes them back through other boxes, so they are listed under the drawing instead.
+function cycleLinks(model) {
+  const links = edges(model);
+  const out = new Map();
+  for (const e of links) out.set(e.from, [...(out.get(e.from) ?? []), e]);
+  const state = new Map();
+  const back = new Set();
+  const walk = (id) => {
+    state.set(id, 'open');
+    for (const e of out.get(id) ?? []) {
+      if (state.get(e.to) === 'open') back.add(e);
+      else if (!state.has(e.to)) walk(e.to);
+    }
+    state.set(id, 'done');
+  };
+  for (const id of model.nodes.keys()) if (!state.has(id)) walk(id);
+  return { forward: links.filter((e) => !back.has(e)), back: links.filter((e) => back.has(e)) };
+}
+
+// Nodes in the order their links run (sources first, stable on ties): the layout places nodes
+// partly by declaration, so this keeps a link from looping back across the drawing.
+function topoOrder(model, links) {
+  const ids = [...model.nodes.keys()];
+  const indeg = new Map(ids.map((id) => [id, 0]));
+  for (const e of links) indeg.set(e.to, (indeg.get(e.to) ?? 0) + 1);
+  const done = [];
+  const left = new Set(ids);
+  while (left.size) {
+    const next = [...left].find((id) => indeg.get(id) === 0) ?? [...left][0];
+    left.delete(next);
+    done.push(next);
+    for (const e of links) if (e.from === next) indeg.set(e.to, indeg.get(e.to) - 1);
+  }
+  return done.map((id) => ({ node: id }));
+}
+
 function drawWhole(model, icons, width) {
+  const { forward, back } = cycleLinks(model);
+  const drawn = { ...model, edges: forward, order: model.groups.size ? model.order : topoOrder(model, forward) };
   const dirs = /^(LR|RL)$/.test(model.dir) ? [model.dir, 'TB'] : [model.dir === 'TD' ? 'TB' : model.dir];
   for (const dir of dirs) {
-    const src = emit(model, dir);
+    const src = emit(drawn, dir);
     for (const paddingX of [3, 1]) {
       let text;
       // The vendored layout throws on some link routes; that layout is skipped like one that does not fit.
@@ -375,7 +414,11 @@ function drawWhole(model, icons, width) {
         continue;
       }
       const lines = trim(colorGrid(text, src, icons));
-      if (visible(lines) <= width && intact(lines, model)) return lines;
+      if (visible(lines) > width || !intact(lines, drawn)) continue;
+      if (!back.length) return lines;
+      const { hue } = labelsOf(src);
+      const name = (id) => [clean(model.nodes.get(id)?.label ?? id, LIST_MAX), hue(id, icons[id]) ?? '#E2E8F0'];
+      return [...lines, [], ...back.map((e) => [['↺ ', '#94A3B8'], name(e.from), [' → ', '#5B8DEF'], name(e.to), ...(e.label ? [[`  ${clean(e.label, LIST_MAX)}`, '#94A3B8']] : [])])];
     }
   }
   return null;
