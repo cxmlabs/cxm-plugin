@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { familyOf } from '../src/lib/diagram.js';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -148,6 +149,18 @@ test('several groups draw one frame each, titled by their path, then the links b
   assert.match(text, /╭─ Edge ─/);
   assert.match(text, /Links between groups +│\n│ +CloudFront → ECS API/);
   assert.match(text, /ECS API[^\n]*►[^\n]*RDS orders|ECS API[\s\S]*▼[\s\S]*RDS orders/, 'a link inside a group is drawn');
+});
+
+test('a node takes the color of the service it names, before a generic word', () => {
+  const same = (a, b) => assert.equal(familyOf(a), familyOf(b), `${a} / ${b}`);
+  const differ = (a, b) => assert.notEqual(familyOf(a), familyOf(b), `${a} / ${b}`);
+  same('SQS jobs', 'Service Bus orders');
+  same('GitHub repo', 'ECR push');
+  same('AWS account prod', 'tenant cava');
+  same('All ECS services using the image', 'Cloud Run api');
+  differ('SQS jobs', 'ECS api');
+  differ('CloudWatch logs', 'S3 logs bucket');
+  assert.equal(familyOf('Shop front page'), undefined);
 });
 
 test('a label inside a longer label colors only its own box', () => {
