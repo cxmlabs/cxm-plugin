@@ -107,6 +107,13 @@ test('a diverging chart signs its "table": true values, and a value that rounds 
   assert.equal(runs(lines).filter(([t]) => t.includes('$0.00')).at(-1)[1], '', 'a zero in the table has no sign color');
 });
 
+test('a row puts as many blocks on a line as fit, then wraps the rest', () => {
+  const text = plain(draw('row', JSON.stringify([{ title: 'One', ...JSON.parse(chart({ data: rows, table: true })) }, { title: 'Two', ...JSON.parse(chart({ data: rows })) }]), { width: 60 }));
+  const tops = text.split('\n').filter((l) => l.startsWith('╭'));
+  assert.equal(tops.length, 2, 'two lines of frames');
+  assert.equal((tops[0].match(/╭/g) || []).length, 2, 'the chart and its table share the first line');
+});
+
 test('a comparison draws its overview and its change side by side in one row', () => {
   const periods = months.flatMap((r) => [{ k: r.k, m: 'Sep', v: r.sep }, { k: r.k, m: 'Oct', v: r.oct }]);
   const text = plain(draw('row', JSON.stringify([{ type: 'bar', title: 'Sep vs Oct', x: 'k', y: 'v', series: 'm', data: periods }, { type: 'bar', diverging: true, title: 'Change', x: 'k', y: 'delta', data: months }]), { width: 140 }));

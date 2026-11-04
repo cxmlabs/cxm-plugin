@@ -287,14 +287,25 @@ function frame({ title, lines, spaced }, height = 0) {
   ];
 }
 
-// Blocks side by side when they fit the width, else one under the other.
+// Blocks side by side, as many to a line as fit the width, each line level at the bottom.
 function layout(blocks, width) {
-  const framed = blocks.map((b) => frame(b));
-  const total = framed.reduce((n, f) => n + widthOf(f[0]) + 1, -1);
-  if (framed.length === 1 || total > width) return framed.flatMap((f, i) => (i ? [[], ...f] : f));
-  const height = Math.max(...framed.map((f) => f.length));
-  const even = blocks.map((b) => frame(b, height));
-  return Array.from({ length: height }, (_, r) => even.flatMap((f, i) => [...(i ? [[' ']] : []), ...f[r]]));
+  const lines = [];
+  let row = [];
+  const flush = () => {
+    if (!row.length) return;
+    const height = Math.max(...row.map((b) => frame(b).length));
+    const even = row.map((b) => frame(b, height));
+    if (lines.length) lines.push([]);
+    for (let r = 0; r < height; r++) lines.push(even.flatMap((f, i) => [...(i ? [[' ']] : []), ...f[r]]));
+    row = [];
+  };
+  for (const b of blocks) {
+    const used = row.reduce((n, x) => n + widthOf(frame(x)[0]) + 1, 0);
+    if (row.length && used + widthOf(frame(b)[0]) > width) flush();
+    row.push(b);
+  }
+  flush();
+  return lines;
 }
 
 // JSON.parse with a message that never quotes the body.
