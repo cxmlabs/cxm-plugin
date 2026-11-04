@@ -144,10 +144,12 @@ test('a diagram reads chains, fan-outs and text links, joins a two-line label, a
   assert.deepEqual(links(src), ['u>lb', 'b>lb', 'lb>api:calls', 'api>db:sql', 'ops>net']);
   const twoGroups = `${src}\n  subgraph jobs["Jobs"]\n    q[Queue]\n  end`;
   assert.match(plain(draw('mermaid', twoGroups, { width: 120 })), /Operators → Network \(group\)/, 'a link between groups names the group');
-  const terse = 'graph TD; a-1:::hot-->b-2[B] -.-> c-->d %% note\n  style a-1 fill:#f00\n  d ==> idle\n  subgraph idle[Idle group]\n  end';
+  const terse = 'graph TD; a-1:::hot-->b-2[B] -.-> c-->d %% note\n  style a-1 fill:#f00\n  d ==> idle\n  subgraph outer[Outer]\n    subgraph idle[Idle group]\n    end\n  end';
   assert.deepEqual(links(terse), ['a-1>b-2', 'b-2>c', 'c>d', 'd>idle']);
-  assert.equal(parseFlowchart(terse).nodes.get('idle').label, 'Idle group', 'an empty group is a node');
-  assert.deepEqual([...parseFlowchart('flowchart\n  a --> b').nodes.keys()], ['a', 'b'], 'a header with no direction is not a node');
+  const { label, group } = parseFlowchart(terse).nodes.get('idle');
+  assert.deepEqual([label, group], ['Idle group', 'outer'], 'an empty group is a node of its parent');
+  const bare = parseFlowchart('flowchart\n  a --> b');
+  assert.deepEqual([bare.dir, ...bare.nodes.keys()], ['TB', 'a', 'b'], 'a header with no direction is not a node');
 });
 
 test('a diagram that no layout draws whole is a list that wraps a long line at a space and keeps every label', () => {
@@ -160,9 +162,11 @@ test('a diagram that no layout draws whole is a list that wraps a long line at a
 });
 
 test('a mermaid block of another kind draws as the text renderer draws it', () => {
-  const text = plain(draw('mermaid', 'sequenceDiagram\n  Alice->>Bob: Hello', { width: 60 }));
+  const src = '%% a note\nsequenceDiagram\n  Alice->>Bob: Hello';
+  const text = plain(draw('mermaid', src, { width: 60 }));
   assert.match(text, /│ Alice │ +│ Bob │/);
   assert.doesNotMatch(text, /sequenceDiagram/);
+  assert.throws(() => draw('mermaid', src, { width: 12 }), /cannot be drawn/);
 });
 
 test('several groups draw one frame each, titled by their path, then the links between them', () => {

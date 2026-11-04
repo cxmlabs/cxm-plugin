@@ -163,13 +163,10 @@ function readNode(line, at) {
       const q = line.indexOf('"', i + 1);
       label = line.slice(i + 1, q < 0 ? undefined : q);
       i = q < 0 ? line.length : q + 1;
-      const c = line.indexOf(close, i);
-      i = c < 0 ? line.length : c + close.length;
-    } else {
-      const c = line.indexOf(close, i);
-      label = line.slice(i, c < 0 ? undefined : c);
-      i = c < 0 ? line.length : c + close.length;
     }
+    const c = line.indexOf(close, i);
+    label ??= line.slice(i, c < 0 ? undefined : c);
+    i = c < 0 ? line.length : c + close.length;
   }
   const cls = line.slice(i).match(/^:::(\w+)/);
   return { id, label, open, close, cls: cls?.[1], end: i + (cls ? cls[0].length : 0) };
@@ -349,11 +346,9 @@ const visible = (lines) => Math.max(0, ...lines.map((runs) => runs.reduce((n, [t
 
 // Only a flowchart has a model here; the text renderer draws the other kinds as written, or throws.
 function drawOther(text, icons, width) {
-  for (const paddingX of [3, 1]) {
-    const lines = trim(colorGrid(renderMermaidASCII(text, { colorMode: 'none', paddingX, paddingY: 1, boxBorderPadding: 1 }), text, icons));
-    if (visible(lines) <= width) return lines;
-  }
-  throw new Error('too wide');
+  const lines = trim(colorGrid(renderMermaidASCII(text, { colorMode: 'none', paddingX: 1, paddingY: 1, boxBorderPadding: 1 }), text, icons));
+  if (visible(lines) > width) throw new Error('too wide');
+  return lines;
 }
 
 // The best drawing of a model that fits the width with every label whole, else null.
@@ -458,7 +453,8 @@ function drawSections(model, icons, width) {
 // Draws a flowchart with every label whole, one frame per group when it has several, else as a list.
 export function drawDiagram(source, width = 100) {
   const { text, icons } = fromIcons(source);
-  if (!/^(?:flowchart|graph)\s/.test(text.replace(/%%.*$/gm, '').trim())) return drawOther(text, icons, width);
+  const bare = text.replace(/%%.*$/gm, '').trim();
+  if (!/^(?:flowchart|graph)\s/.test(bare)) return drawOther(bare, icons, width);
   const model = parseFlowchart(text);
   if (!model.nodes.size) throw new Error('no node');
   const nested = [...model.groups.values()].some((g) => g.parent);
