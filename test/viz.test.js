@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { parseFlowchart } from '../src/lib/diagram.js';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -138,7 +139,30 @@ test('a diagram reads chains, fan-outs and text links, joins a two-line label, a
   const text = plain(draw('mermaid', src, { width: 160 }));
   for (const label of ['Load balancer · public', 'Users', 'Bots', 'API service', 'Orders DB', 'Operators', 'Network']) assert.ok(text.includes(label), label);
   assert.doesNotMatch(text, /<br/);
-  assert.match(text, /calls/);
+  assert.doesNotMatch(text, /│ net +│/, 'a link to a group draws no box of its own');
+  const links = (s) => parseFlowchart(s).edges.map((e) => `${e.from}>${e.to}${e.label ? `:${e.label}` : ''}`);
+  assert.deepEqual(links(src), ['u>lb', 'b>lb', 'lb>api:calls', 'api>db:sql', 'ops>net']);
+  const twoGroups = `${src}\n  subgraph jobs["Jobs"]\n    q[Queue]\n  end`;
+  assert.match(plain(draw('mermaid', twoGroups, { width: 120 })), /Operators → Network \(group\)/, 'a link between groups names the group');
+  const terse = 'graph TD; a-1:::hot-->b-2[B] -.-> c-->d %% note\n  style a-1 fill:#f00\n  d ==> idle\n  subgraph idle[Idle group]\n  end';
+  assert.deepEqual(links(terse), ['a-1>b-2', 'b-2>c', 'c>d', 'd>idle']);
+  assert.equal(parseFlowchart(terse).nodes.get('idle').label, 'Idle group', 'an empty group is a node');
+  assert.deepEqual([...parseFlowchart('flowchart\n  a --> b').nodes.keys()], ['a', 'b'], 'a header with no direction is not a node');
+});
+
+test('a diagram that no layout draws whole is a list that wraps a long line at a space and keeps every label', () => {
+  const src = 'flowchart LR\n  subgraph g["A rather long group title for one box"]\n    a[Alpha]\n  end\n  b[Beta] -->|a label longer than twenty-four characters| a';
+  assert.match(plain(draw('mermaid', src, { width: 100 })), /▌ A rather long group title for one box/, 'a layout that fits but cuts the title is not kept');
+  const text = plain(draw('mermaid', src, { width: 34 }));
+  assert.match(text, /▌ A rather long group title\s+│\n│ +for one box/);
+  assert.match(text, /Beta → Alpha {2}a label longer +│\n│ +than twenty-four +│\n│ +characters/);
+  assert.ok(text.split('\n').every((row) => [...row].length <= 34));
+});
+
+test('a mermaid block of another kind draws as the text renderer draws it', () => {
+  const text = plain(draw('mermaid', 'sequenceDiagram\n  Alice->>Bob: Hello', { width: 60 }));
+  assert.match(text, /│ Alice │ +│ Bob │/);
+  assert.doesNotMatch(text, /sequenceDiagram/);
 });
 
 test('several groups draw one frame each, titled by their path, then the links between them', () => {
@@ -147,7 +171,10 @@ test('several groups draw one frame each, titled by their path, then the links b
   assert.match(text, /╭─ Account prod › VPC main ─/);
   assert.match(text, /╭─ Edge ─/);
   assert.match(text, /Links between groups +│\n│ +CloudFront → ECS API/);
-  assert.match(text, /ECS API[^\n]*►[^\n]*RDS orders|ECS API[\s\S]*▼[\s\S]*RDS orders/, 'a link inside a group is drawn');
+  assert.match(text, /ECS API ├──►│ RDS orders/, 'a link inside a group is drawn');
+  const narrow = plain(draw('mermaid', src, { width: 40 }));
+  assert.match(narrow, /╭─ Account prod › VPC main ─+╮ │\n│ │ ┌/, 'a frame that does not fit beside the last goes under it');
+  assert.ok(narrow.split('\n').every((row) => [...row].length <= 40));
 });
 
 test('a label inside a longer label colors only its own box', () => {

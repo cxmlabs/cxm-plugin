@@ -121,9 +121,11 @@ function colorGrid(text, src, icons) {
   });
 }
 
+const plainOf = (lines) => lines.map((runs) => runs.map(([t]) => t).join(''));
+
 // The drawing without its blank border rows and the empty columns on its right.
 function trim(lines) {
-  const text = lines.map((r) => r.map(([t]) => t).join(''));
+  const text = plainOf(lines);
   const width = Math.max(...text.map((l) => [...l.trimEnd()].length));
   const keep = text.map((l) => l.trim() !== '');
   return lines.slice(keep.indexOf(true), keep.lastIndexOf(true) + 1).map((runs) => {
@@ -149,24 +151,25 @@ const clean = (s, max) => cut(s.replace(/<br\s*\/?>/gi, ' · ').replace(/<[^>]*>
 
 // Reads one node reference at `at`: an id, then an optional shape that holds its label.
 function readNode(line, at) {
-  const id = line.slice(at).match(/^([A-Za-z0-9_][\w-]*)/)?.[1];
+  // A dash joins two word characters only, so `A-->B` leaves the link to the operator.
+  const id = line.slice(at).match(/^[A-Za-z0-9_]+(?:-[A-Za-z0-9_]+)*/)?.[0];
   if (!id) return null;
   let i = at + id.length;
-  const shape = SHAPES.find(([open]) => line.startsWith(open, i));
-  if (!shape) return { id, end: i };
-  const [open, close] = shape;
-  i += open.length;
+  const [open, close] = SHAPES.find(([o]) => line.startsWith(o, i)) ?? [];
   let label;
-  if (line[i] === '"') {
-    const q = line.indexOf('"', i + 1);
-    label = line.slice(i + 1, q < 0 ? undefined : q);
-    i = q < 0 ? line.length : q + 1;
-    const c = line.indexOf(close, i);
-    i = c < 0 ? line.length : c + close.length;
-  } else {
-    const c = line.indexOf(close, i);
-    label = line.slice(i, c < 0 ? undefined : c);
-    i = c < 0 ? line.length : c + close.length;
+  if (open) {
+    i += open.length;
+    if (line[i] === '"') {
+      const q = line.indexOf('"', i + 1);
+      label = line.slice(i + 1, q < 0 ? undefined : q);
+      i = q < 0 ? line.length : q + 1;
+      const c = line.indexOf(close, i);
+      i = c < 0 ? line.length : c + close.length;
+    } else {
+      const c = line.indexOf(close, i);
+      label = line.slice(i, c < 0 ? undefined : c);
+      i = c < 0 ? line.length : c + close.length;
+    }
   }
   const cls = line.slice(i).match(/^:::(\w+)/);
   return { id, label, open, close, cls: cls?.[1], end: i + (cls ? cls[0].length : 0) };
@@ -192,8 +195,8 @@ export function parseFlowchart(src) {
     for (const stmt of raw.split(/;(?=(?:[^"]*"[^"]*")*[^"]*$)/)) {
       const line = stmt.trim();
       if (!line) continue;
-      const head = line.match(/^(?:flowchart|graph)\s+(\w+)/);
-      if (head) { model.dir = head[1].toUpperCase(); continue; }
+      const head = line.match(/^(?:flowchart|graph)\b\s*(\w*)/);
+      if (head) { model.dir = (head[1] || 'TB').toUpperCase(); continue; }
       const sub = line.match(/^subgraph\s+(.+)$/);
       if (sub) {
         const ref = readNode(sub[1], 0);
@@ -237,6 +240,14 @@ export function parseFlowchart(src) {
       }
     }
   }
+  // An empty group is drawn as a node, so its title and the links to it stay.
+  for (const g of [...model.groups.values()].reverse()) {
+    if (g.items.length) continue;
+    model.groups.delete(g.id);
+    model.nodes.set(g.id, { id: g.id, label: g.title, group: g.parent });
+    const items = g.parent ? model.groups.get(g.parent).items : model.order;
+    items[items.findIndex((item) => item.group === g.id)] = { node: g.id };
+  }
   return model;
 }
 
@@ -278,8 +289,6 @@ function emit(model, dir) {
 const edges = (model) =>
   model.edges.map((e) => ({ ...e, from: firstNode(model, e.from), to: firstNode(model, e.to) })).filter((e) => e.from && e.to && e.from !== e.to);
 
-const plainOf = (lines) => lines.map((runs) => runs.map(([t]) => t).join(''));
-
 // A drawing is kept only when every node label and group title reads whole in it.
 function intact(lines, model) {
   const text = plainOf(lines).join('\n');
@@ -312,19 +321,40 @@ function groupedView(model, icons, width) {
   const links = model.edges.filter((e) => e.from !== e.to);
   if (links.length) {
     lines.push([], [['Links', '#94A3B8', '', true]]);
-    for (const e of links) lines.push([['  '], nameRun(e.from), [' → ', '#5B8DEF'], nameRun(e.to), ...(e.label ? [[`  ${clean(e.label, EDGE_MAX)}`, '#94A3B8']] : [])]);
+    for (const e of links) lines.push([['  '], nameRun(e.from), [' → ', '#5B8DEF'], nameRun(e.to), ...(e.label ? [[`  ${clean(e.label, LIST_MAX)}`, '#94A3B8']] : [])]);
   }
-  return lines.map((runs) => {
+  // A line wider than the width goes on under itself at a space, so no link loses its target or its label.
+  return lines.flatMap((runs) => {
+    if (visible([runs]) <= width) return [runs];
+    const rows = [[]];
     let room = width;
-    return runs.map(([t, ...rest]) => {
-      const part = [...t].slice(0, Math.max(0, room)).join('');
-      room -= [...part].length;
-      return [part, ...rest];
-    });
+    for (const [t, ...rest] of runs) {
+      for (const word of t.split(/(?<=\s)(?=\S)/)) {
+        const fits = [...word.trimEnd()].length <= room;
+        if (!fits && !word.trim()) continue;
+        if (!fits && rows.at(-1).some(([done]) => done.trim())) {
+          rows.push([['    ']]);
+          room = width - 4;
+        }
+        const part = [...word].slice(0, Math.max(0, room));
+        rows.at(-1).push([part.join(''), ...rest]);
+        room -= part.length;
+      }
+    }
+    return rows;
   });
 }
 
 const visible = (lines) => Math.max(0, ...lines.map((runs) => runs.reduce((n, [t]) => n + [...t].length, 0)));
+
+// Only a flowchart has a model here; the text renderer draws the other kinds as written, or throws.
+function drawOther(text, icons, width) {
+  for (const paddingX of [3, 1]) {
+    const lines = trim(colorGrid(renderMermaidASCII(text, { colorMode: 'none', paddingX, paddingY: 1, boxBorderPadding: 1 }), text, icons));
+    if (visible(lines) <= width) return lines;
+  }
+  throw new Error('too wide');
+}
 
 // The best drawing of a model that fits the width with every label whole, else null.
 function drawWhole(model, icons, width) {
@@ -369,9 +399,11 @@ function sectionFrame(title, color, lines, height = 0) {
   const inner = Math.max(visible(lines), [...title].length + 2);
   const body = lines.map((runs) => [...runs, [' '.repeat(inner - visible([runs]))]]);
   while (body.length < height - 2) body.push([[' '.repeat(inner)]]);
-  const top = title ? `─ ${title} ${'─'.repeat(Math.max(0, inner - [...title].length - 1))}` : '─'.repeat(inner + 2);
+  const top = title
+    ? [['╭─ ', color], [title, '#F8FAFC', '', true], [` ${'─'.repeat(Math.max(0, inner - [...title].length - 1))}╮`, color]]
+    : [[`╭${'─'.repeat(inner + 2)}╮`, color]];
   return [
-    [['╭', color], [title ? '─ ' : '', color], [title, '#F8FAFC', '', true], [title ? ` ${'─'.repeat(Math.max(0, inner - [...title].length - 1))}` : top, color], ['╮', color]],
+    top,
     ...body.map((runs) => [['│ ', color], ...runs, [' │', color]]),
     [[`╰${'─'.repeat(inner + 2)}╯`, color]],
   ];
@@ -423,10 +455,10 @@ function drawSections(model, icons, width) {
   return out;
 }
 
-// Draws a flowchart that fits the width with every label whole: whole when it has at most one
-// group, else group by group. A part that cannot be drawn shows as a list.
+// Draws a flowchart with every label whole, one frame per group when it has several, else as a list.
 export function drawDiagram(source, width = 100) {
   const { text, icons } = fromIcons(source);
+  if (!/^(?:flowchart|graph)\s/.test(text.replace(/%%.*$/gm, '').trim())) return drawOther(text, icons, width);
   const model = parseFlowchart(text);
   if (!model.nodes.size) throw new Error('no node');
   const nested = [...model.groups.values()].some((g) => g.parent);
