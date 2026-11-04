@@ -212,6 +212,13 @@ test('several groups draw one frame each, titled by their path, then the links b
   assert.ok(narrow.split('\n').every((row) => [...row].length <= 40));
 });
 
+test('a layout that fuses two link labels or runs a wall through one is not kept', () => {
+  const src = 'flowchart TB\n  q[SQS jobs] --> l[Lambda deploy]\n  e[EventBridge rule] -->|invoke| l\n  l -->|UpdateFunctionCode| f[Lambdas using image]\n  l -->|UpdateService| s[ECS services]';
+  const text = plain(draw('mermaid', src, { width: 100 }));
+  assert.doesNotMatch(text, /invoke─?Update|Update\w*─invoke/);
+  assert.match(text, /EventBridge rule → Lambda deploy +invoke/);
+});
+
 test('a label inside a longer label colors only its own box', () => {
   const lines = draw('mermaid', 'flowchart LR\n  G[API Gateway] --> A[API]', { width: 120 });
   assert.notEqual(runOf(lines, 'API Gateway')[2], runs(lines).find(([t]) => t === 'API')[2]);

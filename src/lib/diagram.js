@@ -290,7 +290,17 @@ const edges = (model) =>
 function intact(lines, model) {
   const text = plainOf(lines).join('\n');
   const names = [...[...model.nodes.values()].map((n) => clean(n.label ?? n.id, NODE_MAX)), ...[...model.groups.values()].map((g) => clean(g.title, TITLE_MAX))];
-  return names.every((name) => text.includes(name));
+  // A link label must stand alone: a letter or a line glyph touching it means two labels fused or a wall crossed it.
+  const alone = (label) => {
+    for (let at = text.indexOf(label); at >= 0; at = text.indexOf(label, at + 1)) {
+      // Two characters each side: one line glyph between two labels still reads as one word.
+      const near = text.slice(Math.max(0, at - 2), at) + text.slice(at + label.length, at + label.length + 2);
+      if (!/[\p{L}\p{N}]/u.test(near) && ![...label].some((c) => /[┬┴┼├┤]/.test(c))) return true;
+    }
+    return false;
+  };
+  const links = edges(model).filter((e) => e.label).map((e) => clean(e.label, EDGE_MAX));
+  return names.every((name) => text.includes(name)) && links.every(alone);
 }
 
 // The fallback: each group a frame that lists its nodes, then every link with its label.
