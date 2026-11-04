@@ -245,6 +245,13 @@ test('a node takes the color of the service it names, before a generic word', ()
   assert.equal(familyOf('Shop front page'), undefined);
 });
 
+test('a link that closes a cycle is listed under the drawing, and the rest draws in link order', () => {
+  const src = 'flowchart LR\n  q[SQS jobs] --> l[Lambda deploy]\n  l -->|redeploy| s[ECS services]\n  s -->|done| e[EventBridge state]\n  e --> l';
+  const text = plain(draw('mermaid', src, { width: 120 }));
+  assert.match(text, /↺ EventBridge state → Lambda deploy/);
+  assert.match(text, /SQS jobs[\s\S]*Lambda deploy[\s\S]*ECS services[\s\S]*EventBridge state/);
+});
+
 test('a label inside a longer label colors only its own box', () => {
   const lines = draw('mermaid', 'flowchart LR\n  G[API Gateway] --> A[API]', { width: 120 });
   assert.notEqual(runOf(lines, 'API Gateway')[2], runs(lines).find(([t]) => t === 'API')[2]);
