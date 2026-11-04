@@ -9,7 +9,7 @@ const FAMILY = [
   [/\brds\b|aurora|postgres|mysql|dynamo|azure sql|cloud sql|cosmos|redshift|bigquery|spanner|firestore|bigtable/i, /database|\bdb\b|sql/i, '#5B8DEF'],
   [/\bs3\b|\befs\b|glacier|blob|\bgcs\b|filestore/i, /bucket|lake|storage/i, '#10B981'],
   [/redis|memcached|elasticache/i, /cache/i, '#EF4444'],
-  [/\bsns\b|\bsqs\b|eventbridge|event ?hubs?|service ?bus|pub\/?sub|kinesis|kafka|\bmsk\b/i, /queue|topic|\bstream|webhook|notification|\bevent/i, '#EC4899'],
+  [/\bsns\b|\bsqs\b|eventbridge|event ?grid|event ?hubs?|service ?bus|pub\/?sub|kinesis|kafka|\bmsk\b/i, /queue|topic|\bstream|webhook|notification|\bevents?\b/i, '#EC4899'],
   [/github|gitlab|bitbucket|\becr\b|\bacr\b|codepipeline|codebuild|cloud ?build|azure ?devops|terraform|argo ?cd|\bhelm\b/i, /registry|pipeline|\bci\b|deploy|image|iac/i, '#14B8A6'],
   [/cloudwatch|grafana|datadog|prometheus|sentry|posthog|x-?ray/i, /\blog(s|ging)?\b|monitor|metric|alarm|trace|observab/i, '#84CC16'],
   [/\bglue\b|\bemr\b|\bdbt\b|airflow|\bspark\b|databricks|cube ?js|synapse/i, /warehouse|analytics|\betl\b/i, '#06B6D4'],
