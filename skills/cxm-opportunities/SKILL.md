@@ -1,12 +1,14 @@
 ---
 name: cxm-opportunities
-description: Use when the user asks about savings, cost optimization, savings opportunities, waste, rightsizing, or how to reduce their cloud bill. Queries current AI-discovered optimization opportunities for their connected CloudExMachina organization.
+description: Use when the user asks about savings, cost optimization, savings opportunities, waste, rightsizing, or how to reduce their cloud bill, or asks for a chart of their savings. Queries current AI-discovered optimization opportunities for their connected CloudExMachina organization.
 ---
 
 # Savings opportunities (CloudExMachina)
 
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
+
+**Picture:** a bar chart of savings by opportunity or by service, with its table.
 
 When the user asks about savings, optimizations, or how to cut their cloud costs:
 

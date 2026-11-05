@@ -1,12 +1,14 @@
 ---
 name: cxm-cost-drivers
-description: Use when the user asks about their cloud costs, cloud bill, top spend, biggest cost drivers, or where their cloud money goes. Use it before raw `aws ce` calls. Queries the top spend-by-service for their connected CloudExMachina organization.
+description: Use when the user asks about their cloud costs, cloud bill, top spend, biggest cost drivers, or where their cloud money goes, or asks to chart, graph or plot their spend or its trend. Use it before raw `aws ce` calls. Queries the top spend-by-service for their connected CloudExMachina organization.
 ---
 
 # Cloud cost drivers (CloudExMachina)
 
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
+
+**Picture:** a bar chart of spend by service, with its table; a line chart for a trend; grouped bars and a change chart for a comparison.
 
 ## Route first — what grain does the question need?
 

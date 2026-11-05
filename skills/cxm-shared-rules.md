@@ -27,10 +27,21 @@ measures, dimensions and segments. You write the query. No example in a skill is
 
 ## Visuals
 
-Draw a picture when it shows the shape faster than text: a breakdown (bar), a trend (line, or
-`column` for a few periods), a change up and down (bar with `"diverging": true`), an architecture
-(mermaid `flowchart`). Draw one picture per view the user asks for: a breakdown and a trend are two
-charts, two questions are two charts. Keep the one-line answer above them. Draw only in the chat
+Answer each view of the question with its own picture, next to the text and tables it needs. A
+picture never replaces a chart, a table or the numbers the answer needs. Pick it by the shape:
+
+| The question or the answer has… | Draw |
+|---|---|
+| 3 or more items to compare (services, accounts, teams, regions) | a bar chart |
+| a time window ("last month", "since", "trend", "evolved", "over 45 days") | a line chart, or `column` for a few periods |
+| two periods, or before and after | grouped bars of both periods, with the change as a diverging chart |
+| 3 or more things that connect or contain each other ("what runs in", "how it connects", "flow", "depends on", "deployed", an ARN or a host) | a mermaid diagram |
+| an overview ("everything in", "show me my …") | a chart of the numbers and a diagram of the structure |
+| one number, a yes or no, a single lookup | nothing |
+
+When the user asks to draw, chart, diagram, map or visualize, always draw. When a picture would help
+but nobody asked, draw it if the shape is in the table; otherwise offer it once, in one line ("I can
+draw how these connect."). Keep the one-line answer above the pictures. Draw only in the chat
 answer: never in a ticket, a finding report, a file or a command argument.
 
 - A chart block is single-line JSON: `{"type":"bar|line|column|pie","title":"…","x":"<key>","y":"<key>","yName":"…","series":"<key>","yFormat":"currency|number|percent","xFormat":"month|date","table":true,"data":[{…}]}`.

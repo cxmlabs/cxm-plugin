@@ -1,12 +1,14 @@
 ---
 name: cxm-cloud-context
-description: Use WHENEVER the user asks about their own cloud in an understanding sense — what a resource/service/account/app is, what it is for, why it exists, how it's set up, who owns it, how things connect, naming, tags and tagging, cost allocation, untagged or unallocated spend, environments, standards/conventions/policies, data, or economics — including when asked to add, change, or record a documented standard, convention, or policy ("write this down", "remember our tagging standard", "don't ask me again"). Also before advising on any change, and before raw `aws` CLI calls about their own estate. Search the CloudExMachina cloud-map wiki as part of answering, so the answer reflects THEIR documented reality, not generic cloud knowledge.
+description: Use WHENEVER the user asks about their own cloud in an understanding sense — what a resource/service/account/app is, what it is for, why it exists, how it's set up, who owns it, how things connect, a request to draw, diagram or visualize an architecture, a network or what a resource connects to, naming, tags and tagging, cost allocation, untagged or unallocated spend, environments, standards/conventions/policies, data, or economics — including when asked to add, change, or record a documented standard, convention, or policy ("write this down", "remember our tagging standard", "don't ask me again"). Also before advising on any change, and before raw `aws` CLI calls about their own estate. Search the CloudExMachina cloud-map wiki as part of answering, so the answer reflects THEIR documented reality, not generic cloud knowledge.
 ---
 
 # Understand the user's cloud from CXM's cloud-map (CloudExMachina)
 
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
+
+**Picture:** when the answer is about how things connect or what runs where, a mermaid diagram of those resources and their links.
 
 CXM keeps a per-organization **cloud-map wiki** — dense, data-grounded pages about *this*
 customer's estate across 12 topics (economics, connectivity, data, governance, lifecycle,

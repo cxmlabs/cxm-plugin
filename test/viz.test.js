@@ -355,6 +355,13 @@ test('a link that closes a cycle is listed under the drawing, and the rest draws
   assert.ok(narrow.split('\n').every((row) => [...row].length <= 40), 'a back link wraps to the width');
 });
 
+test('a group with no link inside lists its nodes instead of drawing empty boxes', () => {
+  const src = 'flowchart LR\n  subgraph a["Account prod"]\n    r[RDS]\n    e[ECS]\n  end\n  subgraph b["Account dev"]\n    s[S3]\n  end';
+  const text = plain(draw('mermaid', src, { width: 120 }));
+  assert.match(text, /╭─ Account prod ─[\s\S]*■ RDS[\s\S]*■ ECS/);
+  assert.doesNotMatch(text, /┌/);
+});
+
 test('a label inside a longer label colors only its own box', () => {
   const lines = draw('mermaid', 'flowchart LR\n  G[API Gateway] --> A[API]', { width: 120 });
   assert.notEqual(runOf(lines, 'API Gateway')[2], runs(lines).find(([t]) => t === 'API')[2]);

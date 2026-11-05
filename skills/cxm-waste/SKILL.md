@@ -1,12 +1,14 @@
 ---
 name: cxm-waste
-description: Use when the user asks about waste, anti-patterns, flagged issues, suspicious resources, "what looks wrong", OR asks to clean up / tidy / reduce waste in an environment or account (e.g. "clean up the dev environment"). Lists CloudExMachina's detected smells for the connected organization.
+description: Use when the user asks about waste, anti-patterns, flagged issues, suspicious resources, "what looks wrong", OR asks for a chart of waste, OR asks to clean up / tidy / reduce waste in an environment or account (e.g. "clean up the dev environment"). Lists CloudExMachina's detected smells for the connected organization.
 ---
 
 # Smells / flagged waste (CloudExMachina)
 
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
+
+**Picture:** a bar chart of waste by kind or by account, with its table.
 
 Smells are cheap detector hits (pre-qualification), distinct from the finalized
 opportunities in `cxm-opportunities`. When the user asks what looks wasteful or suspicious:

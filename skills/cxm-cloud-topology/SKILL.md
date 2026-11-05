@@ -1,12 +1,14 @@
 ---
 name: cxm-cloud-topology
-description: Use when the user asks about their cloud footprint, account structure, which clouds/accounts/regions they use, multi-cloud posture, or where their spend is concentrated across accounts. Describes the connected CloudExMachina organization's cloud topology.
+description: Use when the user asks about their cloud footprint, account structure, which clouds/accounts/regions they use, multi-cloud posture, or where their spend is concentrated across accounts, or asks to draw, map or diagram their accounts, regions, organization or what is deployed where. Describes the connected CloudExMachina organization's cloud topology.
 ---
 
 # Cloud topology (CloudExMachina)
 
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
+
+**Picture:** a mermaid diagram of the structure (organization units → accounts → regions, with their top services) and a bar chart of spend by account.
 
 When the user asks about their cloud footprint / accounts / regions / posture, run these
 authenticated queries and summarize.

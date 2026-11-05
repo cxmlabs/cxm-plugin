@@ -1,12 +1,14 @@
 ---
 name: cxm-architecture-review
-description: Use when the user asks to review their architecture or a proposed change, wants their design questioned for cost, asks "is this the right/cheapest way", or is adding significant cloud infrastructure. Composes CloudExMachina's cost, pricing, and context data into a cost-aware architecture critique.
+description: Use when the user asks to review their architecture or a proposed change, wants their design questioned for cost, asks "is this the right/cheapest way", or is adding significant cloud infrastructure, or asks to diagram a current or proposed design. Composes CloudExMachina's cost, pricing, and context data into a cost-aware architecture critique.
 ---
 
 # Architecture review (CloudExMachina)
 
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
+
+**Picture:** a mermaid diagram of the design under review, and a bar chart of its cost by component.
 
 When the user wants their design or a change reviewed for cost, combine what CXM already knows.
 Do the relevant subset — don't over-run:

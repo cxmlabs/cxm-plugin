@@ -533,7 +533,8 @@ function drawSections(model, icons, width) {
   const framed = [];
   for (const sec of sections) {
     const sub = sectionModel(model, sec.ids);
-    const lines = drawWhole(sub, icons, width - 4) ?? groupedView(sub, icons, width - 4);
+    // A group with no link inside is a list: boxes with nothing between them only take room.
+    const lines = (sub.edges.length ? drawWhole(sub, icons, width - 4) : null) ?? groupedView(sub, icons, width - 4);
     framed.push({ ...sec, lines });
   }
   // Frames side by side while they fit, level at the bottom.
