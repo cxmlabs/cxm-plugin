@@ -91,9 +91,11 @@ Build a diagram from the `network_topology_graph` dataset, never from guesses. E
 `account_id` and `region`. A link has `source_id`, `target_id`, `edge_type` and `label`.
 Read `cxm analytics schema network_topology_graph` once for the full field list.
 
-1. The nodes of one account. Get its id from `cloud_topology_accounts.account_id`, ordered by
-   `cloud_topology_accounts.monthly_cost_usd` descending. When the user names no account, take the
-   first one, and offer the others in one line:
+1. The nodes of one account. Filter on the account id, not its name. When the user names no account,
+   take the first one by spend, and offer the others in one line:
+   ```bash
+   cxm analytics query '{"measures":["cloud_topology_accounts.monthly_cost_usd"],"dimensions":["cloud_topology_accounts.account_id","cloud_topology_accounts.account_name"],"order":{"cloud_topology_accounts.monthly_cost_usd":"desc"},"limit":10}'
+   ```
    ```bash
    cxm analytics query '{"measures":["network_topology_graph.count"],"dimensions":["network_topology_graph.element_id","network_topology_graph.node_type","network_topology_graph.label","network_topology_graph.parent_id"],"filters":[{"member":"network_topology_graph.element_kind","operator":"equals","values":["node"]},{"member":"network_topology_graph.account_id","operator":"equals","values":["<account id>"]}],"limit":500}'
    ```

@@ -520,6 +520,30 @@ function sectionFrame(title, family, lines, height = 0) {
   ];
 }
 
+// The model with only the `keep` nodes, its groups kept.
+function without(model, keep) {
+  if (keep.length === model.nodes.size) return model;
+  const kept = new Set(keep);
+  const items = (list) => list.filter((i) => !i.node || kept.has(i.node) || model.groups.has(i.node));
+  return {
+    ...model,
+    nodes: new Map([...model.nodes].filter(([id]) => kept.has(id) || model.groups.has(id))),
+    order: items(model.order),
+    groups: new Map([...model.groups].map(([id, g]) => [id, { ...g, items: items(g.items) }])),
+  };
+}
+
+// Only nodes on a link, a hidden one too, are drawn; the others are a list under the drawing, as a lone box only takes room.
+function drawLinked(model, icons, width, ids = [...model.nodes.keys()].filter((id) => !model.groups.has(id)), pick = (keep) => without(model, keep)) {
+  const inside = new Set(ids);
+  const ends = model.edges.map((e) => [firstNode(model, e.from), firstNode(model, e.to)]).filter(([a, b]) => a && b && a !== b && inside.has(a) && inside.has(b));
+  const linked = new Set(ends.flat());
+  if (!linked.size) return null;
+  const lone = ids.filter((id) => !linked.has(id));
+  const drawn = drawWhole(pick(ids.filter((id) => linked.has(id))), icons, width);
+  return drawn && (lone.length ? [...drawn, [], ...groupedView(sectionModel(model, lone), icons, width)] : drawn);
+}
+
 // Several groups: each group that holds nodes is drawn on its own, then the links between groups.
 function drawSections(model, icons, width) {
   const { hue } = labelsOf(emit(model, model.dir));
@@ -532,14 +556,7 @@ function drawSections(model, icons, width) {
   }
   const framed = [];
   for (const sec of sections) {
-    const sub = sectionModel(model, sec.ids);
-    // Only nodes linked inside the group are drawn; the others are a list under the drawing, as a
-    // lone box only takes room.
-    const linked = sec.ids.filter((id) => sub.edges.some((e) => e.from === id || e.to === id));
-    const drawn = linked.length ? drawWhole(sectionModel(model, linked), icons, width - 4) : null;
-    const rest = drawn ? sec.ids.filter((id) => !linked.includes(id)) : sec.ids;
-    const listed = rest.length ? groupedView(sectionModel(model, rest), icons, width - 4) : [];
-    framed.push({ ...sec, lines: drawn ? [...drawn, ...(listed.length ? [[], ...listed] : [])] : listed });
+    framed.push({ ...sec, lines: drawLinked(model, icons, width - 4, sec.ids, (keep) => sectionModel(model, keep)) ?? groupedView(sectionModel(model, sec.ids), icons, width - 4) });
   }
   // Frames side by side while they fit, level at the bottom.
   const out = [];
@@ -578,6 +595,6 @@ export function drawDiagram(source, width = 100) {
   if (!/^(?:flowchart|graph)\s/.test(bare)) return drawOther(bare, icons, width);
   const model = parseFlowchart(text);
   if (!model.nodes.size) throw new Error('no node');
-  if (model.groups.size <= 1) return drawWhole(model, icons, width) ?? groupedView(model, icons, width);
+  if (model.groups.size <= 1) return drawLinked(model, icons, width) ?? groupedView(model, icons, width);
   return drawSections(model, icons, width);
 }

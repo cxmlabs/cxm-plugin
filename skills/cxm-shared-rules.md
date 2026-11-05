@@ -40,7 +40,7 @@ Pick it by the shape:
 | an overview of an account, an organization or an environment ("everything in", "everything deployed") | a chart of the numbers and a diagram of the structure |
 | only one number, a yes or no, or a single lookup | nothing |
 
-When the user asks to draw, chart, diagram, map or visualize, always draw. When a picture would help
+When the user asks to draw, chart, diagram, map or visualize, always draw, also for one number. When a picture would help
 but nobody asked, draw it if the shape is in the table; otherwise offer it once, in one line ("I can
 draw how these connect."). Keep the one-line answer above the pictures. Draw only in the chat
 answer: never in a ticket, a finding report, a file or a command argument.

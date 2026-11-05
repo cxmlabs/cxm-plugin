@@ -8,7 +8,7 @@ description: Use when the user asks about their cloud footprint, account structu
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
 
-**Picture:** when the answer covers 3 or more accounts, a mermaid diagram of organization units → accounts (add `cloud_topology_accounts.org_hierarchy_path_str` to query 3), and a bar chart of spend by account.
+**Picture:** when the answer covers 3 or more accounts, a mermaid diagram of organization units → accounts (run query 3 again with `cloud_topology_accounts.org_hierarchy_path_str` and no `limit`, so that no account is missing), and a bar chart of spend by account.
 
 When the user asks about their cloud footprint / accounts / regions / posture, run these
 authenticated queries and summarize.

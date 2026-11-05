@@ -433,3 +433,15 @@ test('cxm viz cube-chart runs its query only when the block has no rows', () => 
   assert.equal(given.status, 0, given.stderr);
   assert.match(given.stdout, /p █/);
 });
+
+test('with one group or none, linked nodes are drawn, lone nodes are listed, and a hidden link keeps a node drawn', () => {
+  const one = plain(draw('mermaid', 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB] --> n[NAT]\n    r[(RDS orders)]\n  end', { width: 120 }));
+  assert.match(one, /VPC main/);
+  assert.match(one, /■ RDS orders/);
+  assert.doesNotMatch(one, /│ RDS orders │/);
+  const none = plain(draw('mermaid', 'flowchart LR\n  a[ALB] --> n[NAT]\n  r[(RDS orders)]', { width: 120 }));
+  assert.match(none, /■ RDS orders/);
+  const hidden = plain(draw('mermaid', 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB] --> n[NAT]\n    n ~~~ c[Cache]\n  end\n  subgraph w["Edge"]\n    e[CDN]\n  end', { width: 120 }));
+  assert.match(hidden, /│ +Cache +│/);
+  assert.doesNotMatch(hidden, /■ Cache/);
+});

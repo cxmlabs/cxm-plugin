@@ -6,7 +6,7 @@ import { draw, needsRows, splitReply } from '../src/lib/viz.js';
 const SECTION = {
   id: 'cxm-agent-plugin:visuals',
   scope: 'session',
-  text: 'CXM rich visuals are on: write a CXM chart, cube-chart, row or mermaid block as a fenced block in the reply, and it is drawn in place. Do not run `cxm viz`. Draw one picture per part of the answer, next to the text and tables: 3+ items to compare → bar chart; a series over time → line chart; two periods → grouped bars and a diverging change chart; 3+ things that connect → mermaid diagram; an overview → both; only one number or a lookup → nothing.',
+  text: 'CXM rich visuals are on: write a CXM chart, cube-chart, row or mermaid block as a fenced block in the reply, and it is drawn in place. Do not run `cxm viz`. Draw one picture for each part of the answer, next to its text and table. A picture never replaces the table. For 3 or more items to compare, draw a bar chart. For a series over time, draw a line chart, or a column chart for a few periods. For two periods, draw grouped bars and a diverging chart of the change. For 3 or more things that connect, draw a mermaid diagram. For an overview, draw a chart and a diagram. For one number or one lookup, draw nothing, unless the user asks for a picture.',
 };
 
 // A queried chart's rows, fetched once per block by the CLI with the user's session.
