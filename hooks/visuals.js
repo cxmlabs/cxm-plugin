@@ -33,7 +33,7 @@ function exportButton($, t, key, label, act) {
     {
       key,
       onPress: async (press) => {
-        pressed.set(key, await act(press).catch((err) => `Not exported: ${err.message}`));
+        pressed.set(key, await Promise.resolve(press).then(act).catch((err) => `Not exported: ${err.message}`));
         $.ui.invalidate('ui.render');
       },
     },
@@ -43,17 +43,17 @@ function exportButton($, t, key, label, act) {
 
 async function save($, name, text) {
   const path = `${(await $.session.cwd()).replace(/\/$/, '')}/${name}`;
-  await $.fs.write(path, text);
+  await $.fs.write(path, `${text}\n`);
   return `✓ Saved ${path}`;
 }
 
-// A block's own name, the same in every redraw and different between blocks of any reply.
+// A block's file name, the same in every redraw and different for a different block.
 const idOf = (part) => `cxm-${part.kind}-${[...part.body].reduce((x, c) => (Math.imul(x, 31) + c.charCodeAt(0)) >>> 0, 7).toString(36)}`;
 
-function exportButtons($, t, part, body, lines, n) {
+function exportButtons($, t, part, body, lines, place) {
   const id = idOf(part);
-  // The place in the reply keeps two copies of one block apart.
-  const key = (button) => `${id}-${n}-${button}`;
+  // The message and the place in it keep two copies of one block apart.
+  const key = (button) => `${id}-${place}-${button}`;
   return h(
     t.Box,
     { flexDirection: 'row', gap: 1 },
@@ -69,7 +69,7 @@ function exportButtons($, t, part, body, lines, n) {
 const style = (fg, bg, bold) => ({ ...(fg && { color: fg }), ...(bg && { backgroundColor: bg }), ...(bold && { bold: true }) });
 const raw = (t, part, reason) => h(t.Markdown, { text: `${part.text}\n\n_Not drawn: ${reason}_` });
 
-function block($, t, part, width, n) {
+function block($, t, part, width, place) {
   let body = part.body;
   if (needsRows(part.kind, body)) {
     const got = rows.get(body) ?? fetchRows($, part.kind, body);
@@ -82,7 +82,7 @@ function block($, t, part, width, n) {
     t.Box,
     { flexDirection: 'column', alignItems: 'center' },
     h(t.Box, { flexDirection: 'column' }, ...lines.map((runs) => h(t.Box, {}, ...runs.filter(([s]) => s).map(([s, fg, bg, bold]) => h(t.Text, style(fg, bg, bold), s))))),
-    exportButtons($, t, part, body, lines, n),
+    exportButtons($, t, part, body, lines, place),
   );
 }
 
@@ -104,7 +104,7 @@ export const register = (on, options) => {
     const drawn = parts.map((p, n) => {
       if (!p.kind) return h(t.Markdown, { text: p.text });
       try {
-        return block($, t, p, width, n);
+        return block($, t, p, width, `${e.requestId}-${n}`);
       } catch (err) {
         return raw(t, p, err.message);
       }
