@@ -35,15 +35,16 @@ export async function viz(argv) {
   const valued = ['--width', '--csv', '--svg'];
   const arg = rest.find((a, i) => (a === '-' || !a.startsWith('--')) && !valued.includes(rest[i - 1]));
   if (!KINDS.includes(kind) || !arg) throw new Error(`viz needs a kind and a body, e.g. cxm viz chart '<json>' (kinds: ${KINDS.join(', ')}; body: inline, a file, or - for stdin)`);
+  const csv = flag(argv, '--csv');
+  const svg = flag(argv, '--svg');
+  const noPath = (name, file) => argv.includes(name) && (!file || file.startsWith('-'));
+  if (noPath('--csv', csv) || noPath('--svg', svg)) throw new Error('--csv and --svg need a file path');
   const body = await withRows(kind, readInput(arg));
   // The reply renderer runs the query here, with the session, and draws the rows itself.
   if (argv.includes('--rows')) return process.stdout.write(body);
   const width = argv.includes('--width') ? Number(flag(argv, '--width')) : process.stdout.columns || 100;
   if (!(width >= 20)) throw new Error('--width needs a number of columns, 20 or more');
   const lines = draw(kind, body, { width });
-  const csv = flag(argv, '--csv');
-  const svg = flag(argv, '--svg');
-  if ((argv.includes('--csv') && !csv) || (argv.includes('--svg') && !svg)) throw new Error('--csv and --svg need a file path');
   if (csv) writeFileSync(csv, `${toCsv(kind, body)}\n`);
   if (svg) writeFileSync(svg, `${toSvg(lines)}\n`);
   for (const file of [csv, svg].filter(Boolean)) console.log(`Wrote ${resolve(file)}`);

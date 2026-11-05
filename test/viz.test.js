@@ -448,9 +448,10 @@ test('with one group or none, linked nodes are drawn, lone nodes are listed, and
 });
 
 test('a block exports its rows as CSV, with no cell a spreadsheet would run as a formula', () => {
-  const spec = { x: 'k', y: 'v', series: 's', table: true, data: [{ k: 'RDS, orders', s: 'Oct', v: 30, note: '=HYPERLINK("x")' }, { k: 'ECS', s: 'Oct', v: -10 }] };
-  assert.equal(toCsv('chart', JSON.stringify(spec)), 'k,s,v,note\n"RDS, orders",Oct,30,"\'=HYPERLINK(""x"")"\nECS,Oct,-10,');
-  assert.equal(toCsv('row', JSON.stringify([{ type: 'table', columns: ['a', 'b'], rows: [[1, 2]] }, { type: 'note', text: 'x' }])), 'a,b\n1,2');
+  const spec = { x: 'k', y: 'v', series: 's', table: true, data: [{ k: 'RDS, orders', s: 'Oct', v: 30, note: '=HYPERLINK("x")' }, { k: 'ECS', s: 'Oct', v: '-1.5e3', note: '-2+3' }] };
+  assert.equal(toCsv('chart', JSON.stringify(spec)), 'k,s,v,note\n"RDS, orders",Oct,30,"\'=HYPERLINK(""x"")"\nECS,Oct,-1.5e3,\'-2+3');
+  const items = [{ type: 'table', columns: ['a', { name: 'b', format: 'usd' }], rows: [[1, 2]] }, { type: 'note', text: 'x' }, { type: 'bar', x: 'k', y: 'v', table: [{ key: 'v', name: 'Cost' }], data: [{ k: 'a', v: 1 }] }];
+  assert.equal(toCsv('row', JSON.stringify(items)), 'a,b\n1,2\n\nk,Cost\na,1');
   assert.equal(toCsv('mermaid', 'flowchart LR\n  a[ALB] -->|https| b[ECS api]'), 'source,target,label\nALB,ECS api,https');
 });
 
@@ -471,4 +472,5 @@ test('cxm viz writes --csv and --svg files and names them, and refuses a flag wi
   assert.match(readFileSync(join(dir, 'a.csv'), 'utf8'), /^service,cost\nRDS,1854\n/);
   assert.match(readFileSync(join(dir, 'a.svg'), 'utf8'), /<svg[\s\S]*Spend by service/);
   assert.match(run('chart', 'test/fixtures/spend.json', '--csv').stderr, /--csv and --svg need a file path/);
+  assert.match(run('chart', 'test/fixtures/spend.json', '--csv', '--svg', join(dir, 'b.svg')).stderr, /--csv and --svg need a file path/);
 });

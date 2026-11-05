@@ -5,23 +5,26 @@ import { parseBlock } from './viz.js';
 
 // A cell a spreadsheet would run as a formula starts with one of these; a quote makes it text.
 const FORMULA = /^[=+\-@\t\r]/;
+const NUMBER = /^-?\d+(\.\d+)?(e[-+]?\d+)?$/i;
 function cell(v) {
   if (v === null || v === undefined) return '';
   if (typeof v === 'number') return String(v);
   const text = typeof v === 'object' ? JSON.stringify(v) : String(v);
-  const safe = FORMULA.test(text) && !/^-?\d/.test(text) ? `'${text}` : text;
+  const safe = FORMULA.test(text) && !NUMBER.test(text) ? `'${text}` : text;
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 const csvOf = (header, rows) => [header, ...rows].map((r) => r.map(cell).join(',')).join('\n');
 
-// The keys of the rows, the chart's own keys first, in the order they appear.
+// The keys of the rows, the chart's own keys first, in the order they appear, under their table names.
 function chartCsv(spec) {
   const rows = Array.isArray(spec.data) ? spec.data : [];
   const keys = [...new Set([spec.x, spec.series, spec.y, ...rows.flatMap((r) => Object.keys(r ?? {}))].filter(Boolean))];
-  return csvOf(keys, rows.map((r) => keys.map((k) => r?.[k])));
+  const names = new Map((Array.isArray(spec.table) ? spec.table : []).filter((c) => c?.name).map((c) => [c.key, c.name]));
+  return csvOf(keys.map((k) => names.get(k) ?? k), rows.map((r) => keys.map((k) => r?.[k])));
 }
 
-const itemCsv = (item) => (item?.type === 'table' ? csvOf(item.columns ?? [], item.rows ?? []) : item?.type === 'note' || item?.type === 'markdown' ? '' : chartCsv(item ?? {}));
+const columnName = (c) => (c !== null && typeof c === 'object' ? (c.name ?? '') : c);
+const itemCsv = (item) => (item?.type === 'table' ? csvOf((item.columns ?? []).map(columnName), item.rows ?? []) : item?.type === 'note' || item?.type === 'markdown' ? '' : chartCsv(item ?? {}));
 
 // The block's data as CSV: a chart's rows, each item of a row with a blank line between, a diagram's links.
 export function toCsv(kind, body) {
