@@ -343,7 +343,7 @@ function emit(model, dir, nodeMax = NODE_MAX) {
 const edges = (model) =>
   model.edges.filter((e) => e.link !== 'hidden').map((e) => ({ ...e, from: firstNode(model, e.from), to: firstNode(model, e.to) })).filter((e) => e.from && e.to && e.from !== e.to);
 
-// A drawing is kept only when every node label and group title reads whole in it.
+// A drawing is kept only when every label reads whole in it and every arrowhead lands on a wall.
 function intact(lines, model, nodeMax = NODE_MAX) {
   const text = plainOf(lines).join('\n');
   const names = [...[...model.nodes.values()].map((n) => clean(n.label ?? n.id, nodeMax)), ...[...model.groups.values()].map((g) => clean(g.title, TITLE_MAX))];
@@ -357,15 +357,16 @@ function intact(lines, model, nodeMax = NODE_MAX) {
     return false;
   };
   const links = edges(model).filter((e) => e.label).map((e) => clean(e.label, EDGE_MAX));
-  return names.every((name) => text.includes(name)) && links.every(alone) && arrowsLand(plainOf(lines));
+  // Label text is blanked first, so an arrow glyph written in a label is not read as an arrowhead.
+  const bare = plainOf(lines).map((row) => [...names, ...links].reduce((r, s) => r.replaceAll(s, ' '.repeat([...s].length)), row));
+  return names.every((name) => text.includes(name)) && links.every(alone) && arrowsLand(bare);
 }
 
-// Every arrowhead touches the wall of the box it points at, or sits in that wall; one drawn inside a
-// box or in the open is a link the layout routed through something else.
+// True when every arrowhead touches, or sits in, the wall of the box it points at.
 const SIDE = /[│├┤┼┌┐└┘╭╮╰╯]/;
 const TOP = /[─┬┴┼┌┐└┘╭╮╰╯]/;
 const WALL = { '►': [0, 1, /[│├┤┼]/, SIDE], '◄': [0, -1, /[│├┤┼]/, SIDE], '▼': [1, 0, /[─┬┼┌┐╭╮]/, TOP], '▲': [-1, 0, /[─┴┼└┘╰╯]/, TOP] };
-function arrowsLand(rows) {
+export function arrowsLand(rows) {
   const grid = rows.map((r) => [...r]);
   const at = (y, x) => grid[y]?.[x] ?? '';
   return grid.every((row, y) =>

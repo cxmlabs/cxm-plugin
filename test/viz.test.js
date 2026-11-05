@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { familyOf, parseFlowchart } from '../src/lib/diagram.js';
+import { arrowsLand, familyOf, parseFlowchart } from '../src/lib/diagram.js';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -48,8 +48,13 @@ test('a diagram tints each node by its family and fits the width: left to right,
 test("a Dex cloud diagram's icon nodes become labelled boxes colored by the icon, and edge labels keep their spaces", () => {
   const lines = draw('mermaid', fixture('dex-cloud.mmd'), { width: 120 });
   assert.match(plain(lines), /Public ALB .*https.*Orders API .*sql queries.*Orders DB/);
-  const dbRow = lines.findIndex((runs) => runs.some(([t]) => t.includes('Orders DB')));
-  assert.ok(lines.slice(dbRow - 2, dbRow + 1).flat().some(([t, fg]) => /^┌─+┐$/.test(t) && fg === '#5B8DEF'), 'the database box is blue');
+  const rows = plain(lines).split('\n').map((row) => [...row]);
+  const y = rows.findIndex((row) => row.join('').includes('Orders DB'));
+  const x = rows[y].join('').indexOf('Orders DB');
+  let top = y;
+  while (rows[top][x] !== '─') top--;
+  let end = 0;
+  assert.equal(lines[top].find(([t]) => (end += [...t].length) > x)[1], '#5B8DEF', 'the database box is blue');
 });
 
 const chart = (spec) => JSON.stringify({ x: 'k', y: 'v', ...spec });
@@ -292,7 +297,24 @@ test('a layout that fuses two link labels or runs a wall through one is not kept
   const src = 'flowchart TB\n  q[SQS jobs] --> l[Lambda deploy]\n  e[EventBridge rule] -->|invoke| l\n  l -->|UpdateFunctionCode| f[Lambdas using image]\n  l -->|UpdateService| s[ECS services]';
   const text = plain(draw('mermaid', src, { width: 100 }));
   assert.doesNotMatch(text, /invoke─?Update|Update\w*─invoke/);
-  assert.match(text, /invoke/);
+  assert.match(text, /Lambda deploy +├◄─+invoke─+┤/);
+});
+
+test('a node box is padded with a 44-character label when it fits, then flat, then cut to 32 characters', () => {
+  const src = 'flowchart TB\n  a[Order events stream with retries and backoff] --> b[Billing]';
+  const roomy = plain(draw('mermaid', src, { width: 60 }));
+  assert.match(roomy, /│ │ +│ │\n│ │  Order events stream with retries and backoff  │ │/, 'a blank row pads the box');
+  assert.match(plain(draw('mermaid', src, { width: 52 })), /─┐ │\n│ │ Order events stream with retries and backoff │ │/);
+  assert.match(plain(draw('mermaid', src, { width: 48 })), /│  Order events stream with retrie…  │/);
+  assert.match(plain(draw('mermaid', 'flowchart LR\n  a[Cost ▲] --> b[Billing]', { width: 60 })), /│ +│\n│ │  Cost ▲  ├/, 'an arrow glyph in a label is not an arrowhead');
+});
+
+test('an arrowhead counts only when it touches or sits in a box wall', () => {
+  assert.ok(arrowsLand(['─►│']));
+  assert.ok(arrowsLand(['│', '►', '│']));
+  assert.ok(arrowsLand(['│', '▼', '─']));
+  assert.equal(arrowsLand(['─► ']), false);
+  assert.equal(arrowsLand(['│', '▼', ' ']), false);
 });
 
 test('among generic words, the last one in a label wins', () => {
