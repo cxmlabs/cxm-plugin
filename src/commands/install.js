@@ -1,13 +1,14 @@
 // `npx @cloudexmachina/cxm install`: one command that installs the plugin into every coding agent
-// it finds, then signs in. It runs each agent's own plugin commands, the ones the README lists, and
-// never edits an agent's files itself.
+// it finds, then signs in. It runs each agent's own plugin commands, the ones the README lists. The one
+// agent file it edits is the `autoUpdate` key of the CXM marketplace entry in Claude Code's user
+// settings, which no command sets, and only when the user agrees.
 import { spawnSync } from 'node:child_process';
 import { delimiter } from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import { saveConfig, loadConfig } from '../lib/config.js';
+import { enableClaudeAutoUpdate, MARKETPLACE, PLUGIN } from '../lib/update.js';
 import { login } from './login.js';
 
-const MARKETPLACE = 'cxm-marketplace';
-const PLUGIN = `cxm-agent-plugin@${MARKETPLACE}`;
 
 // Per agent: add the marketplace (fails harmlessly when it is there), refresh it from git, install
 // the plugin, then upgrade it: `install` keeps an installed copy, so a re-run needs `upgrade` to move
@@ -85,10 +86,13 @@ export async function install(argv, { run = (cmd) => spawnAgent(cmd).status, sta
   }
   const signIn = !argv.includes('--no-login');
   if (signIn) console.log('\nThen it opens your browser to sign in to CloudExMachina.');
-  if (!argv.includes('--yes') && process.stdin.isTTY && !(await confirm('\nContinue? [Y/n] '))) {
+  const asking = !argv.includes('--yes') && process.stdin.isTTY;
+  if (asking && !(await confirm('\nContinue? [Y/n] '))) {
     console.log('Nothing changed.');
     return;
   }
+  // Claude Code updates the plugin during a session and loads it at the next; Codex is refreshed at a session start.
+  const autoUpdate = !argv.includes('--no-auto-update') && (!asking || (await confirm('Keep CloudExMachina up to date automatically? [Y/n] ')));
 
   // One agent failing does not stop the others or the sign-in; the failures are reported at the end.
   const failures = [];
@@ -101,6 +105,16 @@ export async function install(argv, { run = (cmd) => spawnAgent(cmd).status, sta
     else if (upgrade && run(upgrade) !== 0) failures.push(`${label}: could not update ${PLUGIN} to the latest version.`);
   }
   if (failures.length === agents.length) throw new Error(failures.join('\n'));
+  saveConfig({ ...(loadConfig() ?? {}), autoUpdate });
+  if (autoUpdate && agents.includes('claude')) {
+    // A settings file Claude Code cannot read back as JSON is left as it is.
+    try {
+      enableClaudeAutoUpdate();
+    } catch (err) {
+      failures.push(`Claude Code: could not turn on auto-update (${err.message}). Turn it on in /plugin → Marketplaces → ${MARKETPLACE}.`);
+    }
+  }
+  console.log(autoUpdate ? '\nAuto-update is on.' : '\nAuto-update is off. Update later with: npx @cloudexmachina/cxm@latest install');
 
   if (signIn) {
     console.log('');

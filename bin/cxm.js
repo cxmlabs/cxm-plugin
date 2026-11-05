@@ -35,6 +35,7 @@ const { context } = await import('../src/commands/wiki.js');
 const { scan } = await import('../src/commands/scan.js');
 const { resolve } = await import('../src/commands/resolve.js');
 const { viz } = await import('../src/commands/viz.js');
+const { updateNotice } = await import('../src/lib/update.js');
 
 // Written for an agent. A person runs `setup` and `login`. A skill runs the rest, so this names
 // each capability and its arguments. It does not teach a workflow.
@@ -43,7 +44,7 @@ const USAGE = `Cloud cost and optimization data, for your coding agent
 Usage: cxm <command> [options]
 
 Setup. A person runs these. A skill runs everything else.
-  install [--agent claude|codex] [--yes] [--no-login] [--url <base>]
+  install [--agent claude|codex] [--yes] [--no-login] [--no-auto-update] [--url <base>]
                                                 Install the plugin into Claude Code and Codex, then sign in
   setup [--url <base>] [--agent claude|codex]   Install the skills and the /cxm command
   login [--url <base>]                          Sign in through the browser and pick an organization
@@ -167,6 +168,11 @@ const started = Date.now();
 Promise.resolve()
   .then(run)
   .then(() => emit('plugin.command_run', { command: name, ok: true, duration_ms: Date.now() - started }))
+  // On stderr, so a command's JSON output stays clean for the agent that reads it.
+  .then(async () => {
+    const notice = name === 'install' ? null : await updateNotice().catch(() => null);
+    if (notice) console.error(notice);
+  })
   .catch(async (err) => {
     await emit('plugin.command_error', {
       command: name,

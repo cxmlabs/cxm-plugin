@@ -74,7 +74,14 @@ Ask your agent:
 
 ## Update
 
-Run the install again: it refreshes the marketplace and moves the plugin to the latest version.
+The installer asks once: "Keep CloudExMachina up to date automatically?". On yes, Claude Code updates
+the plugin during a session and loads the new version at the next one (its own plugin auto-update,
+turned on for the CXM marketplace), and Codex gets it at the start of a session, checked once a day.
+Answer no, or pass `--no-auto-update`, and nothing updates by itself; a `cxm` command then says, at
+most once a day, when a newer version is out.
+
+To update by hand, run the install again: it refreshes the marketplace and moves the plugin to the
+latest version.
 
 ```bash
 npx @cloudexmachina/cxm@latest install --no-login
