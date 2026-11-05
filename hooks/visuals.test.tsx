@@ -32,6 +32,7 @@ test('a queried chart gets its rows from cxm viz --rows once, and a failed query
   const runs: (readonly string[])[] = []
   on('process.run', ($, e) => {
     runs.push(e.argv)
+    if (e.init?.stdin?.includes('slow')) return new Promise(() => {})
     const ok = !e.init?.stdin?.includes('broken')
     return { value: { exitCode: ok ? 0 : 1, stdout: ok ? CHART : '', stderr: ok ? '' : 'cxm: run cxm login\n', isStdoutTruncated: false, isStderrTruncated: false } }
   })
@@ -47,6 +48,9 @@ test('a queried chart gets its rows from cxm viz --rows once, and a failed query
   expect(await failed.find({ type: 'Markdown', text: /Not drawn: cxm: run cxm login/ })).toBeDefined()
   await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props(query('broken')) })
   expect(runs.length).toBe(2)
+  const running = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props(query('slow')) })
+  expect(await running.find({ type: 'Text', text: 'Running the chart query…' })).toBeDefined()
+  expect(await running.find({ type: 'Button' })).toBeUndefined()
 })
 
 test('the system prompt tells the agent the visuals are on where a surface draws, and not where none does', async ($, on) => {
