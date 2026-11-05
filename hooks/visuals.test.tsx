@@ -65,3 +65,23 @@ test('with rich_visuals off, a chart block shows as written and the agent is not
   const facts = { model: 'claude-opus-5-5', promptModel: 'claude-opus-5-5', tools: [], outputStyle: null, traits: [], sections: [], surfaces: ['terminal'] as const }
   expect((await $.prompt.compose(facts)).sections.map((s) => s.id)).toEqual(['intro'])
 })
+
+test('a drawn block has export buttons: Copy CSV copies its rows, Save CSV and Save SVG write files, and each button then says what it did', async ($, on) => {
+  const copied: string[] = []
+  const written: [string, string][] = []
+  on('ui.copy', ($, e) => (copied.push(e.text), { value: { isCopied: true } }))
+  on('fs.write', ($, e) => (written.push([e.path, e.text]), { value: undefined }))
+  on('session.cwd', () => ({ value: '/work' }))
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props('```chart\n' + CHART + '\n```') })
+  const press = async (label: string) => ui.press({ key: (await ui.find({ type: 'Button', text: label }))!.key! })
+  await press('Copy CSV')
+  expect(copied).toEqual(['service,cost\nRDS,1854\nECS,1573'])
+  expect(await ui.find({ type: 'Button', text: '✓ Copied' })).toBeDefined()
+  await press('Save CSV')
+  await press('Save SVG')
+  expect(written.map(([path]) => path)).toEqual([expect.stringMatching(/^\/work\/cxm-chart-\w+\.csv$/), expect.stringMatching(/^\/work\/cxm-chart-\w+\.svg$/)])
+  expect(written[1][1]).toMatch(/^<svg [\s\S]*\$1,854/)
+  expect(await ui.find({ type: 'Button', text: `✓ Saved ${written[0][0]}` })).toBeDefined()
+  const bad = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props('```chart\n{not json\n```') })
+  expect(await bad.find({ type: 'Button' })).toBeUndefined()
+})
