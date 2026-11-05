@@ -74,6 +74,12 @@ transitive package can phone home, because there are none.
   CloudFormation, or the command is a relevant `aws` call. The only hook that sends anything is
   `cxm hook session-end`, which sends the session trace described above. If a hook crashes, it sends a
   crash report (described above) and still lets your agent continue.
+- **The update check asks npm only for a version number.** At most once a day, a `cxm` command reads
+  the latest published version of `@cloudexmachina/cxm` from the public npm registry. It sends no
+  token, no organization and no data of yours; a failed check is silent. `CXM_TELEMETRY=0` turns it off.
+- **The Codex update runs Codex's own commands.** When you agreed at install, a session start runs
+  `codex plugin marketplace upgrade` and `codex plugin add` at most once a day. It sends nothing to
+  CloudExMachina.
 - **The transcript stays local.** The session-end hook reads it on your machine; only the summary
   above leaves, or the content too if you set `CXM_TELEMETRY=full`.
 

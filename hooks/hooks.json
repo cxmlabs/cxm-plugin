@@ -1,5 +1,5 @@
 {
-  "description": "Make `cxm` reachable, nudge cost context on IaC edits and aws CLI calls, and send one usage trace per CXM session.",
+  "description": "Make `cxm` reachable, keep the Codex plugin up to date when the user agreed, nudge cost context on IaC edits and aws CLI calls, and send one usage trace per CXM session.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,10 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts/install-cxm-shim.sh\""
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/bin/cxm.js\" hook session-start"
           }
         ]
       }

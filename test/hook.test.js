@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
@@ -54,4 +56,20 @@ test('a non-IaC Claude edit stays silent', () => {
   const result = runHook('iac-cost', { tool_input: { file_path: 'src/app.js', new_string: 'const x = 1;' } });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, '');
+});
+
+test('a session start prints nothing, exits 0, and refreshes Codex only after the user agreed', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cxm-hook-'));
+  // No codex on this PATH, so the refresh it starts finds nothing to run.
+  const env = { ...process.env, CXM_CONFIG_DIR: dir, CXM_TELEMETRY: '0', PATH: '/usr/bin:/bin' };
+  const start = () => spawnSync(process.execPath, [bin, 'hook', 'session-start'], { encoding: 'utf8', env });
+  let result = start();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(existsSync(join(dir, 'credentials.json')), false, 'nothing is written without consent');
+  writeFileSync(join(dir, 'credentials.json'), JSON.stringify({ autoUpdate: true }));
+  result = start();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.ok(JSON.parse(readFileSync(join(dir, 'credentials.json'), 'utf8')).codexRefreshedAt, 'the refresh ran');
 });

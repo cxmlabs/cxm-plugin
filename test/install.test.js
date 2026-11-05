@@ -3,7 +3,11 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { test } from 'node:test';
-import { AGENTS, agentStatus, chooseAgents, install, spawnAgent } from '../src/commands/install.js';
+
+// An install writes the CXM config and Claude Code's settings, so both point at scratch directories before the import.
+process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-install-'));
+process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-install-claude-'));
+const { AGENTS, agentStatus, chooseAgents, install, spawnAgent } = await import('../src/commands/install.js');
 
 test('installs into the agents that support plugins, narrowed by --agent; an old agent is skipped', () => {
   assert.deepEqual(chooseAgents([], (a) => (a === 'claude' ? 'ready' : 'missing')), { ready: ['claude'], outdated: [] });
@@ -20,7 +24,8 @@ test('runs each agent\'s own commands, refreshes and upgrades on a re-run, and f
   };
   await install(['--yes', '--no-login'], { run, status: () => 'ready' });
   const { claude, codex } = AGENTS;
-  assert.deepEqual(ran, [claude.add, claude.refresh, claude.install, claude.upgrade, codex.add, codex.refresh, codex.install].map((c) => c.join(' ')));
+  assert.match(codex.add.join(' '), /--ref v\d+\.\d+\.\d+/, 'Codex is pinned to a release tag');
+  assert.deepEqual(ran, [claude.add, claude.refresh, claude.install, claude.upgrade, codex.reset, codex.add, codex.refresh, codex.install].map((c) => c.join(' ')));
 
   await assert.rejects(install(['--yes', '--no-login'], { run: () => 1, status: () => 'ready' }), /could not add or refresh/);
   await assert.rejects(install(['--yes', '--no-login'], { run: () => 0, status: () => 'outdated' }), /No coding agent with plugin support/);

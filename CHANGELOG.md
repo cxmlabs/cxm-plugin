@@ -6,6 +6,10 @@ fixes, including security fixes.
 
 ## Unreleased
 
+- Auto-update: the installer asks once whether to keep the plugin up to date. On yes, Claude Code's
+  plugin auto-update is on for the CXM marketplace and Codex is refreshed at a session start, once a
+  day. A `cxm` command says, at most once a day, when a newer version is out.
+
 - Charts and diagrams: the agent draws bar, line, column, pie and diverging charts, with totals
   and an optional table, and mermaid architecture diagrams colored by service family. It accepts
   the chart and cloud-diagram blocks of the CloudExMachina chat. `cxm viz` prints one as text;

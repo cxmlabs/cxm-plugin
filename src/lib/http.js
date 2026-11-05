@@ -79,6 +79,12 @@ export async function currentUser(config) {
   return res.json();
 }
 
+// The latest published CLI version, from the public npm registry. No auth header: it is not a CXM host.
+export async function latestPublishedVersion() {
+  const res = await fetch('https://registry.npmjs.org/@cloudexmachina/cxm/latest', { signal: AbortSignal.timeout(2000) });
+  return res.ok ? (await res.json()).version : null;
+}
+
 // Passthrough for the per-organization REST API (actions + reporting).
 export async function orgApi(config, method, path, body) {
   const { orgApi: base } = deriveHosts(config);

@@ -2,7 +2,7 @@
 // ponytail: plain file, not the OS keychain — no native dep, works everywhere; the token
 // is short-lived and the file is user-only-readable. Swap for keytar if that bar rises.
 
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { clientHeaders } from './client.js';
@@ -21,8 +21,10 @@ export function loadConfig() {
 
 export function saveConfig(config) {
   mkdirSync(dirname(configPath), { recursive: true });
-  writeFileSync(configPath, JSON.stringify(config, null, 2), { mode: 0o600 });
-  chmodSync(configPath, 0o600);
+  // A rename, so a command or hook that reads at the same time never sees a half-written file and drops the tokens.
+  const tmp = `${configPath}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(config, null, 2), { mode: 0o600 });
+  renameSync(tmp, configPath);
 }
 
 // Trade the stored refresh token for a fresh access token (no browser). The session service rotates the
