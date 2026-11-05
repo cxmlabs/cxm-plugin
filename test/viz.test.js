@@ -41,7 +41,7 @@ test('a diagram tints each node by its family and fits the width: left to right,
   assert.notEqual(runOf(wide, 'Aurora PostgreSQL')[2], runOf(wide, 'ECS API service')[2], 'two families, two fills');
   assert.match(plain(draw('mermaid', fixture('aws.mmd'), { width: 80 })), /Users[\s│]+└─+┬─+┘/);
   const list = plain(draw('mermaid', fixture('aws.mmd'), { width: 40 }));
-  assert.match(list, /▌ Production VPC +│\n│ +■ ECS API service/);
+  assert.match(list, /▌ Production VPC +│\n│ +■ Application Load Balancer +│\n│ +■ ECS API service/, 'a node listed in a group moves into it');
   assert.match(list, /Links[\s\S]*Users → CloudFront/);
 });
 
@@ -82,8 +82,10 @@ const months = [{ k: 'RDS', sep: 2042, oct: 1808 }, { k: 'KMS', sep: 113, oct: 1
 
 test('a side table shows the listed row keys, signed columns in red and green with their total, and no total for percents', () => {
   const table = [{ key: 'sep', name: 'Sep' }, { key: 'oct', name: 'Oct' }, { key: 'delta', name: 'Δ', signed: true }, { key: 'pct', name: 'Δ %', format: 'percent', signed: true }];
-  const lines = draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, data: months }), { width: 140 });
+  const lines = draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, data: months }), { width: 96 });
   const text = plain(lines);
+  assert.equal(text.split('\n')[0].match(/╭/g).length, 2, 'a 4-column table sits beside its chart at width 96');
+  assert.ok(text.split('\n').every((l) => [...l].length <= 96));
   assert.match(text, /Sep +Oct +Δ +Δ %/);
   assert.match(text, /RDS +\$2,042 +\$1,808 +-\$234 +-11\.5%/);
   assert.match(text, /Total +\$2,155 +\$1,953 +-\$202 +│/, 'the percent column has no total');
@@ -92,9 +94,15 @@ test('a side table shows the listed row keys, signed columns in red and green wi
   assert.notEqual(last('+$32'), last('-$234'), 'a fall has the other color');
   assert.equal(last('-$202'), last('-$234'), 'the signed total is colored');
   assert.throws(() => draw('chart', chart({ table: [{ name: 'x' }], data: rows })), /row key or an object with a "key"/);
+  assert.throws(() => draw('chart', chart({ table: [{ key: 'v', name: 5 }], data: rows })), /optional text "name"/);
+  assert.match(plain(draw('chart', chart({ table: [{ key: 'v', name: null }], data: rows }))), /│ +v │/, 'a null name falls back to the key');
+  assert.match(plain(draw('row', JSON.stringify([{ type: 'table', columns: ['S', 5, null], rows: [['a', 1, 2]] }]))), /S +5 +│/, 'a table column name is always text');
   const queried = months.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])));
   const query = { measures: ['sep', 'oct', 'delta', 'pct'] };
-  assert.equal(plain(draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, query, data: queried }), { width: 140 })), text, 'a query row holds its measures as strings');
+  assert.equal(plain(draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, query, data: queried }), { width: 96 })), text, 'a query row holds its measures as strings');
+  const na = plain(draw('chart', chart({ table: ['c'], query: { measures: ['v', 'c'] }, data: [{ k: 'a', v: '1', c: 'N/A' }, { k: 'b', v: '2', c: '3' }] })));
+  assert.match(na, /a +N\/A/, 'a measure that is not a number stays text');
+  assert.doesNotMatch(na, /NaN/);
   assert.match(plain(draw('chart', chart({ table: ['id'], query: { measures: ['v'] }, data: [{ k: 'a', v: '1', id: '2024' }] }))), /a +2024 /, 'a dimension stays text');
   assert.match(plain(draw('chart', chart({ table: ['n'], data: [{ k: 'a', v: 1, n: 3 }, { k: 'b', v: 2 }] }))), /b +│[\s\S]*Total +3/, 'a blank cell keeps the column numeric');
   assert.throws(() => draw('chart', chart({ series: 'm', table: ['v'], data: [{ k: 'a', m: 'x', v: 1 }, { k: 'a', m: 'y', v: 2 }] })), /one row per "x"/);
@@ -108,6 +116,9 @@ test('a diverging chart signs its "table": true values, and a value that rounds 
   assert.match(text, /c +\$0 +│/);
   assert.match(text, /d +\$0 +│/);
   assert.equal(runs(lines).find(([t]) => /^c +\$0$/.test(t))[1], '', 'a zero in the table has no sign color');
+  const zeros = runs(lines).filter(([t]) => /^ +\$0$/.test(t));
+  assert.equal(zeros.length, 2);
+  assert.ok(zeros.every(([, fg]) => fg === ''), 'a zero in the chart has no sign color');
 });
 
 test('a listed table skips the x key it already shows, and a whole small amount has no cents', () => {
@@ -125,11 +136,31 @@ test('a row puts as many blocks on a line as fit, then wraps the rest', () => {
   assert.equal((tops[0].match(/╭/g) || []).length, 2, 'the chart and its table share the first line');
 });
 
-test('a comparison draws its overview and its change side by side in one row', () => {
+test('a comparison draws its overview and its change side by side in one row, and the table stays under its own chart', () => {
   const periods = months.flatMap((r) => [{ k: r.k, m: 'Sep', v: r.sep }, { k: r.k, m: 'Oct', v: r.oct }]);
-  const text = plain(draw('row', JSON.stringify([{ type: 'bar', title: 'Sep vs Oct', x: 'k', y: 'v', series: 'm', data: periods }, { type: 'bar', diverging: true, title: 'Change', x: 'k', y: 'delta', data: months }]), { width: 140 }));
-  assert.match(text.split('\n')[1], /Sep vs Oct.*│ │.*Change/);
+  const table = [{ key: 'sep', name: 'Sep' }, { key: 'oct', name: 'Oct' }, { key: 'delta', name: 'Δ', signed: true }, { key: 'pct', name: 'Δ %', format: 'percent', signed: true }];
+  const change = { type: 'bar', diverging: true, title: 'Change', x: 'k', y: 'delta', yFormat: 'currency', table, data: months };
+  const text = plain(draw('row', JSON.stringify([{ type: 'bar', title: 'Sep vs Oct', x: 'k', y: 'v', series: 'm', data: periods }, change]), { width: 96 }));
+  const lines = text.split('\n');
+  assert.match(lines[1], /Sep vs Oct.*│ │.*Change/);
   assert.match(text, /■ Sep 2,155 +■ Oct 1,953/);
+  assert.ok(lines.every((l) => [...l].length <= 96));
+  // The column where the table frame starts holds the bottom corner of a frame on the line above it.
+  const under = (ls) => {
+    const top = ls.findIndex((l) => l.includes('Values')) - 1;
+    return [...ls[top - 1]][[...ls[top]].lastIndexOf('╭')] === '╰';
+  };
+  assert.ok(under(lines), 'the table starts directly under the change chart');
+  const three = [{ title: 'A', ...JSON.parse(chart({ data: rows })) }, change, { title: 'C', ...JSON.parse(chart({ data: rows })) }];
+  assert.ok(under(plain(draw('row', JSON.stringify(three), { width: 96 })).split('\n')), 'in a wrapped row the table still sits under its own chart');
+});
+
+test('a percent chart prints no sum of percentages in its footer', () => {
+  const pct = (spec) => plain(draw('chart', chart({ yFormat: 'percent', data: rows, ...spec })));
+  for (const spec of [{}, { type: 'column' }, { type: 'line' }, { diverging: true }, { series: 'g', data: [{ k: 'a', g: 'x', v: 1 }, { k: 'a', g: 'y', v: 2 }] }]) {
+    assert.doesNotMatch(pct(spec), /total|net|40%|of top/, JSON.stringify(spec));
+  }
+  assert.match(pct({}), /RDS █+ 30%/);
 });
 
 test('signed rows show no share, and a negative column stands as tall as its size', () => {
@@ -215,6 +246,32 @@ test('several groups draw one frame each, titled by their path, then the links b
   assert.ok(narrow.split('\n').every((row) => [...row].length <= 40));
 });
 
+test('a flowchart parses dashed ids, late and repeated groups, both title forms, link styles and an escaped line break', () => {
+  const groupOf = (src) => Object.fromEntries([...parseFlowchart(src).nodes.values()].map((n) => [n.id, n.group]));
+  assert.deepEqual(groupOf('flowchart LR\n  subgraph s[S]\n    end-user[User] --> graph-db[DB]\n  end'), { 'end-user': 's', 'graph-db': 's' }, 'a dashed id is not a keyword');
+  const late = parseFlowchart('flowchart LR\n  ops[Operators] --> net\n  subgraph net[Network]\n    lb[LB]\n  end');
+  assert.deepEqual([[...late.nodes.keys()], late.order], [['ops', 'lb'], [{ node: 'ops' }, { group: 'net' }]], 'a group declared after a link to it draws no box');
+  const moved = parseFlowchart('flowchart LR\n  a[Users] --> b[API]\n  subgraph s[Cloud]\n    b\n  end');
+  assert.deepEqual([moved.nodes.get('b').group, moved.order, moved.groups.get('s').items], ['s', [{ node: 'a' }, { group: 's' }], [{ node: 'b' }]]);
+  const twice = parseFlowchart('flowchart LR\n  subgraph s[First]\n    a\n  end\n  subgraph s\n    b\n  end');
+  assert.deepEqual([twice.groups.get('s').title, twice.groups.get('s').items.length, twice.order.length], ['First', 2, 1], 'a repeated group id adds to the first group');
+  const titles = parseFlowchart('flowchart LR\n  subgraph "My title"\n    a\n  end\n  subgraph id [Other]\n    b\n  end\n  x --> id');
+  assert.deepEqual([...titles.groups.values()].map((g) => [g.id, g.title]), [['g0', 'My title'], ['id', 'Other']]);
+  assert.match(plain(draw('mermaid', 'flowchart LR\n  subgraph id [Other]\n    b[Box]\n  end\n  x[X] --> id', { width: 120 })), /X ├─┼►│ Box/, 'a link to a spaced group id reaches it');
+  const styled = 'flowchart LR\n  a[Alpha] ~~~ b[Beta]\n  a --- c[Gamma]\n  a <--> d[Delta]\n  a -- text --- e[Epsilon]';
+  assert.deepEqual(parseFlowchart(styled).edges.map((e) => e.link), ['hidden', 'line', 'both', 'line']);
+  const drawn = plain(draw('mermaid', styled, { width: 160 }));
+  assert.doesNotMatch(drawn, /►│ Beta/, 'a hidden link draws no arrow');
+  assert.match(drawn, /Alpha ◄[\s\S]*▼/, 'a two-way link has an arrow at both ends');
+  const list = plain(draw('mermaid', styled, { width: 30 }));
+  assert.match(list, /Alpha — Gamma/);
+  assert.match(list, /Alpha ↔ Delta/);
+  assert.doesNotMatch(list, /Alpha . Beta/);
+  const escaped = plain(draw('mermaid', 'flowchart LR\n  a["one\\ntwo"] --> b[B]', { width: 120 }));
+  assert.match(escaped, /one · two/);
+  assert.doesNotMatch(escaped, /\\n/);
+});
+
 test('a layout that fuses two link labels or runs a wall through one is not kept', () => {
   const src = 'flowchart TB\n  q[SQS jobs] --> l[Lambda deploy]\n  e[EventBridge rule] -->|invoke| l\n  l -->|UpdateFunctionCode| f[Lambdas using image]\n  l -->|UpdateService| s[ECS services]';
   const text = plain(draw('mermaid', src, { width: 100 }));
@@ -250,6 +307,9 @@ test('a link that closes a cycle is listed under the drawing, and the rest draws
   const text = plain(draw('mermaid', src, { width: 120 }));
   assert.match(text, /↺ EventBridge state → Lambda deploy/);
   assert.match(text, /SQS jobs[\s\S]*Lambda deploy[\s\S]*ECS services[\s\S]*EventBridge state/);
+  const narrow = plain(draw('mermaid', 'flowchart TB\n  q[Queue] --> l[Deploy]\n  l --> s[Services]\n  s --> e[Event state of the deployment] --> l', { width: 40 }));
+  assert.match(narrow, /↺/);
+  assert.ok(narrow.split('\n').every((row) => [...row].length <= 40), 'a back link wraps to the width');
 });
 
 test('a label inside a longer label colors only its own box', () => {
