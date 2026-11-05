@@ -164,7 +164,9 @@ function trim(lines) {
 // Shapes the text renderer draws, by their opening token; any other shape becomes a box.
 const SHAPES = [['[(', ')]'], ['([', '])'], ['((', '))'], ['[[', ']]'], ['[', ']'], ['(', ')'], ['{{', '}}'], ['{', '}'], ['>', ']']];
 const DRAWN = new Set(['[(', '([', '((', '[', '(']);
-const NODE_MAX = 32;
+// Labels are cut long first, and shorter only when the long ones do not fit.
+const NODE_MAX = 44;
+const NODE_SHORT = 32;
 const EDGE_MAX = 24;
 const TITLE_MAX = 40;
 const LIST_MAX = 64;
@@ -315,12 +317,12 @@ function firstNode(model, id) {
 }
 
 // The model written back as the plain flowchart the text renderer draws best.
-function emit(model, dir) {
+function emit(model, dir, nodeMax = NODE_MAX) {
   const out = [`flowchart ${dir}`];
   const node = (n) => {
     const [open, close] = DRAWN.has(n.open) ? [n.open, n.close] : ['[', ']'];
     // A space each side keeps the text off the walls of a box drawn with no inner padding.
-    return `${n.id}${open}" ${clean(n.label ?? n.id, NODE_MAX)} "${close}${n.cls ? `:::${n.cls}` : ''}`;
+    return `${n.id}${open}" ${clean(n.label ?? n.id, nodeMax)} "${close}${n.cls ? `:::${n.cls}` : ''}`;
   };
   const write = (items, depth) => {
     for (const item of items) {
@@ -341,10 +343,10 @@ function emit(model, dir) {
 const edges = (model) =>
   model.edges.filter((e) => e.link !== 'hidden').map((e) => ({ ...e, from: firstNode(model, e.from), to: firstNode(model, e.to) })).filter((e) => e.from && e.to && e.from !== e.to);
 
-// A drawing is kept only when every node label and group title reads whole in it.
-function intact(lines, model) {
+// A drawing is kept only when every label reads whole in it and every arrowhead lands on a wall.
+function intact(lines, model, nodeMax = NODE_MAX) {
   const text = plainOf(lines).join('\n');
-  const names = [...[...model.nodes.values()].map((n) => clean(n.label ?? n.id, NODE_MAX)), ...[...model.groups.values()].map((g) => clean(g.title, TITLE_MAX))];
+  const names = [...[...model.nodes.values()].map((n) => clean(n.label ?? n.id, nodeMax)), ...[...model.groups.values()].map((g) => clean(g.title, TITLE_MAX))];
   // A link label must stand alone: a letter next to it means two labels fused, and a wall through it breaks the match.
   const alone = (label) => {
     for (let at = text.indexOf(label); at >= 0; at = text.indexOf(label, at + 1)) {
@@ -355,7 +357,26 @@ function intact(lines, model) {
     return false;
   };
   const links = edges(model).filter((e) => e.label).map((e) => clean(e.label, EDGE_MAX));
-  return names.every((name) => text.includes(name)) && links.every(alone);
+  // Label text is blanked first, so an arrow glyph written in a label is not read as an arrowhead.
+  const bare = plainOf(lines).map((row) => [...names, ...links].sort((a, b) => b.length - a.length).reduce((r, s) => r.replaceAll(s, ' '.repeat([...s].length)), row));
+  return names.every((name) => text.includes(name)) && links.every(alone) && arrowsLand(bare);
+}
+
+// True when every arrowhead touches, or sits in, the wall of the box it points at.
+const SIDE = /[│├┤┼┌┐└┘╭╮╰╯]/;
+const TOP = /[─┬┴┼┌┐└┘╭╮╰╯]/;
+const WALL = { '►': [0, 1, /[│├┤┼]/, SIDE], '◄': [0, -1, /[│├┤┼]/, SIDE], '▼': [1, 0, /[─┬┼┌┐╭╮]/, TOP], '▲': [-1, 0, /[─┴┼└┘╰╯]/, TOP] };
+export function arrowsLand(rows) {
+  const grid = rows.map((r) => [...r]);
+  const at = (y, x) => grid[y]?.[x] ?? '';
+  return grid.every((row, y) =>
+    row.every((ch, x) => {
+      const w = WALL[ch];
+      if (!w) return true;
+      const inWall = w[0] ? w[3].test(at(y, x - 1)) && w[3].test(at(y, x + 1)) : w[3].test(at(y - 1, x)) && w[3].test(at(y + 1, x));
+      return inWall || w[2].test(at(y + w[0], x + w[1]));
+    }),
+  );
 }
 
 // The fallback: each group a frame that lists its nodes, then every link with its label.
@@ -462,18 +483,19 @@ function drawWhole(model, icons, width) {
   const { forward, back } = cycleLinks(model);
   const drawn = { ...model, edges: forward, order: model.groups.size ? model.order : topoOrder(model, forward) };
   const dirs = /^(LR|RL)$/.test(model.dir) ? [model.dir, 'TB'] : [model.dir === 'TD' ? 'TB' : model.dir];
-  for (const dir of dirs) {
-    const src = emit(drawn, dir);
-    for (const paddingX of [3, 1]) {
+  for (const [nodeMax, dir] of [NODE_MAX, NODE_SHORT].flatMap((max) => dirs.map((d) => [max, d]))) {
+    const src = emit(drawn, dir, nodeMax);
+    // Roomy boxes first, then tighter spacing, then flat boxes: the roomiest drawing that fits wins.
+    for (const [paddingX, boxBorderPadding] of [[3, 1], [1, 1], [3, 0], [1, 0]]) {
       let text;
       // The vendored layout throws on some link routes; that layout is skipped like one that does not fit.
       try {
-        text = renderMermaidASCII(src, { colorMode: 'none', paddingX, paddingY: 1, boxBorderPadding: 0 });
+        text = renderMermaidASCII(src, { colorMode: 'none', paddingX, paddingY: 1, boxBorderPadding });
       } catch {
         continue;
       }
       const lines = trim(colorGrid(text, src, icons));
-      if (visible(lines) > width || !intact(lines, drawn)) continue;
+      if (visible(lines) > width || !intact(lines, drawn, nodeMax)) continue;
       if (!back.length) return lines;
       const { hue } = labelsOf(src);
       const name = (id) => [clean(model.nodes.get(id)?.label ?? id, LIST_MAX), hue(id, icons[id]) ?? '#E2E8F0'];
@@ -592,9 +614,10 @@ function drawSections(model, icons, width) {
 export function drawDiagram(source, width = 100) {
   const { text, icons } = fromIcons(source);
   const bare = text.replace(/%%.*$/gm, '').trim();
-  if (!/^(?:flowchart|graph)\s/.test(bare)) return drawOther(bare, icons, width);
+  if (!/^(?:flowchart|graph)\s/.test(bare)) return drawOther(bare, icons, width - 4);
   const model = parseFlowchart(text);
   if (!model.nodes.size) throw new Error('no node');
-  if (model.groups.size <= 1) return drawLinked(model, icons, width) ?? groupedView(model, icons, width);
-  return drawSections(model, icons, width);
+  // One frame goes around the drawing, so it takes 4 columns; group frames need no frame around them.
+  if (model.groups.size <= 1) return drawLinked(model, icons, width - 4) ?? groupedView(model, icons, width - 4);
+  return Object.assign(drawSections(model, icons, width), { framed: true });
 }

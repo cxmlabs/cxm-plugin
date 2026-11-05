@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { familyOf, parseFlowchart } from '../src/lib/diagram.js';
+import { arrowsLand, familyOf, parseFlowchart } from '../src/lib/diagram.js';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -36,7 +36,7 @@ test('a diverging chart puts rises right in red and falls left in green, with th
 
 test('a diagram tints each node by its family and fits the width: left to right, then top to bottom, then a list', () => {
   const wide = draw('mermaid', fixture('aws.mmd'), { width: 160 });
-  assert.match(plain(wide), /Users ├──►│ CloudFront/);
+  assert.match(plain(wide), /Users +├─*►│ +CloudFront/);
   assert.notEqual(runOf(wide, 'Aurora PostgreSQL')[2], '', 'a database node has a fill');
   assert.notEqual(runOf(wide, 'Aurora PostgreSQL')[2], runOf(wide, 'ECS API service')[2], 'two families, two fills');
   assert.match(plain(draw('mermaid', fixture('aws.mmd'), { width: 80 })), /Users[\s│]+└─+┬─+┘/);
@@ -48,7 +48,13 @@ test('a diagram tints each node by its family and fits the width: left to right,
 test("a Dex cloud diagram's icon nodes become labelled boxes colored by the icon, and edge labels keep their spaces", () => {
   const lines = draw('mermaid', fixture('dex-cloud.mmd'), { width: 120 });
   assert.match(plain(lines), /Public ALB .*https.*Orders API .*sql queries.*Orders DB/);
-  assert.equal(runs(lines).find(([t]) => /^┌─+┐$/.test(t) && t.length === 13)?.[1], '#5B8DEF', 'the database box is blue');
+  const rows = plain(lines).split('\n').map((row) => [...row]);
+  const y = rows.findIndex((row) => row.join('').includes('Orders DB'));
+  const x = rows[y].join('').indexOf('Orders DB');
+  let top = y;
+  while (rows[top][x] !== '─') top--;
+  let end = 0;
+  assert.equal(lines[top].find(([t]) => (end += [...t].length) > x)[1], '#5B8DEF', 'the database box is blue');
 });
 
 const chart = (spec) => JSON.stringify({ x: 'k', y: 'v', ...spec });
@@ -254,10 +260,10 @@ test('several groups draw one frame each, titled by their path, then the links b
   assert.equal(listed('VPC main'), familyOf('VPC main'), 'a listed group takes its family color');
   assert.match(text, /╭─ Account prod › VPC main ─/);
   assert.match(text, /╭─ Edge ─/);
-  assert.match(text, /Links between groups +│\n│ +CloudFront → ECS API/);
-  assert.match(text, /ECS API ├──►│ RDS orders/, 'a link inside a group is drawn');
+  assert.match(text, /Links between groups\s+CloudFront → ECS API/);
+  assert.match(text, /ECS API +├──►│ +RDS orders/, 'a link inside a group is drawn');
   const narrow = plain(draw('mermaid', src, { width: 40 }));
-  assert.match(narrow, /╭─ Account prod › VPC main ─+╮ │\n│ │ ┌/, 'a frame that does not fit beside the last goes under it');
+  assert.match(narrow, /╰─+╯\n╭─ Edge/, 'a frame that does not fit beside the last goes under it');
   assert.ok(narrow.split('\n').every((row) => [...row].length <= 40));
 });
 
@@ -272,12 +278,12 @@ test('a flowchart parses dashed ids, late and repeated groups, both title forms,
   assert.deepEqual([twice.groups.get('s').title, twice.groups.get('s').items.length, twice.order.length], ['First', 2, 1], 'a repeated group id adds to the first group');
   const titles = parseFlowchart('flowchart LR\n  subgraph "My title"\n    a\n  end\n  subgraph id [Other]\n    b\n  end\n  x --> id');
   assert.deepEqual([...titles.groups.values()].map((g) => [g.id, g.title]), [['g0', 'My title'], ['id', 'Other']]);
-  assert.match(plain(draw('mermaid', 'flowchart LR\n  subgraph id [Other]\n    b[Box]\n  end\n  x[X] --> id', { width: 120 })), /X ├─┼►│ Box/, 'a link to a spaced group id reaches it');
+  assert.match(plain(draw('mermaid', 'flowchart LR\n  subgraph id [Other]\n    b[Box]\n  end\n  x[X] --> id', { width: 120 })), /X +├─*┼─*►│ +Box/, 'a link to a spaced group id reaches it');
   const styled = 'flowchart LR\n  a[Alpha] ~~~ b[Beta]\n  a --- c[Gamma]\n  a <--> d[Delta]\n  a -- text --- e[Epsilon]';
   assert.deepEqual(parseFlowchart(styled).edges.map((e) => e.link), ['hidden', 'line', 'both', 'line']);
   const drawn = plain(draw('mermaid', styled, { width: 160 }));
-  assert.doesNotMatch(drawn, /►│ Beta/, 'a hidden link draws no arrow');
-  assert.match(drawn, /Alpha ◄[\s\S]*▼/, 'a two-way link has an arrow at both ends');
+  assert.doesNotMatch(drawn, /►│ +Beta/, 'a hidden link draws no arrow');
+  assert.match(drawn, /Alpha +◄[\s\S]*▼/, 'a two-way link has an arrow at both ends');
   const list = plain(draw('mermaid', styled, { width: 30 }));
   assert.match(list, /Alpha — Gamma/);
   assert.match(list, /Alpha ↔ Delta/);
@@ -291,7 +297,27 @@ test('a layout that fuses two link labels or runs a wall through one is not kept
   const src = 'flowchart TB\n  q[SQS jobs] --> l[Lambda deploy]\n  e[EventBridge rule] -->|invoke| l\n  l -->|UpdateFunctionCode| f[Lambdas using image]\n  l -->|UpdateService| s[ECS services]';
   const text = plain(draw('mermaid', src, { width: 100 }));
   assert.doesNotMatch(text, /invoke─?Update|Update\w*─invoke/);
-  assert.match(text, /EventBridge rule → Lambda deploy +invoke/);
+  assert.match(text, /Lambda deploy +├◄─+invoke─+┤/);
+});
+
+test('a node box is padded with a 44-character label when it fits, then flat, then cut to 32 characters', () => {
+  const src = 'flowchart TB\n  a[Order events stream with retries and backoff] --> b[Billing]';
+  const roomy = plain(draw('mermaid', src, { width: 60 }));
+  assert.match(roomy, /│ │ +│ │\n│ │  Order events stream with retries and backoff  │ │/, 'a blank row pads the box');
+  assert.match(plain(draw('mermaid', src, { width: 52 })), /─┐ │\n│ │ Order events stream with retries and backoff │ │/);
+  assert.match(plain(draw('mermaid', src, { width: 48 })), /│  Order events stream with retrie…  │/);
+  const glyphs = plain(draw('mermaid', 'flowchart LR\n  a[Cost] -->|Cost ▲| b[Cost ▲ Billing]', { width: 60 }));
+  assert.match(glyphs, /│ +│\n│ │  Cost  ├Cost ▲─+►│  Cost ▲ Billing  │/, 'an arrow glyph in a node or link label is not an arrowhead');
+});
+
+test('an arrowhead counts only when it touches or sits in a box wall', () => {
+  assert.ok(arrowsLand(['─►│']));
+  assert.ok(arrowsLand(['│', '►', '│']));
+  assert.ok(arrowsLand(['│', '▼', '─']));
+  assert.ok(arrowsLand(['─▼─']));
+  assert.equal(arrowsLand(['│', '►', ' ']), false);
+  assert.equal(arrowsLand(['─► ']), false);
+  assert.equal(arrowsLand(['│', '▼', ' ']), false);
 });
 
 test('among generic words, the last one in a label wins', () => {
@@ -365,7 +391,7 @@ test('a group with no link inside lists its nodes instead of drawing empty boxes
 test('in a group, linked nodes are drawn and lone nodes are listed under the drawing', () => {
   const src = 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB public] --> n[NAT gateway]\n    r[(RDS orders)]\n  end\n  subgraph w["VPC edge"]\n    c[CloudFront]\n  end\n  c --> a';
   const text = plain(draw('mermaid', src, { width: 120 }));
-  assert.match(text, /ALB public ├[^\n]*►│ NAT gateway/);
+  assert.match(text, /ALB public +├[^\n]*►│ +NAT gateway/);
   assert.match(text, /■ RDS orders/);
   assert.doesNotMatch(text, /│ RDS orders │/);
 });
