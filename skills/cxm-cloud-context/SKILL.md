@@ -83,6 +83,29 @@ Then ADD what only the plugin can, on top: the live deployed reality (`assets` f
 `_ecs_clusters` / `_cloudwatch` for type detail and whether it's actually active), real owners, real $$.
 Base answer at full depth, then plugin data on top — that ordering is what puts you *ahead*, never level.
 
+## Drawing how things connect (diagram data)
+
+Build a diagram from the `network_topology_graph` dataset, never from guesses. Each row is a node or a
+link (`element_kind`). A node has `element_id`, `node_type`, `label`, `parent_id` (its account, VPC or
+subnet), `account_id` and `region`. A link has `source_id`, `target_id`, `edge_type` and `label`.
+Read `cxm analytics schema network_topology_graph` once for the full field list.
+
+1. The nodes of one account (get its id from `cloud_topology_accounts`):
+   ```bash
+   cxm analytics query '{"measures":["network_topology_graph.count"],"dimensions":["network_topology_graph.element_id","network_topology_graph.node_type","network_topology_graph.label","network_topology_graph.parent_id"],"filters":[{"member":"network_topology_graph.element_kind","operator":"equals","values":["node"]},{"member":"network_topology_graph.account_id","operator":"equals","values":["<account id>"]}],"limit":500}'
+   ```
+2. Its links, with their traffic:
+   ```bash
+   cxm analytics query '{"measures":["network_topology_graph.sum_bytes_30d"],"dimensions":["network_topology_graph.source_id","network_topology_graph.target_id","network_topology_graph.edge_type","network_topology_graph.label"],"filters":[{"member":"network_topology_graph.element_kind","operator":"equals","values":["edge"]},{"member":"network_topology_graph.edge_type","operator":"notEquals","values":["contains"]},{"member":"network_topology_graph.account_id","operator":"equals","values":["<account id>"]}],"limit":500}'
+   ```
+3. Draw it: a `parent_id` of type VPC or subnet becomes a `subgraph` (two levels at most), each
+   link a `-->` edge. Keep about 15 nodes: keep the ones on a link or with traffic, and fold many
+   nodes of one type into one (`SNS topics ×12`). Name the node type and a short name in each label.
+
+`permission_reach_graph` holds who can reach a resource (principal → resource, `can_read`,
+`can_write`, `can_admin`): use it for "who can access X". For code-to-cloud links, the
+`cxm-repo-graph` skill reads `repo_graph_nodes` and `repo_graph_edges`.
+
 ## Standards / conventions / policies ("add X to our architecture standards")
 
 CXM keeps the org's canonical standards in the cloud-map (governance / operating / delivery pages),

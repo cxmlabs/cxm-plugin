@@ -362,6 +362,14 @@ test('a group with no link inside lists its nodes instead of drawing empty boxes
   assert.doesNotMatch(text, /┌/);
 });
 
+test('in a group, linked nodes are drawn and lone nodes are listed under the drawing', () => {
+  const src = 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB public] --> n[NAT gateway]\n    r[(RDS orders)]\n  end\n  subgraph w["VPC edge"]\n    c[CloudFront]\n  end\n  c --> a';
+  const text = plain(draw('mermaid', src, { width: 120 }));
+  assert.match(text, /ALB public ├[^\n]*►│ NAT gateway/);
+  assert.match(text, /■ RDS orders/);
+  assert.doesNotMatch(text, /│ RDS orders │/);
+});
+
 test('a label inside a longer label colors only its own box', () => {
   const lines = draw('mermaid', 'flowchart LR\n  G[API Gateway] --> A[API]', { width: 120 });
   assert.notEqual(runOf(lines, 'API Gateway')[2], runs(lines).find(([t]) => t === 'API')[2]);

@@ -533,9 +533,13 @@ function drawSections(model, icons, width) {
   const framed = [];
   for (const sec of sections) {
     const sub = sectionModel(model, sec.ids);
-    // A group with no link inside is a list: boxes with nothing between them only take room.
-    const lines = (sub.edges.length ? drawWhole(sub, icons, width - 4) : null) ?? groupedView(sub, icons, width - 4);
-    framed.push({ ...sec, lines });
+    // Only nodes linked inside the group are drawn; the others are a list under the drawing, as a
+    // lone box only takes room.
+    const linked = sec.ids.filter((id) => sub.edges.some((e) => e.from === id || e.to === id));
+    const drawn = linked.length ? drawWhole(sectionModel(model, linked), icons, width - 4) : null;
+    const rest = drawn ? sec.ids.filter((id) => !linked.includes(id)) : sec.ids;
+    const listed = rest.length ? groupedView(sectionModel(model, rest), icons, width - 4) : [];
+    framed.push({ ...sec, lines: drawn ? [...drawn, ...(listed.length ? [[], ...listed] : [])] : listed });
   }
   // Frames side by side while they fit, level at the bottom.
   const out = [];
