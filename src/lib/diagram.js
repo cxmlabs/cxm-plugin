@@ -147,7 +147,7 @@ const TITLE_MAX = 40;
 const LIST_MAX = 64;
 const cut = (s, max) => ([...s].length > max ? `${[...s].slice(0, max - 1).join('')}…` : s);
 // One plain line: the renderer overlays a two-line label, and a quote ends the label it is written in.
-const clean = (s, max) => cut(s.replace(/<br\s*\/?>/gi, ' · ').replace(/<[^>]*>/g, '').replace(/"/g, "'").replace(/\s+/g, ' ').trim(), max);
+const clean = (s, max) => cut(s.replace(/<br\s*\/?>|\\n/gi, ' · ').replace(/<[^>]*>/g, '').replace(/"/g, "'").replace(/\s+/g, ' ').trim(), max);
 
 // Reads one node reference at `at`: an id, then an optional shape that holds its label.
 function readNode(line, at) {
@@ -172,40 +172,72 @@ function readNode(line, at) {
   return { id, label, open, close, cls: cls?.[1], end: i + (cls ? cls[0].length : 0) };
 }
 
+// How a link is drawn: `~~~` is hidden, an end mark is an arrow, and no end mark is a plain line.
+const linkOf = (op) => (op === '~~~' ? 'hidden' : /[>ox]$/.test(op) ? (op.startsWith('<') ? 'both' : 'to') : 'line');
+const GLYPH = { to: ' → ', both: ' ↔ ', line: ' — ' };
 const OP = /^\s*<?(?:-{2,}|={2,}|-\.+-?|~~~)[>ox]?\s*/;
-const TEXT_OP = /^\s*(?:--|==|-\.)\s+(.+?)\s+(?:-{2,}|={2,}|\.-)[>ox]?\s*/;
+const TEXT_OP = /^\s*<?(?:--|==|-\.)\s+(.+?)\s+(?:-{2,}|={2,}|\.-)[>ox]?\s*/;
 
 // The flowchart as a model: nodes (label, shape, group), nested groups, edges, class lines.
 export function parseFlowchart(src) {
   const model = { dir: 'LR', nodes: new Map(), groups: new Map(), edges: [], classLines: [], order: [] };
   const stack = [];
+  const itemsOf = (id) => (id ? model.groups.get(id).items : model.order);
+  const ancestors = (id) => {
+    const out = [];
+    for (let g = model.groups.get(id); g?.parent; g = model.groups.get(g.parent)) out.push(g.parent);
+    return out;
+  };
   const touch = (n) => {
     const node = model.nodes.get(n.id) ?? { id: n.id, group: stack.at(-1) ?? null };
+    // A node listed in a later group moves to it, as mermaid draws it; a mention in an enclosing group does not.
+    const here = stack.at(-1);
+    if (model.nodes.has(n.id) && here && node.group !== here && !ancestors(node.group).includes(here)) {
+      const from = itemsOf(node.group);
+      from.splice(from.findIndex((item) => item.node === n.id), 1);
+      model.groups.get(here).items.push({ node: n.id });
+      node.group = here;
+    }
     if (n.label !== undefined && node.label === undefined) Object.assign(node, { label: n.label, open: n.open, close: n.close });
     if (n.cls) node.cls = n.cls;
     if (!model.nodes.has(n.id) && !model.groups.has(n.id)) {
       model.nodes.set(n.id, node);
-      (node.group ? model.groups.get(node.group).items : model.order).push({ node: n.id });
+      itemsOf(node.group).push({ node: n.id });
     }
   };
   for (const raw of src.replace(/%%.*$/gm, '').split('\n')) {
     for (const stmt of raw.split(/;(?=(?:[^"]*"[^"]*")*[^"]*$)/)) {
       const line = stmt.trim();
       if (!line) continue;
-      const head = line.match(/^(?:flowchart|graph)\b\s*(\w*)/);
+      const head = line.match(/^(?:flowchart|graph)(?![\w-])\s*(\w*)/);
       if (head) { model.dir = (head[1] || 'TB').toUpperCase(); continue; }
       const sub = line.match(/^subgraph\s+(.+)$/);
       if (sub) {
-        const ref = readNode(sub[1], 0);
-        const id = ref?.end === sub[1].trim().length || ref?.label !== undefined ? ref.id : `g${model.groups.size}`;
-        const title = ref?.label ?? (ref?.end === sub[1].trim().length ? ref.id : sub[1].trim());
-        const group = { id, title, parent: stack.at(-1) ?? null, items: [] };
-        model.groups.set(id, group);
-        (group.parent ? model.groups.get(group.parent).items : model.order).push({ group: id });
+        // `id [Title]` is the same as `id[Title]`; `"Title"` alone is a title with no id.
+        const head = sub[1].trim().replace(/^([\w-]+)\s+(?=\[)/, '$1');
+        const ref = readNode(head, 0);
+        const named = ref?.end === head.length || ref?.label !== undefined;
+        const id = named ? ref.id : `g${model.groups.size}`;
+        const title = ref?.label ?? (named ? ref.id : head.replace(/^"(.*)"$/, '$1'));
+        const old = model.groups.get(id);
+        if (old) {
+          // A second block with the same id adds to the first group.
+          if (ref?.label !== undefined) old.title = title;
+        } else {
+          // A link written before the block made a bare node of the group id; the group replaces it.
+          const bare = model.nodes.get(id);
+          if (bare?.label === undefined && model.nodes.delete(id)) {
+            const items = itemsOf(bare.group);
+            items.splice(items.findIndex((item) => item.node === id), 1);
+          }
+          const group = { id, title, parent: stack.at(-1) ?? null, items: [] };
+          model.groups.set(id, group);
+          itemsOf(group.parent).push({ group: id });
+        }
         stack.push(id);
         continue;
       }
-      if (/^end\b/.test(line)) { stack.pop(); continue; }
+      if (line === 'end') { stack.pop(); continue; }
       if (/^(classDef|class)\s/.test(line)) { model.classLines.push(line); continue; }
       if (/^(style|linkStyle|click|direction)\s/.test(line)) continue;
       // A chain of node groups joined by links: `A & B -->|x| C --> D`.
@@ -224,7 +256,7 @@ export function parseFlowchart(src) {
         }
         if (!refs.length) break;
         refs.forEach(touch);
-        if (left) for (const a of left.refs) for (const b of refs) model.edges.push({ from: a.id, to: b.id, label: left.label });
+        if (left) for (const a of left.refs) for (const b of refs) model.edges.push({ from: a.id, to: b.id, label: left.label, link: left.link });
         const rest = line.slice(at);
         const text = rest.match(TEXT_OP);
         const op = text ?? rest.match(OP);
@@ -233,7 +265,7 @@ export function parseFlowchart(src) {
         let label = text?.[1];
         const pipe = line.slice(at).match(/^\|([^|]*)\|\s*/);
         if (pipe) { label = pipe[1]; at += pipe[0].length; }
-        left = { refs, label: label?.replace(/^"|"$/g, '') };
+        left = { refs, label: label?.replace(/^"|"$/g, ''), link: linkOf(op[0].trim()) };
       }
     }
   }
@@ -279,23 +311,23 @@ function emit(model, dir) {
     }
   };
   write(model.order, 1);
-  for (const e of edges(model)) out.push(`  ${e.from} -->${e.label ? `|"${clean(e.label, EDGE_MAX)}"|` : ''} ${e.to}`);
+  for (const e of edges(model)) out.push(`  ${e.from} ${{ both: '<-->', line: '---' }[e.link] ?? '-->'}${e.label ? `|"${clean(e.label, EDGE_MAX)}"|` : ''} ${e.to}`);
   return [...out, ...model.classLines].join('\n');
 }
 
 const edges = (model) =>
-  model.edges.map((e) => ({ ...e, from: firstNode(model, e.from), to: firstNode(model, e.to) })).filter((e) => e.from && e.to && e.from !== e.to);
+  model.edges.filter((e) => e.link !== 'hidden').map((e) => ({ ...e, from: firstNode(model, e.from), to: firstNode(model, e.to) })).filter((e) => e.from && e.to && e.from !== e.to);
 
 // A drawing is kept only when every node label and group title reads whole in it.
 function intact(lines, model) {
   const text = plainOf(lines).join('\n');
   const names = [...[...model.nodes.values()].map((n) => clean(n.label ?? n.id, NODE_MAX)), ...[...model.groups.values()].map((g) => clean(g.title, TITLE_MAX))];
-  // A link label must stand alone: a letter or a line glyph touching it means two labels fused or a wall crossed it.
+  // A link label must stand alone: a letter next to it means two labels fused, and a wall through it breaks the match.
   const alone = (label) => {
     for (let at = text.indexOf(label); at >= 0; at = text.indexOf(label, at + 1)) {
       // Two characters each side: one line glyph between two labels still reads as one word.
       const near = text.slice(Math.max(0, at - 2), at) + text.slice(at + label.length, at + label.length + 2);
-      if (!/[\p{L}\p{N}]/u.test(near) && ![...label].some((c) => /[┬┴┼├┤]/.test(c))) return true;
+      if (!/[\p{L}\p{N}]/u.test(near)) return true;
     }
     return false;
   };
@@ -325,12 +357,16 @@ function groupedView(model, icons, width) {
     }
   };
   block(model.order, 0, '', '');
-  const links = model.edges.filter((e) => e.from !== e.to);
+  const links = model.edges.filter((e) => e.from !== e.to && e.link !== 'hidden');
   if (links.length) {
     lines.push([], [['Links', '#94A3B8', '', true]]);
-    for (const e of links) lines.push([['  '], nameRun(e.from), [' → ', '#5B8DEF'], nameRun(e.to), ...(e.label ? [[`  ${clean(e.label, LIST_MAX)}`, '#94A3B8']] : [])]);
+    for (const e of links) lines.push([['  '], nameRun(e.from), [GLYPH[e.link] ?? ' → ', '#5B8DEF'], nameRun(e.to), ...(e.label ? [[`  ${clean(e.label, LIST_MAX)}`, '#94A3B8']] : [])]);
   }
-  // A line wider than the width goes on under itself at a space, so no link loses its target or its label.
+  return wrap(lines, width);
+}
+
+// A line wider than the width goes on under itself at a space, so no link loses its target or its label.
+function wrap(lines, width) {
   return lines.flatMap((runs) => {
     if (visible([runs]) <= width) return [runs];
     const rows = [[]];
@@ -361,7 +397,6 @@ function drawOther(text, icons, width) {
   return lines;
 }
 
-// The best drawing of a model that fits the width with every label whole, else null.
 // The links that close a cycle, found by a depth-first walk in source order. A layered layout
 // routes them back through other boxes, so they are listed under the drawing instead.
 function cycleLinks(model) {
@@ -399,6 +434,7 @@ function topoOrder(model, links) {
   return done.map((id) => ({ node: id }));
 }
 
+// The best drawing of a model that fits the width with every label whole, else null.
 function drawWhole(model, icons, width) {
   const { forward, back } = cycleLinks(model);
   const drawn = { ...model, edges: forward, order: model.groups.size ? model.order : topoOrder(model, forward) };
@@ -418,7 +454,7 @@ function drawWhole(model, icons, width) {
       if (!back.length) return lines;
       const { hue } = labelsOf(src);
       const name = (id) => [clean(model.nodes.get(id)?.label ?? id, LIST_MAX), hue(id, icons[id]) ?? '#E2E8F0'];
-      return [...lines, [], ...back.map((e) => [['↺ ', '#94A3B8'], name(e.from), [' → ', '#5B8DEF'], name(e.to), ...(e.label ? [[`  ${clean(e.label, LIST_MAX)}`, '#94A3B8']] : [])])];
+      return [...lines, [], ...wrap(back.map((e) => [['↺ ', '#94A3B8'], name(e.from), [GLYPH[e.link] ?? ' → ', '#5B8DEF'], name(e.to), ...(e.label ? [[`  ${clean(e.label, LIST_MAX)}`, '#94A3B8']] : [])]), width)];
     }
   }
   return null;
@@ -442,9 +478,12 @@ const pathOf = (model, id) => {
   return names.join(' › ');
 };
 
+// The width inside a section frame: its drawing, or its title with a rule each side.
+const innerWidth = (title, lines) => Math.max(visible(lines), [...title].length + 2);
+
 // A rounded frame titled in its group's color, padded to `height`.
 function sectionFrame(title, color, lines, height = 0) {
-  const inner = Math.max(visible(lines), [...title].length + 2);
+  const inner = innerWidth(title, lines);
   const body = lines.map((runs) => [...runs, [' '.repeat(inner - visible([runs]))]]);
   while (body.length < height - 2) body.push([[' '.repeat(inner)]]);
   const top = title
@@ -484,8 +523,8 @@ function drawSections(model, icons, width) {
     row = [];
   };
   for (const f of framed) {
-    const w = Math.max(visible(f.lines), [...f.title].length + 2) + 4;
-    const used = row.reduce((n, x) => n + Math.max(visible(x.lines), [...x.title].length + 2) + 5, 0);
+    const w = innerWidth(f.title, f.lines) + 4;
+    const used = row.reduce((n, x) => n + innerWidth(x.title, x.lines) + 5, 0);
     if (row.length && used + w > width) flush();
     row.push(f);
   }
@@ -510,7 +549,6 @@ export function drawDiagram(source, width = 100) {
   if (!/^(?:flowchart|graph)\s/.test(bare)) return drawOther(bare, icons, width);
   const model = parseFlowchart(text);
   if (!model.nodes.size) throw new Error('no node');
-  const nested = [...model.groups.values()].some((g) => g.parent);
-  if (model.groups.size <= 1 && !nested) return drawWhole(model, icons, width) ?? groupedView(model, icons, width);
+  if (model.groups.size <= 1) return drawWhole(model, icons, width) ?? groupedView(model, icons, width);
   return drawSections(model, icons, width);
 }
