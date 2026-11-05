@@ -2,33 +2,38 @@
 import { renderMermaidASCII } from '../vendor/mermaid-ascii.js';
 
 const BG = '#0F172A';
-// Service families: a service name (`ecs`, `sqs`) wins over a generic word (`image`, `queue`), so
-// "ECS services using the image" is compute. Within each pass, the first family that matches wins.
+// Service families: a service name beats a generic word, and the first service name wins, so "ECS task writing to S3" is compute.
+// Weak patterns carry the g flag, because lastWeak reads every match.
 const FAMILY = [
-  [/key ?vault|entra|active directory|azure ad\b|\biam\b|kms|secrets? manager|firewall|\bwaf\b|defender|guardduty|shield|\bsso\b|cognito|okta/i, /secrets?|identity|\bauth|security/i, '#EAB308'],
-  [/\brds\b|aurora|postgres|mysql|dynamo|azure sql|cloud sql|cosmos|redshift|bigquery|spanner|firestore|bigtable/i, /database|\bdb\b|sql/i, '#5B8DEF'],
-  [/\bs3\b|\befs\b|glacier|blob|\bgcs\b|filestore/i, /bucket|lake|storage/i, '#10B981'],
-  [/redis|memcached|elasticache/i, /cache/i, '#EF4444'],
-  [/\bsns\b|\bsqs\b|eventbridge|event ?grid|event ?hubs?|service ?bus|pub\/?sub|kinesis|kafka|\bmsk\b/i, /queue|topic|\bstream|webhook|notification|\bevents?\b/i, '#EC4899'],
-  [/github|gitlab|bitbucket|\becr\b|\bacr\b|codepipeline|codebuild|cloud ?build|azure ?devops|terraform|argo ?cd|\bhelm\b/i, /registry|pipeline|\bci\b|deploy|image|iac/i, '#14B8A6'],
-  [/cloudwatch|grafana|datadog|prometheus|sentry|posthog|x-?ray/i, /\blog(s|ging)?\b|monitor|metric|alarm|trace|observab/i, '#84CC16'],
-  [/\bglue\b|\bemr\b|\bdbt\b|airflow|\bspark\b|databricks|cube ?js|synapse/i, /warehouse|analytics|\betl\b/i, '#06B6D4'],
-  [/\baws account|subscription|management group|resource group|landing zone|\bou\b/i, /\baccount|tenant|organi[sz]ation|\borg\b|project/i, '#818CF8'],
-  [/\bvpc\b|vnet|subnet|\bnat\b|load.balanc|\b[an]lb\b|\belb\b|cloudfront|front ?door|route ?53|transit|internet gateway|private ?endpoint|expressroute|interconnect|cloud cdn|\bnsg\b|api gateway/i, /gateway|\bdns\b|\bcdn\b|ingress|vpn|network/i, '#A78BFA'],
-  [/\becs\b|\beks\b|\baks\b|\bgke\b|\bec2\b|cloud run|compute engine|app engine|lambda|fargate|app service|container apps?|kubernetes|\bk8s\b|azure functions?|cloud functions?/i, /\bvm\b|virtual machine|function|\bapi\b|service|worker|compute|cluster|\btask|\bapp\b|\bservers?\b/i, '#F59E0B'],
-  [/internet/i, /user|client|browser|customer|operator|developer|team/i, '#E2E8F0'],
+  [/key ?vault|entra|active directory|azure ad\b|\biam\b|kms|secrets? manager|firewall|\bwaf\b|defender|guardduty|shield|\bsso\b|cognito|okta/i, /secrets?|identity|\bauth|security/gi, '#EAB308'],
+  [/\brds\b|aurora|postgres|mysql|dynamo|azure sql|cloud sql|cosmos|redshift|bigquery|spanner|firestore|bigtable/i, /database|\bdb\b|sql/gi, '#5B8DEF'],
+  [/\bs3\b|\befs\b|glacier|blob|\bgcs\b|filestore/i, /bucket|lake|storage/gi, '#10B981'],
+  [/redis|memcached|elasticache/i, /cache/gi, '#EF4444'],
+  [/\bsns\b|\bsqs\b|eventbridge|event ?grid|event ?hubs?|service ?bus|pub\/?sub|kinesis|kafka|\bmsk\b/i, /queue|topic|\bstream|webhook|notification|\bevents?\b/gi, '#EC4899'],
+  [/github|gitlab|bitbucket|\becr\b|\bacr\b|codepipeline|codebuild|cloud ?build|azure ?devops|terraform|argo ?cd|\bhelm\b/i, /registry|pipeline|\bci\b|deploy|image|iac/gi, '#14B8A6'],
+  [/cloudwatch|grafana|prometheus|x-?ray/i, /\blog(s|ging)?\b|monitor|metric|alarm|trace|observab|errors?\b/gi, '#84CC16'],
+  [/\bglue\b|\bemr\b|\bdbt\b|airflow|\bspark\b|databricks|synapse/i, /warehouse|analytics|\betl\b/gi, '#06B6D4'],
+  [/\baws account|azure subscription|gcp project|management group|resource group|landing zone|\bou\b/i, /\baccount|tenant|organi[sz]ation|\borg\b/gi, '#818CF8'],
+  [/\bvpc\b|vnet|subnet|\bnat\b|load.balanc|\b[an]lb\b|\belb\b|cloudfront|front ?door|route ?53|transit|(?:internet|api|vpn) gateway|private ?endpoint|expressroute|interconnect|cloud cdn|\bnsg\b/i, /\bdns\b|\bcdn\b|ingress|vpn|network/gi, '#A78BFA'],
+  [/\becs\b|\beks\b|\baks\b|\bgke\b|\bec2\b|cloud run|compute engine|app engine|lambda|fargate|app service|container apps?|kubernetes|\bk8s\b|azure functions?|cloud functions?/i, /\bvm\b|virtual machine|function|\bapi\b|worker|compute|cluster|\btask|\bapp\b|\bservers?\b/gi, '#F59E0B'],
+  [/internet/i, /user|client|browser|customer|operator|developer|team/gi, '#E2E8F0'],
 ];
 // The family color a label names, or undefined when it names none.
 // Among generic words the last one wins, as a label ends with its noun: "Auth DB" is a database.
 function lastWeak(text) {
   let best;
-  for (const family of FAMILY) {
-    const flags = family[1].flags.includes('g') ? family[1].flags : `${family[1].flags}g`;
-    for (const m of text.matchAll(new RegExp(family[1].source, flags))) if (!best || m.index > best.at) best = { at: m.index, color: family[2] };
+  for (const [, weak, color] of FAMILY) for (const m of text.matchAll(weak)) if (!best || m.index > best.at) best = { at: m.index, color };
+  return best?.color;
+}
+function firstStrong(text) {
+  let best;
+  for (const [strong, , color] of FAMILY) {
+    const at = text.search(strong);
+    if (at >= 0 && (!best || at < best.at)) best = { at, color };
   }
   return best?.color;
 }
-export const familyOf = (text) => FAMILY.find(([strong]) => strong.test(text))?.[2] ?? lastWeak(text);
+export const familyOf = (text) => firstStrong(text) ?? lastWeak(text);
 const ARROW = /[►◄▲▼]/;
 const LINE = /[─│├┤┬┴┼┌┐└┘╭╮╰╯]/;
 const tint = (hex, pct) =>
@@ -59,7 +64,7 @@ function labelsOf(src) {
     const hex = m[2].match(/(?:stroke|fill|color):\s*#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/)?.[1];
     if (hex) classes[m[1]] = `#${hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex}`;
   }
-  return { labels, hue: (id, hint = '') => classes[nodeClass[id]] ?? familyOf(`${labels[id] ?? ''} ${hint} ${id}`) };
+  return { labels, hue: (id, hint = '') => classes[nodeClass[id]] ?? familyOf(labels[id] ?? '') ?? familyOf(`${hint} ${id}`) };
 }
 
 // The box whose left wall is the first vertical left of (r, c) with real corners at both ends.
@@ -365,12 +370,12 @@ function groupedView(model, icons, width) {
   const lines = [];
   const block = (items, depth, title, color) => {
     const pad = '  '.repeat(depth);
-    if (title) lines.push([[pad], ['▌ ', color], [title, color, '', true]]);
+    if (title) lines.push([[pad], ['▌ ', color ?? '#64748B'], [title, color ?? '#F8FAFC', '', true]]);
     for (const item of items) {
       if (item.node) lines.push([[`${pad}${title ? '  ' : ''}`], ['■ ', nameRun(item.node)[1]], [nameRun(item.node)[0]]]);
       else {
         const g = model.groups.get(item.group);
-        block(g.items, depth + (title ? 1 : 0), clean(g.title, TITLE_MAX), hue(g.id) ?? '#64748B');
+        block(g.items, depth + (title ? 1 : 0), clean(g.title, TITLE_MAX), hue(g.id));
       }
     }
   };
@@ -499,13 +504,14 @@ const pathOf = (model, id) => {
 // The width inside a section frame: its drawing, or its title with a rule each side.
 const innerWidth = (title, lines) => Math.max(visible(lines), [...title].length + 2);
 
-// A rounded frame titled in its group's color, padded to `height`.
-function sectionFrame(title, color, lines, height = 0) {
+// A rounded frame titled in its group's color, padded to `height`. A group with no family keeps a light title for contrast.
+function sectionFrame(title, family, lines, height = 0) {
+  const color = family ?? '#64748B';
   const inner = innerWidth(title, lines);
   const body = lines.map((runs) => [...runs, [' '.repeat(inner - visible([runs]))]]);
   while (body.length < height - 2) body.push([[' '.repeat(inner)]]);
   const top = title
-    ? [['╭─ ', color], [title, color, '', true], [` ${'─'.repeat(Math.max(0, inner - [...title].length - 1))}╮`, color]]
+    ? [['╭─ ', color], [title, family ?? '#F8FAFC', '', true], [` ${'─'.repeat(Math.max(0, inner - [...title].length - 1))}╮`, color]]
     : [[`╭${'─'.repeat(inner + 2)}╮`, color]];
   return [
     top,
@@ -522,7 +528,7 @@ function drawSections(model, icons, width) {
   if (loose.length) sections.push({ title: '', color: '#475569', ids: loose });
   for (const g of model.groups.values()) {
     const ids = g.items.filter((i) => i.node).map((i) => i.node);
-    if (ids.length) sections.push({ title: cut(pathOf(model, g.id), width - 8), color: hue(g.id) ?? '#64748B', ids });
+    if (ids.length) sections.push({ title: cut(pathOf(model, g.id), width - 8), color: hue(g.id), ids });
   }
   const framed = [];
   for (const sec of sections) {
