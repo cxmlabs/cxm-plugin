@@ -355,6 +355,27 @@ test('a link that closes a cycle is listed under the drawing, and the rest draws
   assert.ok(narrow.split('\n').every((row) => [...row].length <= 40), 'a back link wraps to the width');
 });
 
+test('a group with no link inside lists its nodes instead of drawing empty boxes', () => {
+  const src = 'flowchart LR\n  subgraph a["Account prod"]\n    r[RDS]\n    e[ECS]\n  end\n  subgraph b["Account dev"]\n    s[S3]\n  end';
+  const text = plain(draw('mermaid', src, { width: 120 }));
+  assert.match(text, /╭─ Account prod ─[\s\S]*■ RDS[\s\S]*■ ECS/);
+  assert.doesNotMatch(text, /┌/);
+});
+
+test('in a group, linked nodes are drawn and lone nodes are listed under the drawing', () => {
+  const src = 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB public] --> n[NAT gateway]\n    r[(RDS orders)]\n  end\n  subgraph w["VPC edge"]\n    c[CloudFront]\n  end\n  c --> a';
+  const text = plain(draw('mermaid', src, { width: 120 }));
+  assert.match(text, /ALB public ├[^\n]*►│ NAT gateway/);
+  assert.match(text, /■ RDS orders/);
+  assert.doesNotMatch(text, /│ RDS orders │/);
+});
+
+test('a group whose linked nodes do not fit the width lists every node and its links', () => {
+  const src = 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB public facing orders] --> n[NAT gateway shared egress]\n    r[(RDS orders)]\n  end\n  subgraph w["VPC edge"]\n    c[CloudFront]\n  end';
+  const text = plain(draw('mermaid', src, { width: 28 }));
+  assert.match(text, /■ ALB public facing[\s\S]*■ NAT gateway shared[\s\S]*■ RDS orders[\s\S]*Links/);
+});
+
 test('a label inside a longer label colors only its own box', () => {
   const lines = draw('mermaid', 'flowchart LR\n  G[API Gateway] --> A[API]', { width: 120 });
   assert.notEqual(runOf(lines, 'API Gateway')[2], runs(lines).find(([t]) => t === 'API')[2]);
@@ -411,4 +432,16 @@ test('cxm viz cube-chart runs its query only when the block has no rows', () => 
   const given = run('{"x":"a","y":"b","query":{"measures":["m"]},"data":[{"a":"p","b":1}]}');
   assert.equal(given.status, 0, given.stderr);
   assert.match(given.stdout, /p █/);
+});
+
+test('with one group or none, linked nodes are drawn, lone nodes are listed, and a hidden link keeps a node drawn', () => {
+  const one = plain(draw('mermaid', 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB] --> n[NAT]\n    r[(RDS orders)]\n  end', { width: 120 }));
+  assert.match(one, /VPC main/);
+  assert.match(one, /■ RDS orders/);
+  assert.doesNotMatch(one, /│ RDS orders │/);
+  const none = plain(draw('mermaid', 'flowchart LR\n  a[ALB] --> n[NAT]\n  r[(RDS orders)]', { width: 120 }));
+  assert.match(none, /■ RDS orders/);
+  const hidden = plain(draw('mermaid', 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB] --> n[NAT]\n    n ~~~ c[Cache]\n  end\n  subgraph w["Edge"]\n    e[CDN]\n  end', { width: 120 }));
+  assert.match(hidden, /│ +Cache +│/);
+  assert.doesNotMatch(hidden, /■ Cache/);
 });
