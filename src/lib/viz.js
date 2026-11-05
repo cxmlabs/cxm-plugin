@@ -108,10 +108,10 @@ function barLines({ labels, series }, spec, room) {
       lines.push(line);
     }),
   );
-  lines.push([]);
-  if (single) lines.push([[`${' '.repeat(labelW)} ${spec.totalLabel} ${fmt(totals[0], spec.yFormat)}`, FAINT]]);
-  else lines.push([...series.flatMap((s, j) => [['■ ', PALETTE[j % PALETTE.length]], [`${s.name} ${fmt(totals[j], spec.yFormat)}  `, FAINT]]), [spec.top ? `of top ${spec.top}` : '', FAINT]]);
-  return lines;
+  const sums = spec.yFormat !== 'percent';
+  if (single) return sums ? [...lines, [], [[`${' '.repeat(labelW)} ${spec.totalLabel} ${fmt(totals[0], spec.yFormat)}`, FAINT]]] : lines;
+  const legend = series.flatMap((s, j) => [['■ ', PALETTE[j % PALETTE.length]], [`${s.name}${sums ? ` ${fmt(totals[j], spec.yFormat)}` : ''}  `, FAINT]]);
+  return [...lines, [], [...legend, [sums && spec.top ? `of top ${spec.top}` : '', FAINT]]];
 }
 
 // Rises go right in red, falls go left in green, both deeper as they grow.
@@ -123,7 +123,9 @@ function divergingLines({ labels, series }, spec, room) {
   const max = Math.max(...data.map(Math.abs));
   const lines = data.map((v, i) => {
     const k = 0.25 + 0.75 * (Math.abs(v) / (max || 1));
-    const color = v > 0 ? shade('#FCA5A5', '#B91C1C', k) : shade('#86EFAC', '#15803D', k);
+    const text = signed(v, spec.yFormat);
+    // The same rule as the table: a value that rounds to zero has no sign and no color.
+    const color = !nonZero(text) ? '' : v > 0 ? shade('#FCA5A5', '#B91C1C', k) : shade('#86EFAC', '#15803D', k);
     const bar = blocks(Math.abs(v), max, half);
     const left = v < 0 ? [...bar].reverse().join('').replace(/[▏▎▍▌▋▊▉]/, '▐') : '';
     return [
@@ -131,9 +133,10 @@ function divergingLines({ labels, series }, spec, room) {
       [left.padStart(half), color],
       ['│', FAINT],
       [(v > 0 ? bar : '').padEnd(half), color],
-      [` ${signed(v, spec.yFormat).padStart(valueW)}`, color],
+      [` ${text.padStart(valueW)}`, color],
     ];
   });
+  if (spec.yFormat === 'percent') return lines;
   return [...lines, [], [[`net${spec.top ? ` of top ${spec.top}` : ''} ${signed(sum(data), spec.yFormat)}`, FAINT]]];
 }
 
@@ -156,8 +159,7 @@ function columnLines({ labels, series }, spec, room) {
     [[data.map((v) => cut(fmt(v, spec.yFormat), w).padStart(w)).join(' ')]],
     ...bars,
     [[labels.map((x) => cut(x, w).padStart(w)).join(' '), MUTED]],
-    [],
-    [[`${spec.totalLabel} ${fmt(sum(data), spec.yFormat)}`, FAINT]],
+    ...(spec.yFormat === 'percent' ? [] : [[], [[`${spec.totalLabel} ${fmt(sum(data), spec.yFormat)}`, FAINT]]]),
   ];
 }
 
@@ -176,16 +178,15 @@ function lineLines({ labels, series }, spec, room) {
       const note = r === 0 ? `  max ${fmt(Math.max(...s.data), spec.yFormat)}` : r === height - 1 ? `  min ${fmt(Math.min(...s.data), spec.yFormat)}` : '';
       lines.push([[`${(r === Math.floor(height / 2) ? s.name : '').padStart(nameW)} `, MUTED], [cells.map(([t]) => t).join(''), PALETTE[i % PALETTE.length]], [note, FAINT]]);
     });
-    lines.push([[`${' '.repeat(nameW)} now ${fmt(s.data.at(-1), spec.yFormat)} · ${spec.totalLabel} ${fmt(sum(s.data), spec.yFormat)}`, FAINT]]);
+    lines.push([[`${' '.repeat(nameW)} now ${fmt(s.data.at(-1), spec.yFormat)}${spec.yFormat === 'percent' ? '' : ` · ${spec.totalLabel} ${fmt(sum(s.data), spec.yFormat)}`}`, FAINT]]);
   });
   lines.push([[`${' '.repeat(nameW)} ${labels[0]} → ${labels.at(-1)}`, FAINT]]);
   return lines;
 }
 
-// A table block: numbers right-aligned, and a bold total row unless `total` is false. A column is a
-// name or { name, format, signed, total }; a signed column shows +/− in red and green, its total too.
+// A table: numbers right-aligned, a bold total row unless `total` is false; a column is a name or { name, format, signed, total }.
 function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' }) {
-  const cols = columns.map((c) => (typeof c === 'string' ? { name: c } : c));
+  const cols = columns.map((c) => (c !== null && typeof c === 'object' ? { ...c, name: String(c.name ?? '') } : { name: String(c ?? '') }));
   // A blank cell stays blank and leaves its column numeric, as a missing chart value does.
   const blank = (v) => v === null || v === undefined || v === '';
   const numeric = cols.map((_, i) => rows.some((r) => typeof r[i] === 'number') && rows.every((r) => typeof r[i] === 'number' || blank(r[i])));
@@ -223,8 +224,7 @@ function tableBlock({ title, columns, rows, total, format, totalLabel = 'Total' 
   };
 }
 
-// The side table: `true` shows the charted values; a list names more keys of the rows, one per
-// column, each a key or { key, name, format, signed }. A diverging chart's values are signed.
+// The side table: `true` shows the charted values, signed when diverging; a list holds row keys or { key, name, format, signed }.
 function asTable(spec, { labels, series }) {
   const base = { title: 'Values', format: spec.yFormat, totalLabel: `T${spec.totalLabel.slice(1)}` };
   if (spec.table === true) {
@@ -233,19 +233,21 @@ function asTable(spec, { labels, series }) {
   }
   if (!Array.isArray(spec.table) || spec.table.length === 0) throw new Error('"table" is true or a list of row keys');
   const listed = spec.table.map((c) => (typeof c === 'string' ? { key: c } : c));
-  if (listed.some((c) => typeof c?.key !== 'string')) throw new Error('Each "table" column is a row key or an object with a "key"');
+  if (listed.some((c) => typeof c?.key !== 'string' || (c.name != null && typeof c.name !== 'string'))) throw new Error('Each "table" column is a row key or an object with a "key" and an optional text "name"');
   // The first column already shows `x`, so a listed `x` would repeat it.
   const cols = listed.filter((c) => c.key !== spec.x);
   // A series chart holds one row per x and series, so a list of row keys has no single row per x.
   if (spec.series) throw new Error('A "table" list needs one row per "x": use "table": true on a chart with "series"');
   // A query returns its measures as strings; only those turn into numbers, never a dimension such as an account ID.
   const measures = new Set(spec.query?.measures ?? []);
-  const value = (r, key) => (measures.has(key) && typeof r[key] === 'string' && r[key] !== '' ? Number(r[key]) : r[key]);
+  const toNumber = (v) => (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : v);
+  // A measure that is not a number, such as "N/A", stays text, so no cell or total reads "NaN".
+  const value = (r, key) => (measures.has(key) ? toNumber(r[key]) : r[key]);
   const rows = spec.data.map((r) => [cut(formatX(r[spec.x], spec.xFormat), LABEL_MAX), ...cols.map((c) => value(r, c.key))]);
-  return tableBlock({ ...base, columns: ['', ...cols.map((c) => ({ name: c.key, ...c }))], rows });
+  return tableBlock({ ...base, columns: ['', ...cols.map((c) => ({ ...c, name: c.name ?? c.key }))], rows });
 }
 
-// The blocks one chart spec draws: the chart, and its table beside it when `table` is set.
+// One chart spec as columns of frames: the chart, and its table beside it when both fit the room, else under it.
 function chartBlocks(spec, room) {
   if (!Array.isArray(spec.data)) throw new Error('This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first');
   if (!TYPES.includes(spec.type ?? 'bar')) throw new Error(`Unknown chart type (types: ${TYPES.join(', ')})`);
@@ -254,10 +256,12 @@ function chartBlocks(spec, room) {
   spec = { ...spec, top, totalLabel: top ? `total of top ${top}` : 'total' };
   const parsed = toSeries(spec);
   parsed.labels = parsed.labels.map((l) => cut(l, LABEL_MAX));
-  const inner = (spec.table ? Math.floor(room * 0.6) : room) - 4;
   const draw = spec.type === 'line' ? lineLines : spec.type === 'column' ? columnLines : spec.diverging ? divergingLines : barLines;
-  const chart = { title: spec.title ?? spec.yName ?? '', spaced: true, lines: draw(parsed, spec, inner) };
-  return spec.table ? [chart, asTable(spec, parsed)] : [chart];
+  const chart = (w) => frame({ title: spec.title ?? spec.yName ?? '', spaced: true, lines: draw(parsed, spec, w - 4) });
+  if (!spec.table) return [[chart(room)]];
+  const table = frame(asTable(spec, parsed));
+  const beside = chart(room - widthOf(table[0]) - 1);
+  return widthOf(beside[0]) + 1 + widthOf(table[0]) <= room ? [[beside], [table]] : [[chart(room), table]];
 }
 
 function noteBlock({ title, text }) {
@@ -270,41 +274,47 @@ function noteBlock({ title, text }) {
   return { title, lines: lines.map((l) => [[l]]) };
 }
 
-const itemBlocks = (item, room) => (item.type === 'table' ? [tableBlock(item)] : item.type === 'note' || item.type === 'markdown' ? [noteBlock(item)] : chartBlocks(item, room));
+const itemBlocks = (item, room) => (item.type === 'table' ? [[frame(tableBlock(item))]] : item.type === 'note' || item.type === 'markdown' ? [[frame(noteBlock(item))]] : chartBlocks(item, room));
 
-// A rounded frame around one block, padded to `height` so blocks side by side end level.
-function frame({ title, lines, spaced }, height = 0) {
+// A rounded frame around one block.
+function frame({ title, lines, spaced }) {
   const bodyW = Math.max(0, ...lines.map(widthOf));
   const titleW = title ? len(title) : 0;
   const inner = Math.max(bodyW, titleW);
   const left = Math.floor((inner - bodyW) / 2);
   const body = lines.map((runs) => padEnd([[' '.repeat(left)], ...runs], inner));
   const head = title ? [[[' '.repeat(Math.floor((inner - titleW) / 2)) + title, '', '', true]], ...(spaced ? [[]] : [])].map((r) => padEnd(r, inner)) : [];
-  const all = [...head, ...body];
-  while (all.length < height - 2) all.push([[' '.repeat(inner)]]);
   return [
     [[`╭${'─'.repeat(inner + 2)}╮`, BORDER]],
-    ...all.map((runs) => [['│ ', BORDER], ...runs, [' │', BORDER]]),
+    ...[...head, ...body].map((runs) => [['│ ', BORDER], ...runs, [' │', BORDER]]),
     [[`╰${'─'.repeat(inner + 2)}╯`, BORDER]],
   ];
 }
 
-// Blocks side by side, as many to a line as fit the width, each line level at the bottom.
-function layout(blocks, width) {
+// A frame made taller by blank lines inside its bottom border, so frames side by side end level.
+const grow = (f, extra) => [...f.slice(0, -1), ...Array(extra).fill([['│ ', BORDER], [' '.repeat(widthOf(f[0]) - 4)], [' │', BORDER]]), f.at(-1)];
+
+// Items side by side, as many to a line as fit the width; an item is columns of frames and never splits.
+function layout(items, width) {
   const lines = [];
   let row = [];
+  let used = -1;
   const flush = () => {
     if (!row.length) return;
-    const height = Math.max(...row.map((b) => frame(b).length));
-    const even = row.map((b) => frame(b, height));
+    const tall = (c) => sum(c.map((f) => f.length));
+    const height = Math.max(...row.map(tall));
+    const even = row.map((c) => [...c.slice(0, -1), grow(c.at(-1), height - tall(c))].flat().map((r) => padEnd(r, c.w)));
     if (lines.length) lines.push([]);
-    for (let r = 0; r < height; r++) lines.push(even.flatMap((f, i) => [...(i ? [[' ']] : []), ...f[r]]));
+    for (let r = 0; r < height; r++) lines.push(even.flatMap((c, i) => [...(i ? [[' ']] : []), ...c[r]]));
     row = [];
+    used = -1;
   };
-  for (const b of blocks) {
-    const used = row.reduce((n, x) => n + widthOf(frame(x)[0]) + 1, 0);
-    if (row.length && used + widthOf(frame(b)[0]) > width) flush();
-    row.push(b);
+  for (const item of items) {
+    const cols = item.map((c) => Object.assign(c, { w: Math.max(...c.map((f) => widthOf(f[0]))) }));
+    const w = sum(cols.map((c) => c.w + 1)) - 1;
+    if (row.length && used + 1 + w > width) flush();
+    row.push(...cols);
+    used += 1 + w;
   }
   flush();
   return lines;
@@ -333,12 +343,12 @@ export function draw(kind, body, { width = 100 } = {}) {
   if (kind === 'row') {
     const items = Array.isArray(spec) ? spec : spec?.items;
     if (!Array.isArray(items) || items.length === 0) throw new Error('A row needs a non-empty array of items');
-    // Each item may use the whole width: a bar has a set maximum, and blocks that do not fit wrap.
-    const room = width;
-    return layout(items.flatMap((item) => itemBlocks(item, room)), width);
+    // Each item gets an equal share of the width, so two charts fit side by side; an item that does not fit wraps.
+    const room = Math.floor((width - items.length + 1) / items.length);
+    return layout(items.map((item) => itemBlocks(item, room)), width);
   }
   if (spec === null || typeof spec !== 'object' || Array.isArray(spec)) throw new Error('A chart is one JSON object');
-  return layout(chartBlocks(spec, width), width);
+  return layout([chartBlocks(spec, width)], width);
 }
 
 // The reply split into text and the blocks the renderer draws, in order.
