@@ -358,7 +358,7 @@ function intact(lines, model, nodeMax = NODE_MAX) {
   };
   const links = edges(model).filter((e) => e.label).map((e) => clean(e.label, EDGE_MAX));
   // Label text is blanked first, so an arrow glyph written in a label is not read as an arrowhead.
-  const bare = plainOf(lines).map((row) => [...names, ...links].reduce((r, s) => r.replaceAll(s, ' '.repeat([...s].length)), row));
+  const bare = plainOf(lines).map((row) => [...names, ...links].sort((a, b) => b.length - a.length).reduce((r, s) => r.replaceAll(s, ' '.repeat([...s].length)), row));
   return names.every((name) => text.includes(name)) && links.every(alone) && arrowsLand(bare);
 }
 

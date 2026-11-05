@@ -306,13 +306,16 @@ test('a node box is padded with a 44-character label when it fits, then flat, th
   assert.match(roomy, /│ │ +│ │\n│ │  Order events stream with retries and backoff  │ │/, 'a blank row pads the box');
   assert.match(plain(draw('mermaid', src, { width: 52 })), /─┐ │\n│ │ Order events stream with retries and backoff │ │/);
   assert.match(plain(draw('mermaid', src, { width: 48 })), /│  Order events stream with retrie…  │/);
-  assert.match(plain(draw('mermaid', 'flowchart LR\n  a[Cost ▲] --> b[Billing]', { width: 60 })), /│ +│\n│ │  Cost ▲  ├/, 'an arrow glyph in a label is not an arrowhead');
+  const glyphs = plain(draw('mermaid', 'flowchart LR\n  a[Cost] -->|Cost ▲| b[Cost ▲ Billing]', { width: 60 }));
+  assert.match(glyphs, /│ +│\n│ │  Cost  ├Cost ▲─+►│  Cost ▲ Billing  │/, 'an arrow glyph in a node or link label is not an arrowhead');
 });
 
 test('an arrowhead counts only when it touches or sits in a box wall', () => {
   assert.ok(arrowsLand(['─►│']));
   assert.ok(arrowsLand(['│', '►', '│']));
   assert.ok(arrowsLand(['│', '▼', '─']));
+  assert.ok(arrowsLand(['─▼─']));
+  assert.equal(arrowsLand(['│', '►', ' ']), false);
   assert.equal(arrowsLand(['─► ']), false);
   assert.equal(arrowsLand(['│', '▼', ' ']), false);
 });
