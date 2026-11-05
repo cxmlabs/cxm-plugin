@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { parseFlowchart } from '../src/lib/diagram.js';
+import { familyOf, parseFlowchart } from '../src/lib/diagram.js';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -233,7 +233,25 @@ test('a mermaid block of another kind draws as the text renderer draws it', () =
 
 test('several groups draw one frame each, titled by their path, then the links between them', () => {
   const src = 'flowchart LR\n  subgraph acct["Account prod"]\n    subgraph vpc["VPC main"]\n      api[ECS API] --> db[(RDS orders)]\n    end\n  end\n  subgraph edge["Edge"]\n    cdn[CloudFront]\n  end\n  cdn --> api';
-  const text = plain(draw('mermaid', src, { width: 120 }));
+  const lines = draw('mermaid', src, { width: 120 });
+  const text = plain(lines);
+  const at = (title) => {
+    const i = lines.flat().findIndex(([t]) => t === title);
+    assert.ok(i > 0, `no frame titled ${title}`);
+    return i;
+  };
+  const frame = (title) => lines.flat()[at(title) - 1][1];
+  assert.equal(frame('Account prod › VPC main'), familyOf('VPC main'), 'a frame takes the color of its group');
+  assert.equal(lines.flat()[at('Account prod › VPC main')][1], familyOf('VPC main'), 'a family titles its frame in its color');
+  assert.equal(lines.flat()[at('Edge')][1], '#F8FAFC', 'a group with no family keeps a light title');
+  const listed = (title) => {
+    const src = `flowchart LR\n  subgraph g["${title}"]\n    a[Alpha]\n  end\n  b[Beta] -->|a label longer than twenty-four characters| a`;
+    const list = draw('mermaid', src, { width: 34 });
+    assert.match(plain(list), new RegExp(`▌ ${title}`), 'the group is listed');
+    return runs(list).find(([t]) => t === title)?.[1];
+  };
+  assert.equal(listed('Shop'), '#F8FAFC', 'a listed group with no family keeps a light title');
+  assert.equal(listed('VPC main'), familyOf('VPC main'), 'a listed group takes its family color');
   assert.match(text, /╭─ Account prod › VPC main ─/);
   assert.match(text, /╭─ Edge ─/);
   assert.match(text, /Links between groups +│\n│ +CloudFront → ECS API/);
@@ -274,6 +292,57 @@ test('a layout that fuses two link labels or runs a wall through one is not kept
   const text = plain(draw('mermaid', src, { width: 100 }));
   assert.doesNotMatch(text, /invoke─?Update|Update\w*─invoke/);
   assert.match(text, /EventBridge rule → Lambda deploy +invoke/);
+});
+
+test('among generic words, the last one in a label wins', () => {
+  assert.equal(familyOf('Auth DB'), familyOf('orders database'));
+  assert.equal(familyOf('Analytics API'), familyOf('ECS api'));
+  assert.equal(familyOf('Monitoring worker'), familyOf('ECS api'));
+  assert.notEqual(familyOf('Auth DB'), familyOf('Auth API'));
+});
+
+test('a node takes the color of the service it names, before a generic word', () => {
+  const same = (a, b) => assert.equal(familyOf(a), familyOf(b), `${a} / ${b}`);
+  const differ = (a, b) => assert.notEqual(familyOf(a), familyOf(b), `${a} / ${b}`);
+  same('SQS jobs', 'Service Bus orders');
+  same('GitHub repo', 'ECR push');
+  same('AWS account prod', 'tenant acme');
+  same('All ECS services using the image', 'Cloud Run api');
+  same('Cloud Build', 'GitHub repo');
+  same('Internet Gateway', 'NAT gateway');
+  same('Upstream API', 'ECS api');
+  differ('Dashboards', 'RDS orders');
+  differ('SQS jobs', 'ECS api');
+  differ('CloudWatch logs', 'S3 logs bucket');
+  assert.equal(familyOf('Shop front page'), undefined);
+});
+
+test('among service names, the first one in a label wins, as a label starts with its subject', () => {
+  assert.equal(familyOf('ECS task writing to S3'), familyOf('ECS api'));
+  assert.equal(familyOf('Lambda reads RDS'), familyOf('ECS api'));
+  assert.equal(familyOf('Kafka on EKS'), familyOf('SQS jobs'));
+  assert.equal(familyOf('Terraform state bucket'), familyOf('GitHub repo'), 'terraform is the only service name, so the bucket is CI/CD');
+});
+
+test('an account or a network needs a cloud word, not a word that a product also uses', () => {
+  const account = familyOf('AWS account prod');
+  assert.equal(familyOf('Azure subscription prod'), account);
+  assert.equal(familyOf('GCP project data'), account);
+  assert.notEqual(familyOf('Stripe subscription'), account);
+  assert.notEqual(familyOf('API project'), account);
+  assert.notEqual(familyOf('Payment gateway'), familyOf('VPC main'));
+  assert.equal(familyOf('VPN gateway'), familyOf('VPC main'));
+  assert.equal(familyOf('API Gateway'), familyOf('VPC main'));
+});
+
+test('a node label decides its color, and its id or icon name counts only when the label names no family', () => {
+  const src = 'flowchart LR\n  users[(Users DB)] --> auth[(Auth DB)] --> api[Orders queue]\n  r[(RDS main)] --> s[SQS jobs]\n  db[Primary] --> u[Users]';
+  const lines = draw('mermaid', src, { width: 200 });
+  const fill = (label) => runs(lines).find(([t]) => t === label)?.[2];
+  assert.equal(fill('Users DB'), fill('RDS main'));
+  assert.equal(fill('Auth DB'), fill('RDS main'));
+  assert.equal(fill('Orders queue'), fill('SQS jobs'));
+  assert.equal(fill('Primary'), fill('RDS main'), 'the id names the family when the label names none');
 });
 
 test('a link that closes a cycle is listed under the drawing, and the rest draws in link order', () => {
