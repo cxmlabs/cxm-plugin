@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { parseFlowchart } from '../src/lib/diagram.js';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -33,13 +34,15 @@ test('a diverging chart puts rises right in red and falls left in green, with th
   assert.ok(parseInt(fall.slice(3, 5), 16) > parseInt(fall.slice(1, 3), 16), 'a fall is green');
 });
 
-test('a diagram tints each node by its family and fits the width: left to right, then top to bottom, then an edge list', () => {
+test('a diagram tints each node by its family and fits the width: left to right, then top to bottom, then a list', () => {
   const wide = draw('mermaid', fixture('aws.mmd'), { width: 160 });
   assert.match(plain(wide), /Users ├──►│ CloudFront/);
   assert.notEqual(runOf(wide, 'Aurora PostgreSQL')[2], '', 'a database node has a fill');
   assert.notEqual(runOf(wide, 'Aurora PostgreSQL')[2], runOf(wide, 'ECS API service')[2], 'two families, two fills');
   assert.match(plain(draw('mermaid', fixture('aws.mmd'), { width: 80 })), /Users[\s│]+└─+┬─+┘/);
-  assert.match(plain(draw('mermaid', fixture('aws.mmd'), { width: 40 })), /^│ Users → CloudFront/m);
+  const list = plain(draw('mermaid', fixture('aws.mmd'), { width: 40 }));
+  assert.match(list, /▌ Production VPC +│\n│ +■ Application Load Balancer +│\n│ +■ ECS API service/, 'a node listed in a group moves into it');
+  assert.match(list, /Links[\s\S]*Users → CloudFront/);
 });
 
 test("a Dex cloud diagram's icon nodes become labelled boxes colored by the icon, and edge labels keep their spaces", () => {
@@ -186,12 +189,101 @@ test('a chart refuses no rows, a value that is not a number, and an unknown type
   assert.doesNotMatch(plain(draw('mermaid', 'flowchart LR\n  A[a\u001b[2J] --> B')), /\u001b/);
 });
 
-test('a diagram takes a classDef color in short hex, and its edge list keeps every edge of a chain', () => {
+test('a diagram takes a classDef color in short hex, and its list keeps every edge of a chain', () => {
   const lines = draw('mermaid', 'flowchart LR\n  A[Users] --> B[Orders]\n  classDef hot fill:#f00\n  class B hot');
   assert.ok(runs(lines).some(([, fg]) => fg === '#ff0000'), 'the class color wins over the family color');
-  const list = plain(draw('mermaid', 'flowchart LR\n  A[Users of the shop] --> B[Orders API of the shop] --> C[(Orders database of the shop)]', { width: 20 }));
-  assert.match(list, /Users of the shop → Orders API of the shop/);
-  assert.match(list, /Orders API of the shop → Orders database of the shop/);
+  const list = plain(draw('mermaid', 'flowchart LR\n  A[Users of the shop] --> B[Orders API of the shop] --> C[(Orders database of the shop)]', { width: 60 }));
+  assert.match(list, /Users of the shop[\s\S]*▼[\s\S]*Orders API of the shop[\s\S]*▼[\s\S]*Orders database of the shop/, 'both links of the chain');
+});
+
+test('a diagram reads chains, fan-outs and text links, joins a two-line label, and sends a link to a group to its first node', () => {
+  const src = 'flowchart LR\n  subgraph net["Network"]\n    lb["Load balancer<br/>public"]\n  end\n  u[Users] & b[Bots] --> lb\n  lb -- calls --> api[API service] -->|"sql"| db[(Orders DB)]\n  ops[Operators] --> net';
+  const text = plain(draw('mermaid', src, { width: 160 }));
+  for (const label of ['Load balancer · public', 'Users', 'Bots', 'API service', 'Orders DB', 'Operators', 'Network']) assert.ok(text.includes(label), label);
+  assert.doesNotMatch(text, /<br/);
+  assert.doesNotMatch(text, /│ net +│/, 'a link to a group draws no box of its own');
+  const links = (s) => parseFlowchart(s).edges.map((e) => `${e.from}>${e.to}${e.label ? `:${e.label}` : ''}`);
+  assert.deepEqual(links(src), ['u>lb', 'b>lb', 'lb>api:calls', 'api>db:sql', 'ops>net']);
+  const twoGroups = `${src}\n  subgraph jobs["Jobs"]\n    q[Queue]\n  end`;
+  assert.match(plain(draw('mermaid', twoGroups, { width: 120 })), /Operators → Network \(group\)/, 'a link between groups names the group');
+  const terse = 'graph TD; a-1:::hot-->b-2[B] -.-> c-->d %% note\n  style a-1 fill:#f00\n  d ==> idle\n  subgraph outer[Outer]\n    subgraph idle[Idle group]\n    end\n  end';
+  assert.deepEqual(links(terse), ['a-1>b-2', 'b-2>c', 'c>d', 'd>idle']);
+  const { label, group } = parseFlowchart(terse).nodes.get('idle');
+  assert.deepEqual([label, group], ['Idle group', 'outer'], 'an empty group is a node of its parent');
+  const bare = parseFlowchart('flowchart\n  a --> b');
+  assert.deepEqual([bare.dir, ...bare.nodes.keys()], ['TB', 'a', 'b'], 'a header with no direction is not a node');
+});
+
+test('a diagram that no layout draws whole is a list that wraps a long line at a space and keeps every label', () => {
+  const src = 'flowchart LR\n  subgraph g["A rather long group title for one box"]\n    a[Alpha]\n  end\n  b[Beta] -->|a label longer than twenty-four characters| a';
+  assert.match(plain(draw('mermaid', src, { width: 100 })), /▌ A rather long group title for one box/, 'a layout that fits but cuts the title is not kept');
+  const text = plain(draw('mermaid', src, { width: 34 }));
+  assert.match(text, /▌ A rather long group title\s+│\n│ +for one box/);
+  assert.match(text, /Beta → Alpha {2}a label longer +│\n│ +than twenty-four +│\n│ +characters/);
+  assert.ok(text.split('\n').every((row) => [...row].length <= 34));
+});
+
+test('a mermaid block of another kind draws as the text renderer draws it', () => {
+  const src = '%% a note\nsequenceDiagram\n  Alice->>Bob: Hello';
+  const text = plain(draw('mermaid', src, { width: 60 }));
+  assert.match(text, /│ Alice │ +│ Bob │/);
+  assert.doesNotMatch(text, /sequenceDiagram/);
+  assert.throws(() => draw('mermaid', src, { width: 12 }), /cannot be drawn/);
+});
+
+test('several groups draw one frame each, titled by their path, then the links between them', () => {
+  const src = 'flowchart LR\n  subgraph acct["Account prod"]\n    subgraph vpc["VPC main"]\n      api[ECS API] --> db[(RDS orders)]\n    end\n  end\n  subgraph edge["Edge"]\n    cdn[CloudFront]\n  end\n  cdn --> api';
+  const text = plain(draw('mermaid', src, { width: 120 }));
+  assert.match(text, /╭─ Account prod › VPC main ─/);
+  assert.match(text, /╭─ Edge ─/);
+  assert.match(text, /Links between groups +│\n│ +CloudFront → ECS API/);
+  assert.match(text, /ECS API ├──►│ RDS orders/, 'a link inside a group is drawn');
+  const narrow = plain(draw('mermaid', src, { width: 40 }));
+  assert.match(narrow, /╭─ Account prod › VPC main ─+╮ │\n│ │ ┌/, 'a frame that does not fit beside the last goes under it');
+  assert.ok(narrow.split('\n').every((row) => [...row].length <= 40));
+});
+
+test('a flowchart parses dashed ids, late and repeated groups, both title forms, link styles and an escaped line break', () => {
+  const groupOf = (src) => Object.fromEntries([...parseFlowchart(src).nodes.values()].map((n) => [n.id, n.group]));
+  assert.deepEqual(groupOf('flowchart LR\n  subgraph s[S]\n    end-user[User] --> graph-db[DB]\n  end'), { 'end-user': 's', 'graph-db': 's' }, 'a dashed id is not a keyword');
+  const late = parseFlowchart('flowchart LR\n  ops[Operators] --> net\n  subgraph net[Network]\n    lb[LB]\n  end');
+  assert.deepEqual([[...late.nodes.keys()], late.order], [['ops', 'lb'], [{ node: 'ops' }, { group: 'net' }]], 'a group declared after a link to it draws no box');
+  const moved = parseFlowchart('flowchart LR\n  a[Users] --> b[API]\n  subgraph s[Cloud]\n    b\n  end');
+  assert.deepEqual([moved.nodes.get('b').group, moved.order, moved.groups.get('s').items], ['s', [{ node: 'a' }, { group: 's' }], [{ node: 'b' }]]);
+  const twice = parseFlowchart('flowchart LR\n  subgraph s[First]\n    a\n  end\n  subgraph s\n    b\n  end');
+  assert.deepEqual([twice.groups.get('s').title, twice.groups.get('s').items.length, twice.order.length], ['First', 2, 1], 'a repeated group id adds to the first group');
+  const titles = parseFlowchart('flowchart LR\n  subgraph "My title"\n    a\n  end\n  subgraph id [Other]\n    b\n  end\n  x --> id');
+  assert.deepEqual([...titles.groups.values()].map((g) => [g.id, g.title]), [['g0', 'My title'], ['id', 'Other']]);
+  assert.match(plain(draw('mermaid', 'flowchart LR\n  subgraph id [Other]\n    b[Box]\n  end\n  x[X] --> id', { width: 120 })), /X ├─┼►│ Box/, 'a link to a spaced group id reaches it');
+  const styled = 'flowchart LR\n  a[Alpha] ~~~ b[Beta]\n  a --- c[Gamma]\n  a <--> d[Delta]\n  a -- text --- e[Epsilon]';
+  assert.deepEqual(parseFlowchart(styled).edges.map((e) => e.link), ['hidden', 'line', 'both', 'line']);
+  const drawn = plain(draw('mermaid', styled, { width: 160 }));
+  assert.doesNotMatch(drawn, /►│ Beta/, 'a hidden link draws no arrow');
+  assert.match(drawn, /Alpha ◄[\s\S]*▼/, 'a two-way link has an arrow at both ends');
+  const list = plain(draw('mermaid', styled, { width: 30 }));
+  assert.match(list, /Alpha — Gamma/);
+  assert.match(list, /Alpha ↔ Delta/);
+  assert.doesNotMatch(list, /Alpha . Beta/);
+  const escaped = plain(draw('mermaid', 'flowchart LR\n  a["one\\ntwo"] --> b[B]', { width: 120 }));
+  assert.match(escaped, /one · two/);
+  assert.doesNotMatch(escaped, /\\n/);
+});
+
+test('a layout that fuses two link labels or runs a wall through one is not kept', () => {
+  const src = 'flowchart TB\n  q[SQS jobs] --> l[Lambda deploy]\n  e[EventBridge rule] -->|invoke| l\n  l -->|UpdateFunctionCode| f[Lambdas using image]\n  l -->|UpdateService| s[ECS services]';
+  const text = plain(draw('mermaid', src, { width: 100 }));
+  assert.doesNotMatch(text, /invoke─?Update|Update\w*─invoke/);
+  assert.match(text, /EventBridge rule → Lambda deploy +invoke/);
+});
+
+test('a link that closes a cycle is listed under the drawing, and the rest draws in link order', () => {
+  const src = 'flowchart LR\n  q[SQS jobs] --> l[Lambda deploy]\n  l -->|redeploy| s[ECS services]\n  s -->|done| e[EventBridge state]\n  e --> l';
+  const text = plain(draw('mermaid', src, { width: 120 }));
+  assert.match(text, /↺ EventBridge state → Lambda deploy/);
+  assert.match(text, /SQS jobs[\s\S]*Lambda deploy[\s\S]*ECS services[\s\S]*EventBridge state/);
+  const narrow = plain(draw('mermaid', 'flowchart TB\n  q[Queue] --> l[Deploy]\n  l --> s[Services]\n  s --> e[Event state of the deployment] --> l', { width: 40 }));
+  assert.match(narrow, /↺/);
+  assert.ok(narrow.split('\n').every((row) => [...row].length <= 40), 'a back link wraps to the width');
 });
 
 test('a label inside a longer label colors only its own box', () => {
