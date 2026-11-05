@@ -75,6 +75,91 @@ test('a query that hit its limit labels its total as the top rows only', () => {
   assert.match(plain(draw('chart', chart({ series: 'g', query: { limit: 2 }, data: two }))), /y 2 +of top 2/);
 });
 
+const months = [{ k: 'RDS', sep: 2042, oct: 1808 }, { k: 'KMS', sep: 113, oct: 145 }].map((r) => ({ ...r, delta: r.oct - r.sep, pct: ((r.oct - r.sep) / r.sep) * 100 }));
+
+test('a side table shows the listed row keys, signed columns in red and green with their total, and no total for percents', () => {
+  const table = [{ key: 'sep', name: 'Sep' }, { key: 'oct', name: 'Oct' }, { key: 'delta', name: 'Δ', signed: true }, { key: 'pct', name: 'Δ %', format: 'percent', signed: true }];
+  const lines = draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, data: months }), { width: 96 });
+  const text = plain(lines);
+  assert.equal(text.split('\n')[0].match(/╭/g).length, 2, 'a 4-column table sits beside its chart at width 96');
+  assert.ok(text.split('\n').every((l) => [...l].length <= 96));
+  assert.match(text, /Sep +Oct +Δ +Δ %/);
+  assert.match(text, /RDS +\$2,042 +\$1,808 +-\$234 +-11\.5%/);
+  assert.match(text, /Total +\$2,155 +\$1,953 +-\$202 +│/, 'the percent column has no total');
+  const last = (t) => runs(lines).filter(([r]) => r.includes(t)).at(-1)[1];
+  assert.equal(last('+$32'), last('+28.3%'), 'a rise is one color in both table columns');
+  assert.notEqual(last('+$32'), last('-$234'), 'a fall has the other color');
+  assert.equal(last('-$202'), last('-$234'), 'the signed total is colored');
+  assert.throws(() => draw('chart', chart({ table: [{ name: 'x' }], data: rows })), /row key or an object with a "key"/);
+  assert.throws(() => draw('chart', chart({ table: [{ key: 'v', name: 5 }], data: rows })), /optional text "name"/);
+  assert.match(plain(draw('chart', chart({ table: [{ key: 'v', name: null }], data: rows }))), /│ +v │/, 'a null name falls back to the key');
+  assert.match(plain(draw('row', JSON.stringify([{ type: 'table', columns: ['S', 5, null], rows: [['a', 1, 2]] }]))), /S +5 +│/, 'a table column name is always text');
+  const queried = months.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v)])));
+  const query = { measures: ['sep', 'oct', 'delta', 'pct'] };
+  assert.equal(plain(draw('chart', chart({ diverging: true, y: 'delta', yFormat: 'currency', table, query, data: queried }), { width: 96 })), text, 'a query row holds its measures as strings');
+  const na = plain(draw('chart', chart({ table: ['c'], query: { measures: ['v', 'c'] }, data: [{ k: 'a', v: '1', c: 'N/A' }, { k: 'b', v: '2', c: '3' }] })));
+  assert.match(na, /a +N\/A/, 'a measure that is not a number stays text');
+  assert.doesNotMatch(na, /NaN/);
+  assert.match(plain(draw('chart', chart({ table: ['id'], query: { measures: ['v'] }, data: [{ k: 'a', v: '1', id: '2024' }] }))), /a +2024 /, 'a dimension stays text');
+  assert.match(plain(draw('chart', chart({ table: ['n'], data: [{ k: 'a', v: 1, n: 3 }, { k: 'b', v: 2 }] }))), /b +│[\s\S]*Total +3/, 'a blank cell keeps the column numeric');
+  assert.throws(() => draw('chart', chart({ series: 'm', table: ['v'], data: [{ k: 'a', m: 'x', v: 1 }, { k: 'a', m: 'y', v: 2 }] })), /one row per "x"/);
+});
+
+test('a diverging chart signs its "table": true values, and a value that rounds to zero has no sign', () => {
+  const lines = draw('chart', chart({ diverging: true, yFormat: 'currency', table: true, data: [{ k: 'a', v: 87.8 }, { k: 'b', v: -9.996 }, { k: 'c', v: -0.001 }, { k: 'd', v: 0.001 }] }), { width: 140 });
+  const text = plain(lines);
+  assert.match(text, /a +\+\$88 +│/);
+  assert.match(text, /b +-\$10 +│/);
+  assert.match(text, /c +\$0 +│/);
+  assert.match(text, /d +\$0 +│/);
+  assert.equal(runs(lines).find(([t]) => /^c +\$0$/.test(t))[1], '', 'a zero in the table has no sign color');
+  const zeros = runs(lines).filter(([t]) => /^ +\$0$/.test(t));
+  assert.equal(zeros.length, 2);
+  assert.ok(zeros.every(([, fg]) => fg === ''), 'a zero in the chart has no sign color');
+});
+
+test('a listed table skips the x key it already shows, and a whole small amount has no cents', () => {
+  const text = plain(draw('chart', chart({ yFormat: 'currency', table: ['k', 'v'], data: [{ k: 'A', v: 0 }, { k: 'B', v: 1 }, { k: 'C', v: 3.3 }] }), { width: 100 }));
+  assert.equal((text.match(/│ B /g) || []).length, 2, 'B once in the chart and once in the table');
+  assert.match(text, /\$0 /);
+  assert.match(text, /\$3\.30/);
+  assert.doesNotMatch(text, /\$1\.00|\$0\.00/);
+});
+
+test('a row puts as many blocks on a line as fit, then wraps the rest', () => {
+  const text = plain(draw('row', JSON.stringify([{ title: 'One', ...JSON.parse(chart({ data: rows, table: true })) }, { title: 'Two', ...JSON.parse(chart({ data: rows })) }]), { width: 60 }));
+  const tops = text.split('\n').filter((l) => l.startsWith('╭'));
+  assert.equal(tops.length, 2, 'two lines of frames');
+  assert.equal((tops[0].match(/╭/g) || []).length, 2, 'the chart and its table share the first line');
+});
+
+test('a comparison draws its overview and its change side by side in one row, and the table stays under its own chart', () => {
+  const periods = months.flatMap((r) => [{ k: r.k, m: 'Sep', v: r.sep }, { k: r.k, m: 'Oct', v: r.oct }]);
+  const table = [{ key: 'sep', name: 'Sep' }, { key: 'oct', name: 'Oct' }, { key: 'delta', name: 'Δ', signed: true }, { key: 'pct', name: 'Δ %', format: 'percent', signed: true }];
+  const change = { type: 'bar', diverging: true, title: 'Change', x: 'k', y: 'delta', yFormat: 'currency', table, data: months };
+  const text = plain(draw('row', JSON.stringify([{ type: 'bar', title: 'Sep vs Oct', x: 'k', y: 'v', series: 'm', data: periods }, change]), { width: 96 }));
+  const lines = text.split('\n');
+  assert.match(lines[1], /Sep vs Oct.*│ │.*Change/);
+  assert.match(text, /■ Sep 2,155 +■ Oct 1,953/);
+  assert.ok(lines.every((l) => [...l].length <= 96));
+  // The column where the table frame starts holds the bottom corner of a frame on the line above it.
+  const under = (ls) => {
+    const top = ls.findIndex((l) => l.includes('Values')) - 1;
+    return [...ls[top - 1]][[...ls[top]].lastIndexOf('╭')] === '╰';
+  };
+  assert.ok(under(lines), 'the table starts directly under the change chart');
+  const three = [{ title: 'A', ...JSON.parse(chart({ data: rows })) }, change, { title: 'C', ...JSON.parse(chart({ data: rows })) }];
+  assert.ok(under(plain(draw('row', JSON.stringify(three), { width: 96 })).split('\n')), 'in a wrapped row the table still sits under its own chart');
+});
+
+test('a percent chart prints no sum of percentages in its footer', () => {
+  const pct = (spec) => plain(draw('chart', chart({ yFormat: 'percent', data: rows, ...spec })));
+  for (const spec of [{}, { type: 'column' }, { type: 'line' }, { diverging: true }, { series: 'g', data: [{ k: 'a', g: 'x', v: 1 }, { k: 'a', g: 'y', v: 2 }] }]) {
+    assert.doesNotMatch(pct(spec), /total|net|40%|of top/, JSON.stringify(spec));
+  }
+  assert.match(pct({}), /RDS █+ 30%/);
+});
+
 test('signed rows show no share, and a negative column stands as tall as its size', () => {
   const bar = plain(draw('chart', chart({ data: [{ k: 'a', v: -5 }, { k: 'b', v: 10 }] })));
   assert.doesNotMatch(bar, /%/);
