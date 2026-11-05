@@ -39,6 +39,8 @@ function block($, t, part, width) {
     t.Box,
     { flexDirection: 'column', alignItems: 'center' },
     h(t.Box, { flexDirection: 'column' }, ...lines.map((runs) => h(t.Box, {}, ...runs.filter(([s]) => s).map(([s, fg, bg, bold]) => h(t.Text, style(fg, bg, bold), s))))),
+    // The reader sees this line; the stored reply does not hold it.
+    h(t.Text, { dimColor: true }, 'ask to export this as CSV or SVG'),
   );
 }
 
