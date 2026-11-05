@@ -6,9 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { delimiter } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { saveConfig, loadConfig } from '../lib/config.js';
-import { enableClaudeAutoUpdate, MARKETPLACE, PLUGIN } from '../lib/update.js';
+import { enableClaudeAutoUpdate, MARKETPLACE, PLUGIN, SOURCE } from '../lib/update.js';
 import { login } from './login.js';
-
 
 // Per agent: add the marketplace (fails harmlessly when it is there), refresh it from git, install
 // the plugin, then upgrade it: `install` keeps an installed copy, so a re-run needs `upgrade` to move
@@ -17,7 +16,7 @@ export const AGENTS = {
   claude: {
     label: 'Claude Code',
     upgradeHint: 'claude update',
-    add: ['claude', 'plugin', 'marketplace', 'add', 'https://github.com/cxmlabs/cxm-plugin.git'],
+    add: ['claude', 'plugin', 'marketplace', 'add', SOURCE.url],
     refresh: ['claude', 'plugin', 'marketplace', 'update', MARKETPLACE],
     install: ['claude', 'plugin', 'install', PLUGIN],
     upgrade: ['claude', 'plugin', 'update', PLUGIN],
@@ -96,17 +95,21 @@ export async function install(argv, { run = (cmd) => spawnAgent(cmd).status, sta
 
   // One agent failing does not stop the others or the sign-in; the failures are reported at the end.
   const failures = [];
+  const installed = [];
   for (const a of agents) {
     const { label, add, refresh, install: installCmd, upgrade } = AGENTS[a];
     console.log(`\n${label}`);
     run(add);
     if (run(refresh) !== 0) failures.push(`${label}: could not add or refresh the ${MARKETPLACE} marketplace.`);
     else if (run(installCmd) !== 0) failures.push(`${label}: could not install ${PLUGIN}.`);
-    else if (upgrade && run(upgrade) !== 0) failures.push(`${label}: could not update ${PLUGIN} to the latest version.`);
+    else {
+      installed.push(a);
+      if (upgrade && run(upgrade) !== 0) failures.push(`${label}: could not update ${PLUGIN} to the latest version.`);
+    }
   }
   if (failures.length === agents.length) throw new Error(failures.join('\n'));
   saveConfig({ ...(loadConfig() ?? {}), autoUpdate });
-  if (autoUpdate && agents.includes('claude')) {
+  if (autoUpdate && installed.includes('claude')) {
     // A settings file Claude Code cannot read back as JSON is left as it is.
     try {
       enableClaudeAutoUpdate();

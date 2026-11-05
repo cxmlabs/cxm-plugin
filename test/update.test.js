@@ -33,17 +33,23 @@ test('versions compare on their numbers', () => {
   assert.equal(compareVersions('0.2.1', '1.0.0-rc.1'), -1);
 });
 
-test('a newer version is announced once a day, a failed check says nothing, and the registry is asked once a day', async () => {
+test('a newer version is announced, the registry is asked once a day even when it fails, and CXM_TELEMETRY=0 asks nothing', async () => {
+  delete process.env.CXM_TELEMETRY;
   saveConfig({});
   let asked = 0;
-  const fetchJson = async () => (asked++, '9.0.0');
+  const fetchLatest = async () => (asked++, '9.0.0');
   const now = 1_000 * DAY;
-  assert.match(await updateNotice({ now, current: '0.2.1', fetchJson }), /CloudExMachina 9\.0\.0 is available \(this is 0\.2\.1\)\. Update: npx @cloudexmachina\/cxm@latest install/);
-  assert.equal(await updateNotice({ now: now + 1000, current: '0.2.1', fetchJson }), null, 'once a day');
-  assert.equal(asked, 1, 'the registry answer is kept for a day');
-  assert.equal(await updateNotice({ now: now + 2 * DAY, current: '9.0.0', fetchJson }), null, 'nothing when current');
+  assert.match(await updateNotice({ now, current: '0.2.1', fetchLatest }), /CloudExMachina 9\.0\.0 is available \(this is 0\.2\.1\)\. Update: npx @cloudexmachina\/cxm@latest install/);
+  assert.equal(await updateNotice({ now: now + 1000, current: '0.2.1', fetchLatest }), null, 'once a day');
+  assert.equal(await updateNotice({ now: now + DAY, current: '9.0.0', fetchLatest }), null, 'nothing when current');
+  assert.equal(asked, 2);
   saveConfig({});
-  assert.equal(await updateNotice({ now, current: '0.2.1', fetchJson: async () => { throw new Error('offline'); } }), null);
+  assert.equal(await updateNotice({ now, current: '0.2.1', fetchLatest: async () => { throw new Error('offline'); } }), null);
+  assert.equal(await updateNotice({ now: now + 1000, current: '0.2.1', fetchLatest }), null, 'a failed check also waits a day');
+  saveConfig({});
+  process.env.CXM_TELEMETRY = '0';
+  assert.equal(await updateNotice({ now, current: '0.2.1', fetchLatest }), null);
+  assert.equal(asked, 2, 'the registry is not asked');
 });
 
 test('Codex is refreshed at a session start only when the user agreed, and at most once a day', () => {
@@ -69,5 +75,9 @@ test('install turns auto-update on unless --no-auto-update, and records the answ
   await install(['--yes', '--no-login', '--no-auto-update'], quiet);
   assert.equal(loadConfig().autoUpdate, false);
   assert.throws(() => readFileSync(join(off, 'settings.json')), /ENOENT/, 'no setting is written on no');
+  const failed = mkdtempSync(join(tmpdir(), 'cxm-claude-'));
+  process.env.CLAUDE_CONFIG_DIR = failed;
+  await install(['--yes', '--no-login'], { run: (cmd) => (cmd[0] === 'claude' ? 1 : 0), status: () => 'ready' }).catch(() => {});
+  assert.throws(() => readFileSync(join(failed, 'settings.json')), /ENOENT/, 'no setting for a Claude Code install that failed');
   delete process.env.CLAUDE_CONFIG_DIR;
 });

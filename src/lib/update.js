@@ -6,11 +6,11 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pluginVersion } from './client.js';
 import { loadConfig, saveConfig } from './config.js';
+import { latestPublishedVersion } from './http.js';
 
 export const MARKETPLACE = 'cxm-marketplace';
 export const PLUGIN = `cxm-agent-plugin@${MARKETPLACE}`;
-const SOURCE = { source: 'git', url: 'https://github.com/cxmlabs/cxm-plugin.git' };
-const REGISTRY = 'https://registry.npmjs.org/@cloudexmachina/cxm/latest';
+export const SOURCE = { source: 'git', url: 'https://github.com/cxmlabs/cxm-plugin.git' };
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Claude Code has no command for it: the setting is `autoUpdate` on the marketplace entry it wrote
@@ -32,27 +32,15 @@ export function compareVersions(a, b) {
   return 0;
 }
 
-// The latest published version, asked at most once a day and kept in the config.
-export async function latestVersion({ now = Date.now(), fetchJson = registryLatest } = {}) {
+// One line when a newer version exists; the registry is asked at most once a day, before the wait, so a failed check also waits a day.
+export async function updateNotice({ now = Date.now(), current = pluginVersion(), fetchLatest = latestPublishedVersion } = {}) {
   const config = loadConfig() ?? {};
-  if (config.latestVersion && now - (config.latestCheckedAt ?? 0) < DAY_MS) return config.latestVersion;
-  const latest = await fetchJson().catch(() => null);
-  saveConfig({ ...(loadConfig() ?? {}), latestCheckedAt: now, ...(latest ? { latestVersion: latest } : {}) });
-  return latest ?? config.latestVersion ?? null;
-}
-
-async function registryLatest() {
-  const res = await fetch(REGISTRY, { signal: AbortSignal.timeout(2000) });
-  return res.ok ? (await res.json()).version : null;
-}
-
-// One line when a newer version exists, at most once a day; null otherwise.
-export async function updateNotice({ now = Date.now(), current = pluginVersion(), fetchJson } = {}) {
-  const latest = await latestVersion({ now, fetchJson });
-  const config = loadConfig() ?? {};
-  if (!latest || compareVersions(latest, current) <= 0 || now - (config.noticeShownAt ?? 0) < DAY_MS) return null;
-  saveConfig({ ...config, noticeShownAt: now });
-  return `CloudExMachina ${latest} is available (this is ${current}). Update: npx @cloudexmachina/cxm@latest install`;
+  if (process.env.CXM_TELEMETRY === '0' || now - (config.latestCheckedAt ?? 0) < DAY_MS) return null;
+  saveConfig({ ...config, latestCheckedAt: now });
+  const latest = await fetchLatest().catch(() => null);
+  return latest && compareVersions(latest, current) > 0
+    ? `CloudExMachina ${latest} is available (this is ${current}). Update: npx @cloudexmachina/cxm@latest install`
+    : null;
 }
 
 // Codex has no auto-update. When the user agreed, a session start refreshes the marketplace and

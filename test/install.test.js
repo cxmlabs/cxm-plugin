@@ -3,7 +3,11 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { test } from 'node:test';
-import { AGENTS, agentStatus, chooseAgents, install, spawnAgent } from '../src/commands/install.js';
+
+// An install writes the CXM config and Claude Code's settings, so both point at scratch directories before the import.
+process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-install-'));
+process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-install-claude-'));
+const { AGENTS, agentStatus, chooseAgents, install, spawnAgent } = await import('../src/commands/install.js');
 
 test('installs into the agents that support plugins, narrowed by --agent; an old agent is skipped', () => {
   assert.deepEqual(chooseAgents([], (a) => (a === 'claude' ? 'ready' : 'missing')), { ready: ['claude'], outdated: [] });

@@ -76,7 +76,7 @@ transitive package can phone home, because there are none.
   crash report (described above) and still lets your agent continue.
 - **The update check asks npm only for a version number.** At most once a day, a `cxm` command reads
   the latest published version of `@cloudexmachina/cxm` from the public npm registry. It sends no
-  token, no organization and no data of yours; a failed check is silent.
+  token, no organization and no data of yours; a failed check is silent. `CXM_TELEMETRY=0` turns it off.
 - **The Codex update runs Codex's own commands.** When you agreed at install, a session start runs
   `codex plugin marketplace upgrade` and `codex plugin add` at most once a day. It sends nothing to
   CloudExMachina.

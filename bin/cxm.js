@@ -126,7 +126,7 @@ function dispatch(argv) {
 
 const argv = process.argv.slice(2);
 // `hook` runs on every agent edit, so dispatch does not see it and no command event is sent. Only
-// `hook session-end` calls the network, to send the session trace, unless a hook crashes (see docs/privacy.md).
+// `hook session-end` sends to CXM, unless a hook crashes; `hook session-start` can start Codex's own update (see docs/privacy.md).
 // Anything thrown outside a command's own error path is a bug: report it, then exit. A hook always
 // exits 0, so a crash in it never blocks the agent.
 const crashExit = (err) => reportCrash(err, { source: argv[0] === 'hook' ? `hook:${argv[1]}` : 'process', handled: false }).finally(() => process.exit(argv[0] === 'hook' ? 0 : 1));
