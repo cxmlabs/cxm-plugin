@@ -370,6 +370,12 @@ test('in a group, linked nodes are drawn and lone nodes are listed under the dra
   assert.doesNotMatch(text, /│ RDS orders │/);
 });
 
+test('a group whose linked nodes do not fit the width lists every node and its links', () => {
+  const src = 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB public facing orders] --> n[NAT gateway shared egress]\n    r[(RDS orders)]\n  end\n  subgraph w["VPC edge"]\n    c[CloudFront]\n  end';
+  const text = plain(draw('mermaid', src, { width: 28 }));
+  assert.match(text, /■ ALB public facing[\s\S]*■ NAT gateway shared[\s\S]*■ RDS orders[\s\S]*Links/);
+});
+
 test('a label inside a longer label colors only its own box', () => {
   const lines = draw('mermaid', 'flowchart LR\n  G[API Gateway] --> A[API]', { width: 120 });
   assert.notEqual(runOf(lines, 'API Gateway')[2], runs(lines).find(([t]) => t === 'API')[2]);

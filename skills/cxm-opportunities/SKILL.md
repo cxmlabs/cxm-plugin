@@ -8,7 +8,7 @@ description: Use when the user asks about savings, cost optimization, savings op
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
 
-**Picture:** a bar chart of savings by opportunity or by service, with its table.
+**Picture:** when the answer lists 3 or more opportunities, a bar chart of savings by opportunity or by service, with its table.
 
 When the user asks about savings, optimizations, or how to cut their cloud costs:
 

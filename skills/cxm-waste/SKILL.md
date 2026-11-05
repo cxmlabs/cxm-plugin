@@ -8,7 +8,7 @@ description: Use when the user asks about waste, anti-patterns, flagged issues, 
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
 
-**Picture:** a bar chart of waste by kind or by account, with its table.
+**Picture:** when the answer lists 3 or more categories, a bar chart of the monthly cost of the flagged resources by category, with its table.
 
 Smells are cheap detector hits (pre-qualification), distinct from the finalized
 opportunities in `cxm-opportunities`. When the user asks what looks wasteful or suspicious:

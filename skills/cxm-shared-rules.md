@@ -27,17 +27,18 @@ measures, dimensions and segments. You write the query. No example in a skill is
 
 ## Visuals
 
-Answer each view of the question with its own picture, next to the text and tables it needs. A
-picture never replaces a chart, a table or the numbers the answer needs. Pick it by the shape:
+A picture is a chart or a diagram. Answer each part of the question with its own picture, next to
+the text and tables it needs. A picture never replaces a table or the numbers the answer needs.
+Pick it by the shape:
 
 | The question or the answer has… | Draw |
 |---|---|
 | 3 or more items to compare (services, accounts, teams, regions) | a bar chart |
-| a time window ("last month", "since", "trend", "evolved", "over 45 days") | a line chart, or `column` for a few periods |
+| a series over time ("since", "trend", "evolved", "month by month", "over 45 days") | a line chart, or `column` for a few periods |
 | two periods, or before and after | grouped bars of both periods, with the change as a diverging chart |
-| 3 or more things that connect or contain each other ("what runs in", "how it connects", "flow", "depends on", "deployed", an ARN or a host) | a mermaid diagram |
-| an overview ("everything in", "show me my …") | a chart of the numbers and a diagram of the structure |
-| one number, a yes or no, a single lookup | nothing |
+| 3 or more things that connect or contain each other ("what runs in", "how it connects", "flow", "depends on", what connects to an ARN or a host) | a mermaid diagram |
+| an overview of an account, an organization or an environment ("everything in", "everything deployed") | a chart of the numbers and a diagram of the structure |
+| only one number, a yes or no, or a single lookup | nothing |
 
 When the user asks to draw, chart, diagram, map or visualize, always draw. When a picture would help
 but nobody asked, draw it if the shape is in the table; otherwise offer it once, in one line ("I can

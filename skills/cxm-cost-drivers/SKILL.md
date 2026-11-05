@@ -8,7 +8,7 @@ description: Use when the user asks about their cloud costs, cloud bill, top spe
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
 It holds how to query CXM and how to answer, for every CXM skill. Follow it in every answer.
 
-**Picture:** a bar chart of spend by service, with its table; a line chart for a trend; grouped bars and a change chart for a comparison.
+**Picture:** when the answer lists 3 or more services, a bar chart of spend by service, with its table.
 
 ## Route first — what grain does the question need?
 
