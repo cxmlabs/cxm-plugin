@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { delimiter } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { saveConfig, loadConfig } from '../lib/config.js';
-import { enableClaudeAutoUpdate, MARKETPLACE, PLUGIN, SOURCE } from '../lib/update.js';
+import { pluginVersion } from '../lib/client.js';
+import { codexPin, enableClaudeAutoUpdate, MARKETPLACE, PLUGIN, SOURCE } from '../lib/update.js';
 import { login } from './login.js';
 
 // Per agent: add the marketplace (fails harmlessly when it is there), refresh it from git, install
@@ -24,7 +25,9 @@ export const AGENTS = {
   codex: {
     label: 'Codex',
     upgradeHint: 'npm install -g @openai/codex@latest, or brew upgrade codex',
-    add: ['codex', 'plugin', 'marketplace', 'add', 'cxmlabs/cxm-plugin', '--ref', 'main'],
+    // Pinned to this installer's release tag; a re-run moves an older pin to it.
+    reset: codexPin(pluginVersion())[0],
+    add: codexPin(pluginVersion())[1],
     refresh: ['codex', 'plugin', 'marketplace', 'upgrade', MARKETPLACE],
     install: ['codex', 'plugin', 'add', PLUGIN],
   },
@@ -79,9 +82,9 @@ export async function install(argv, { run = (cmd) => spawnAgent(cmd).status, sta
 
   console.log('CloudExMachina will be installed into:\n');
   for (const a of agents) {
-    const { label, add, refresh, install: installCmd, upgrade } = AGENTS[a];
+    const { label, reset, add, refresh, install: installCmd, upgrade } = AGENTS[a];
     console.log(`  ${label}:`);
-    for (const cmd of [add, refresh, installCmd, upgrade].filter(Boolean)) console.log(`    ${show(cmd)}`);
+    for (const cmd of [reset, add, refresh, installCmd, upgrade].filter(Boolean)) console.log(`    ${show(cmd)}`);
   }
   const signIn = !argv.includes('--no-login');
   if (signIn) console.log('\nThen it opens your browser to sign in to CloudExMachina.');
@@ -97,8 +100,9 @@ export async function install(argv, { run = (cmd) => spawnAgent(cmd).status, sta
   const failures = [];
   const installed = [];
   for (const a of agents) {
-    const { label, add, refresh, install: installCmd, upgrade } = AGENTS[a];
+    const { label, reset, add, refresh, install: installCmd, upgrade } = AGENTS[a];
     console.log(`\n${label}`);
+    if (reset) run(reset);
     run(add);
     if (run(refresh) !== 0) failures.push(`${label}: could not add or refresh the ${MARKETPLACE} marketplace.`);
     else if (run(installCmd) !== 0) failures.push(`${label}: could not install ${PLUGIN}.`);

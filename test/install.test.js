@@ -24,7 +24,8 @@ test('runs each agent\'s own commands, refreshes and upgrades on a re-run, and f
   };
   await install(['--yes', '--no-login'], { run, status: () => 'ready' });
   const { claude, codex } = AGENTS;
-  assert.deepEqual(ran, [claude.add, claude.refresh, claude.install, claude.upgrade, codex.add, codex.refresh, codex.install].map((c) => c.join(' ')));
+  assert.match(codex.add.join(' '), /--ref v\d+\.\d+\.\d+/, 'Codex is pinned to a release tag');
+  assert.deepEqual(ran, [claude.add, claude.refresh, claude.install, claude.upgrade, codex.reset, codex.add, codex.refresh, codex.install].map((c) => c.join(' ')));
 
   await assert.rejects(install(['--yes', '--no-login'], { run: () => 1, status: () => 'ready' }), /could not add or refresh/);
   await assert.rejects(install(['--yes', '--no-login'], { run: () => 0, status: () => 'outdated' }), /No coding agent with plugin support/);

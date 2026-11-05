@@ -6,7 +6,7 @@ import { scanCloudFormation } from '../lib/cfn-scan.js';
 import { buildSessionTrace } from '../lib/session-trace.js';
 import { emitBatch, shareContent } from '../lib/telemetry.js';
 import { iacNudge, scanTerraform } from '../lib/tf-scan.js';
-import { refreshCodex } from '../lib/update.js';
+import { refreshCodex, updateCodex } from '../lib/update.js';
 
 const CFN_EXT = /\.(ya?ml|json|template)$/i;
 
@@ -77,6 +77,7 @@ export async function hook(argv) {
   const name = argv[0];
   // A session start needs no payload: it only refreshes the Codex plugin, when the user agreed to it.
   if (name === 'session-start') return void refreshCodex();
+  if (name === 'codex-update') return void (await updateCodex());
   if (name !== 'tf-cost' && name !== 'iac-cost' && name !== 'aws-cost' && name !== 'session-end') return;
   const raw = await readStdin();
   if (!raw) return;

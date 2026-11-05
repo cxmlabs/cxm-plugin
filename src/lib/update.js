@@ -1,9 +1,10 @@
 // Keeps the plugin current: Claude Code's own auto-update for the marketplace, a daily Codex refresh,
 // and a once-a-day notice when a newer version exists. Every network or file failure here is silent.
-import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { pluginVersion } from './client.js';
 import { loadConfig, saveConfig } from './config.js';
 import { latestPublishedVersion } from './http.js';
@@ -43,18 +44,41 @@ export async function updateNotice({ now = Date.now(), current = pluginVersion()
     : null;
 }
 
-// Codex has no auto-update. When the user agreed, a session start refreshes the marketplace and
-// re-adds the plugin, once a day, detached so the session does not wait.
+// Codex pins the marketplace to a release tag, so a merge to main reaches nobody before its release.
+export const codexPin = (version) => [
+  ['codex', 'plugin', 'marketplace', 'remove', MARKETPLACE],
+  ['codex', 'plugin', 'marketplace', 'add', 'cxmlabs/cxm-plugin', '--ref', `v${version}`],
+  ['codex', 'plugin', 'add', PLUGIN],
+];
+
+// The newest CXM plugin version in the Codex cache, or null when Codex does not have it installed.
+export function codexInstalledVersion(home = process.env.CODEX_HOME || join(homedir(), '.codex')) {
+  const dir = join(home, 'plugins', 'cache', MARKETPLACE, 'cxm-agent-plugin');
+  const versions = existsSync(dir) ? readdirSync(dir).filter((v) => /^\d+\.\d+\.\d+/.test(v)) : [];
+  return versions.sort(compareVersions).at(-1) ?? null;
+}
+
+// Codex has no auto-update. When the user agreed, a session start launches the check below once a
+// day, detached, so the session does not wait.
 export function refreshCodex({ now = Date.now(), run = spawnDetached } = {}) {
   const config = loadConfig() ?? {};
   if (config.autoUpdate !== true || now - (config.codexRefreshedAt ?? 0) < DAY_MS) return false;
   saveConfig({ ...config, codexRefreshedAt: now });
-  run(`codex plugin marketplace upgrade ${MARKETPLACE} && codex plugin add ${PLUGIN}`);
+  run([process.execPath, join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bin', 'cxm.js'), 'hook', 'codex-update']);
   return true;
 }
 
-function spawnDetached(command) {
-  const child = spawn('sh', ['-c', `command -v codex >/dev/null 2>&1 && { ${command}; }`], { detached: true, stdio: 'ignore' });
+// Moves an installed Codex plugin to the newest release; never installs it where it is absent.
+export async function updateCodex({ latest, installed = codexInstalledVersion(), run = (cmd) => spawnSync(cmd[0], cmd.slice(1), { stdio: 'ignore' }).status } = {}) {
+  if (!installed) return false;
+  const newest = latest ?? (await latestPublishedVersion().catch(() => null));
+  if (!newest || compareVersions(newest, installed) <= 0) return false;
+  for (const cmd of codexPin(newest)) if (run(cmd) !== 0) return false;
+  return true;
+}
+
+function spawnDetached(argv) {
+  const child = spawn(argv[0], argv.slice(1), { detached: true, stdio: 'ignore' });
   child.on('error', () => {});
   child.unref();
 }

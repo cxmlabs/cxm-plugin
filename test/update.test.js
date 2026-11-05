@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -7,7 +7,7 @@ import { test } from 'node:test';
 // The config module reads its directory when it loads, so it is set before the import.
 process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-update-'));
 process.env.CXM_TELEMETRY = '0';
-const { compareVersions, enableClaudeAutoUpdate, refreshCodex, updateNotice } = await import('../src/lib/update.js');
+const { codexInstalledVersion, compareVersions, enableClaudeAutoUpdate, refreshCodex, updateCodex, updateNotice } = await import('../src/lib/update.js');
 const { loadConfig, saveConfig } = await import('../src/lib/config.js');
 const { install } = await import('../src/commands/install.js');
 
@@ -60,7 +60,20 @@ test('Codex is refreshed at a session start only when the user agreed, and at mo
   saveConfig({ autoUpdate: true });
   assert.equal(refreshCodex({ now: DAY, run }), true);
   assert.equal(refreshCodex({ now: DAY + 1000, run }), false);
-  assert.deepEqual(runs, ['codex plugin marketplace upgrade cxm-marketplace && codex plugin add cxm-agent-plugin@cxm-marketplace']);
+  assert.equal(runs.length, 1);
+  assert.deepEqual(runs[0].slice(-2), ['hook', 'codex-update']);
+});
+
+test('the Codex update moves an installed plugin to the newest release tag, and never installs one', async () => {
+  const ran = [];
+  const run = (cmd) => (ran.push(cmd.join(' ')), 0);
+  assert.equal(await updateCodex({ latest: '0.3.0', installed: null, run }), false, 'absent: left absent');
+  assert.equal(await updateCodex({ latest: '0.3.0', installed: '0.3.0', run }), false, 'current: nothing to do');
+  assert.equal(await updateCodex({ latest: '0.3.0', installed: '0.2.1', run }), true);
+  assert.deepEqual(ran, ['codex plugin marketplace remove cxm-marketplace', 'codex plugin marketplace add cxmlabs/cxm-plugin --ref v0.3.0', 'codex plugin add cxm-agent-plugin@cxm-marketplace']);
+  const home = mkdtempSync(join(tmpdir(), 'cxm-codex-'));
+  for (const v of ['0.2.0', '0.10.1', '0.9.0']) mkdirSync(join(home, 'plugins', 'cache', 'cxm-marketplace', 'cxm-agent-plugin', v), { recursive: true });
+  assert.equal(codexInstalledVersion(home), '0.10.1');
 });
 
 test('install turns auto-update on unless --no-auto-update, and records the answer', async () => {
