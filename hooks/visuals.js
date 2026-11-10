@@ -94,7 +94,8 @@ function block($, t, part, width, place) {
   return h(
     t.Box,
     { flexDirection: 'column', alignItems: 'center' },
-    h(t.Box, { flexDirection: 'column' }, ...lines.map((runs) => h(t.Box, {}, ...runs.filter(([s]) => s).map(([s, fg, bg, bold]) => h(t.Text, style(fg, bg, bold), s))))),
+    // minHeight keeps a blank row; an empty Box takes no height.
+    h(t.Box, { flexDirection: 'column' }, ...lines.map((runs) => h(t.Box, { minHeight: 1 }, ...runs.filter(([s]) => s).map(([s, fg, bg, bold]) => h(t.Text, style(fg, bg, bold), s))))),
     exportButtons($, t, part, body, lines, place),
   );
 }
