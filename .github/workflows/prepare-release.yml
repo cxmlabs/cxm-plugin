@@ -31,6 +31,7 @@ jobs:
         id: bump
         env:
           LEVEL: ${{ inputs.level }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           # npm version also prints the version script's output, so read the result back from package.json.
           npm version "$LEVEL" --no-git-tag-version
@@ -41,7 +42,8 @@ jobs:
           git switch -c "$branch"
           git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json
           git commit -m "release: cxm-agent-plugin ${version}"
-          git push origin "$branch"
+          # main requires signed commits, and only a commit made through the API is signed.
+          .github/scripts/signed-push.sh "$branch" "$(git rev-parse HEAD~1)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
       - name: Link the release PR to open
