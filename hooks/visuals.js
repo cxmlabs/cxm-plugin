@@ -1,6 +1,7 @@
 // Claude Code only: draws the chart and diagram blocks of a reply in place, in color, and tells the
 // agent it can write them. Without this module (Codex, an older Claude Code) the agent runs `cxm viz`.
 // `h`, the element factory, is a global of the hooks module environment.
+import { toCsv, toSvg } from '../src/lib/export.js';
 import { draw, needsRows, splitReply } from '../src/lib/viz.js';
 
 const SECTION = {
@@ -23,10 +24,65 @@ function fetchRows($, kind, body) {
   return entry;
 }
 
+// What an export button reads after its press, by block and button.
+const pressed = new Map();
+
+function exportButton($, t, key, label, act) {
+  return h(
+    t.Button,
+    {
+      key,
+      onPress: async (press) => {
+        pressed.set(key, await Promise.resolve(press).then(act).catch((err) => `Not exported: ${err.message}`));
+        $.ui.invalidate('ui.render');
+      },
+    },
+    pressed.get(key) ?? label,
+  );
+}
+
+// The session directory is usually a repository, where an export would show as an untracked file.
+let downloads;
+function downloadsDir($) {
+  downloads ??= $.process
+    .run(['node', '-p', "require('node:path').join(require('node:os').homedir(), 'Downloads')"], { timeoutMs: 10000 })
+    .then((r) => (r.exitCode === 0 ? r.stdout.trim() : Promise.reject(new Error('no home directory'))))
+    .catch((err) => {
+      downloads = undefined;
+      throw err;
+    });
+  return downloads;
+}
+
+async function save($, name, text) {
+  const path = `${await downloadsDir($)}/${name}`;
+  await $.fs.write(path, `${text}\n`);
+  return `✓ Saved ${path}`;
+}
+
+// A block's file name, the same in every redraw and different for a different block.
+const idOf = (part) => `cxm-${part.kind}-${[...part.body].reduce((x, c) => (Math.imul(x, 31) + c.charCodeAt(0)) >>> 0, 7).toString(36)}`;
+
+function exportButtons($, t, part, body, lines, place) {
+  const id = idOf(part);
+  // The message and the place in it keep two copies of one block apart.
+  const key = (button) => `${id}-${place}-${button}`;
+  return h(
+    t.Box,
+    { flexDirection: 'row', gap: 1 },
+    exportButton($, t, key('copy'), 'Copy CSV', async (press) => {
+      const r = await $.ui.copy({ text: toCsv(part.kind, body), surface: press.surface });
+      return r.isCopied ? '✓ Copied' : `Not copied: ${r.reason}`;
+    }),
+    exportButton($, t, key('csv'), 'Save CSV', () => save($, `${id}.csv`, toCsv(part.kind, body))),
+    exportButton($, t, key('svg'), 'Save SVG', () => save($, `${id}.svg`, toSvg(lines))),
+  );
+}
+
 const style = (fg, bg, bold) => ({ ...(fg && { color: fg }), ...(bg && { backgroundColor: bg }), ...(bold && { bold: true }) });
 const raw = (t, part, reason) => h(t.Markdown, { text: `${part.text}\n\n_Not drawn: ${reason}_` });
 
-function block($, t, part, width) {
+function block($, t, part, width, place) {
   let body = part.body;
   if (needsRows(part.kind, body)) {
     const got = rows.get(body) ?? fetchRows($, part.kind, body);
@@ -40,8 +96,7 @@ function block($, t, part, width) {
     { flexDirection: 'column', alignItems: 'center' },
     // minHeight keeps a blank row; an empty Box takes no height.
     h(t.Box, { flexDirection: 'column' }, ...lines.map((runs) => h(t.Box, { minHeight: 1 }, ...runs.filter(([s]) => s).map(([s, fg, bg, bold]) => h(t.Text, style(fg, bg, bold), s))))),
-    // The reader sees this line; the stored reply does not hold it.
-    h(t.Text, { dimColor: true }, 'ask to export this as CSV or SVG'),
+    exportButtons($, t, part, body, lines, place),
   );
 }
 
@@ -60,10 +115,10 @@ export const register = (on, options) => {
     const t = $.ui.resolve(e);
     const width = (e.viewport?.columns ?? 100) - 4;
     // A block that does not parse shows as written, with a note, so a bad block never hides the reply.
-    const drawn = parts.map((p) => {
+    const drawn = parts.map((p, n) => {
       if (!p.kind) return h(t.Markdown, { text: p.text });
       try {
-        return block($, t, p, width);
+        return block($, t, p, width, `${e.requestId}-${n}`);
       } catch (err) {
         return raw(t, p, err.message);
       }
