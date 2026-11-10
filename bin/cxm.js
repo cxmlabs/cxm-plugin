@@ -67,7 +67,7 @@ Everything else
         [--savings-monthly + --current-monthly/--region/--resource-type/--description]
                                                 Record a finding in the platform
   api <METHOD> <path> [--body '<json>']         Call a REST endpoint the datasets do not cover
-  viz <chart|cube-chart|row|mermaid> '<body>' | <file> | - [--width n] [--color]
+  viz <chart|cube-chart|row|mermaid> '<body>' | <file> | - [--width n] [--color] [--csv <file>] [--svg <file>]
                                                 Draw one chart or diagram block as text
   --version, -v                                 Print the CLI version
 
