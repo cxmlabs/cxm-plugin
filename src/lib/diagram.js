@@ -611,13 +611,14 @@ function drawSections(model, icons, width) {
 }
 
 // Draws a flowchart with every label whole, one frame per group when it has several, else as a list.
+// `framed` says the lines already hold their frames, so the caller adds none.
 export function drawDiagram(source, width = 100) {
   const { text, icons } = fromIcons(source);
   const bare = text.replace(/%%.*$/gm, '').trim();
-  if (!/^(?:flowchart|graph)\s/.test(bare)) return drawOther(bare, icons, width - 4);
+  if (!/^(?:flowchart|graph)\s/.test(bare)) return { lines: drawOther(bare, icons, width - 4), framed: false };
   const model = parseFlowchart(text);
   if (!model.nodes.size) throw new Error('no node');
   // One frame goes around the drawing, so it takes 4 columns; group frames need no frame around them.
-  if (model.groups.size <= 1) return drawLinked(model, icons, width - 4) ?? groupedView(model, icons, width - 4);
-  return Object.assign(drawSections(model, icons, width), { framed: true });
+  if (model.groups.size <= 1) return { lines: drawLinked(model, icons, width - 4) ?? groupedView(model, icons, width - 4), framed: false };
+  return { lines: drawSections(model, icons, width), framed: true };
 }

@@ -334,8 +334,8 @@ export function draw(kind, body, { width = 100 } = {}) {
   // The parser messages quote the body, and the CLI sends an error message with usage analytics.
   if (kind === 'mermaid') {
     try {
-      const drawn = drawDiagram(body.replace(CONTROL_BUT_LINES, ''), width);
-      return drawn.framed ? drawn : frame({ lines: drawn });
+      const { lines, framed } = drawDiagram(body.replace(CONTROL_BUT_LINES, ''), width);
+      return framed ? lines : frame({ lines });
     } catch {
       throw new Error('This mermaid block cannot be drawn: check its first line (e.g. "flowchart LR") and its syntax');
     }
