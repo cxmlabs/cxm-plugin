@@ -41,8 +41,21 @@ function exportButton($, t, key, label, act) {
   );
 }
 
+// The session directory is usually a repository, where an export would show as an untracked file.
+let downloads;
+function downloadsDir($) {
+  downloads ??= $.process
+    .run(['node', '-p', "require('node:path').join(require('node:os').homedir(), 'Downloads')"], { timeoutMs: 10000 })
+    .then((r) => (r.exitCode === 0 ? r.stdout.trim() : Promise.reject(new Error('no home directory'))))
+    .catch((err) => {
+      downloads = undefined;
+      throw err;
+    });
+  return downloads;
+}
+
 async function save($, name, text) {
-  const path = `${(await $.session.cwd()).replace(/\/$/, '')}/${name}`;
+  const path = `${await downloadsDir($)}/${name}`;
   await $.fs.write(path, `${text}\n`);
   return `✓ Saved ${path}`;
 }
