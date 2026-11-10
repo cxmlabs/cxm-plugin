@@ -108,3 +108,16 @@ test('a press that fails says why on its button', async ($, on) => {
   await table.press({ key: (await table.find({ type: 'Button', text: 'Save CSV' }))!.key! })
   expect(await table.find({ type: 'Button', text: /^Not exported: / })).toBeDefined()
 })
+
+test('a Save press says why when the Downloads folder is not found, and the next press looks it up again', async ($, on) => {
+  const written: string[] = []
+  on('fs.write', ($, e) => (written.push(e.path), { value: undefined }))
+  let lookups = 0
+  on('process.run', () => ({ value: { exitCode: lookups++ ? 0 : 1, stdout: lookups > 1 ? '/home/u/Downloads\n' : '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
+  const ui = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props('```chart\n' + CHART + '\n```') })
+  await ui.press({ key: (await ui.find({ type: 'Button', text: 'Save CSV' }))!.key! })
+  expect(await ui.find({ type: 'Button', text: 'Not exported: no home directory' })).toBeDefined()
+  expect(written).toEqual([])
+  await ui.press({ key: (await ui.find({ type: 'Button', text: 'Save SVG' }))!.key! })
+  expect(written).toEqual([expect.stringMatching(/^\/home\/u\/Downloads\/cxm-chart-\w+\.svg$/)])
+})
