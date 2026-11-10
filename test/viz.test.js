@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { arrowsLand, familyOf, parseFlowchart } from '../src/lib/diagram.js';
+import { toCsv, toSvg } from '../src/lib/export.js';
 import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
@@ -470,4 +471,33 @@ test('with one group or none, linked nodes are drawn, lone nodes are listed, and
   const hidden = plain(draw('mermaid', 'flowchart LR\n  subgraph v["VPC main"]\n    a[ALB] --> n[NAT]\n    n ~~~ c[Cache]\n  end\n  subgraph w["Edge"]\n    e[CDN]\n  end', { width: 120 }));
   assert.match(hidden, /│ +Cache +│/);
   assert.doesNotMatch(hidden, /■ Cache/);
+});
+
+test('a block exports its rows as CSV, with no cell a spreadsheet would run as a formula', () => {
+  const spec = { x: 'k', y: 'v', series: 's', table: true, data: [{ k: 'RDS, orders', s: 'Oct', v: 30, note: '=HYPERLINK("x")' }, { k: 'ECS', s: 'Oct', v: '-1.5e3', note: '-2+3' }] };
+  assert.equal(toCsv('chart', JSON.stringify(spec)), 'k,s,v,note\n"RDS, orders",Oct,30,"\'=HYPERLINK(""x"")"\nECS,Oct,-1.5e3,\'-2+3');
+  const items = [{ type: 'table', columns: ['a', { name: 'b', format: 'usd' }], rows: [[1, 2]] }, { type: 'note', text: 'x' }, { type: 'bar', x: 'k', y: 'v', table: [{ key: 'v', name: 'Cost' }], data: [{ k: 'a', v: 1 }] }];
+  assert.equal(toCsv('row', JSON.stringify(items)), 'a,b\n1,2\n\nk,Cost\na,1');
+  assert.equal(toCsv('mermaid', 'flowchart LR\n  a[ALB] -->|https| b[ECS api]'), 'source,target,label\nALB,ECS api,https');
+  assert.throws(() => toCsv('row', JSON.stringify([{ type: 'table', columns: ['a'], rows: [1] }])), /each table row must be a list of cells/);
+});
+
+test('a drawing exports as an SVG with its colors, fills and escaped text', () => {
+  const svg = toSvg([[['<RDS>', '#5B8DEF', '#123456', true], [' & co']]]);
+  assert.match(svg, /^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  assert.match(svg, /<rect x="12\.0" y="12" width="42\.0" height="18" fill="#123456"/);
+  assert.match(svg, /<tspan fill="#5B8DEF" font-weight="bold">&lt;RDS&gt;<\/tspan><tspan fill="#E2E8F0"> &amp; co<\/tspan>/);
+});
+
+test('cxm viz writes --csv and --svg files and names them, and refuses a flag with no path', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'cxm-export-'));
+  const env = { ...process.env, CXM_TELEMETRY: '0', CXM_CONFIG_DIR: dir };
+  const run = (...args) => spawnSync(process.execPath, ['bin/cxm.js', 'viz', ...args], { encoding: 'utf8', env });
+  const ok = run('chart', 'test/fixtures/spend.json', '--csv', join(dir, 'a.csv'), '--svg', join(dir, 'a.svg'));
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.match(ok.stdout, /Wrote .*a\.csv\nWrote .*a\.svg/);
+  assert.match(readFileSync(join(dir, 'a.csv'), 'utf8'), /^service,cost\nRDS,1854\n/);
+  assert.match(readFileSync(join(dir, 'a.svg'), 'utf8'), /<svg[\s\S]*Spend by service/);
+  assert.match(run('chart', 'test/fixtures/spend.json', '--csv').stderr, /--csv and --svg need a file path/);
+  assert.match(run('chart', 'test/fixtures/spend.json', '--csv', '--svg', join(dir, 'b.svg')).stderr, /--csv and --svg need a file path/);
 });

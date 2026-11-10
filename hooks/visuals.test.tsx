@@ -15,6 +15,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     expect(await ui.find({ type: 'Text', text: /\$1,854/ })).toBeDefined()
     expect((await ui.find({ type: 'Text', text: /█/ }))?.props.color).toBe('#5B8DEF')
     expect(await ui.find({ type: 'Text', text: /Total +\$3,427/ })).toBeDefined()
+    expect((await ui.find({ type: 'Text', text: /^ask to export this as CSV or SVG$/ }))?.props.dimColor).toBe(true)
     await ui.unmount()
 
     const plain = await $.ui.mount({ plugin: PLUGIN, surface, component: 'AssistantMessage', props: props('No chart here.') })
