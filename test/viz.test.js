@@ -453,6 +453,7 @@ test('a block exports its rows as CSV, with no cell a spreadsheet would run as a
   const items = [{ type: 'table', columns: ['a', { name: 'b', format: 'usd' }], rows: [[1, 2]] }, { type: 'note', text: 'x' }, { type: 'bar', x: 'k', y: 'v', table: [{ key: 'v', name: 'Cost' }], data: [{ k: 'a', v: 1 }] }];
   assert.equal(toCsv('row', JSON.stringify(items)), 'a,b\n1,2\n\nk,Cost\na,1');
   assert.equal(toCsv('mermaid', 'flowchart LR\n  a[ALB] -->|https| b[ECS api]'), 'source,target,label\nALB,ECS api,https');
+  assert.throws(() => toCsv('row', JSON.stringify([{ type: 'table', columns: ['a'], rows: [1] }])), /each table row must be a list of cells/);
 });
 
 test('a drawing exports as an SVG with its colors, fills and escaped text', () => {
