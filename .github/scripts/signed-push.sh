@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Push the tree of HEAD to <branch> as one commit on <parent>, made through the Git Data API.
-# GitHub signs API commits made with GITHUB_TOKEN; a commit made on the runner stays unsigned.
-# Usage: signed-push.sh <branch> <parent-sha> [--force]. Needs GH_TOKEN and contents: write.
+# Usage: signed-push.sh <branch> <parent-sha> [--force]. GitHub signs a commit made through the Git Data API; needs GH_TOKEN.
 set -euo pipefail
 branch=$1
 parent=$2
@@ -22,6 +20,7 @@ entries=$(git diff --name-status --no-renames -z "$parent" HEAD | while IFS= rea
 done | jq -s .)
 
 tree=$(jq -n --arg b "$(git rev-parse "$parent^{tree}")" --argjson e "$entries" '{base_tree:$b, tree:$e}' | gh api "$api/trees" --input - -q .sha)
+[ "$tree" = "$(git rev-parse 'HEAD^{tree}')" ] || { echo "API tree $tree differs from the HEAD tree" >&2; exit 1; }
 commit=$(git log -1 --format=%B HEAD | jq -Rs --arg t "$tree" --arg p "$parent" '{message:sub("\\s+$"; ""), tree:$t, parents:[$p]}' | gh api "$api/commits" --input - -q .sha)
 
 if gh api "$api/ref/heads/$branch" --silent 2>/dev/null; then
