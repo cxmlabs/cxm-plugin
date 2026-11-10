@@ -24,7 +24,12 @@ function chartCsv(spec) {
 }
 
 const columnName = (c) => (c !== null && typeof c === 'object' ? (c.name ?? '') : c);
-const itemCsv = (item) => (item?.type === 'table' ? csvOf((item.columns ?? []).map(columnName), item.rows ?? []) : item?.type === 'note' || item?.type === 'markdown' ? '' : chartCsv(item ?? {}));
+function tableCsv(item) {
+  const rows = item.rows ?? [];
+  if (!rows.every(Array.isArray)) throw new Error('each table row must be a list of cells');
+  return csvOf((item.columns ?? []).map(columnName), rows);
+}
+const itemCsv = (item) => (item?.type === 'table' ? tableCsv(item) : item?.type === 'note' || item?.type === 'markdown' ? '' : chartCsv(item ?? {}));
 
 // The block's data as CSV: a chart's rows, each item of a row with a blank line between, a diagram's links.
 export function toCsv(kind, body) {
