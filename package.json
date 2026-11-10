@@ -1,6 +1,6 @@
 {
   "name": "@cloudexmachina/cxm",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Query your CloudExMachina cloud cost drivers and savings opportunities from your coding agent (Claude Code, Codex).",
   "type": "module",
   "bin": {
