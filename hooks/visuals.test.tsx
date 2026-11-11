@@ -75,7 +75,7 @@ test('with rich_visuals off, a chart block shows as written and the agent is not
   expect((await $.prompt.compose(facts)).sections.map((s) => s.id)).toEqual(['intro'])
 })
 
-test('a drawn block has export buttons: Copy CSV copies its rows, Save CSV and Save SVG write files in Downloads, and each button then says what it did', async ($, on) => {
+test('a drawn block has export buttons: Copy CSV copies its rows, Save CSV and Save SVG write files in Downloads and copy their path, and each button then says what it did', async ($, on) => {
   const copied: string[] = []
   const written: [string, string][] = []
   on('ui.copy', ($, e) => (copied.push(e.text), { value: { isCopied: true } }))
@@ -95,7 +95,8 @@ test('a drawn block has export buttons: Copy CSV copies its rows, Save CSV and S
   expect(written.map(([path]) => path)).toEqual([expect.stringMatching(/^\/home\/u\/Downloads\/cxm-chart-\w+\.csv$/), expect.stringMatching(/^\/home\/u\/Downloads\/cxm-chart-\w+\.svg$/)])
   expect(written[0][1]).toBe('service,cost\nRDS,1854\nECS,1573\n')
   expect(written[1][1]).toMatch(/^<svg [\s\S]*\$1,854[\s\S]*<\/svg>\n$/)
-  expect(await ui.find({ type: 'Button', text: `✓ Saved ${written[0][0]}` })).toBeDefined()
+  expect(copied.slice(1)).toEqual(written.map(([path]) => path))
+  expect(await ui.find({ type: 'Button', text: `✓ Saved ${written[0][0]}, path copied` })).toBeDefined()
   const bad = await $.ui.mount({ plugin: PLUGIN, surface: 'terminal', component: 'AssistantMessage', props: props('```chart\n{not json\n```') })
   expect(await bad.find({ type: 'Button' })).toBeUndefined()
 })

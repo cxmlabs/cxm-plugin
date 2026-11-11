@@ -54,10 +54,11 @@ function downloadsDir($) {
   return downloads;
 }
 
-async function save($, name, text) {
+async function save($, press, name, text) {
   const path = `${await downloadsDir($)}/${name}`;
   await $.fs.write(path, `${text}\n`);
-  return `✓ Saved ${path}`;
+  const r = await $.ui.copy({ text: path, surface: press.surface });
+  return `✓ Saved ${path}${r.isCopied ? ', path copied' : ''}`;
 }
 
 // A block's file name, the same in every redraw and different for a different block.
@@ -74,8 +75,8 @@ function exportButtons($, t, part, body, lines, place) {
       const r = await $.ui.copy({ text: toCsv(part.kind, body), surface: press.surface });
       return r.isCopied ? '✓ Copied' : `Not copied: ${r.reason}`;
     }),
-    exportButton($, t, key('csv'), 'Save CSV', () => save($, `${id}.csv`, toCsv(part.kind, body))),
-    exportButton($, t, key('svg'), 'Save SVG', () => save($, `${id}.svg`, toSvg(lines))),
+    exportButton($, t, key('csv'), 'Save CSV', (press) => save($, press, `${id}.csv`, toCsv(part.kind, body))),
+    exportButton($, t, key('svg'), 'Save SVG', (press) => save($, press, `${id}.svg`, toSvg(lines))),
   );
 }
 
