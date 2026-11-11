@@ -1,5 +1,6 @@
-// Keeps the plugin current: Claude Code's own auto-update for the marketplace, a daily Codex refresh,
-// and a once-a-day notice when a newer version exists. Every network or file failure here is silent.
+// Keeps the plugin current: Claude Code's own auto-update for the marketplace, a daily refresh of the
+// Claude Code and Codex plugins, and a once-a-day notice when a newer version exists. Every network or
+// file failure here is silent.
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -58,23 +59,44 @@ export function codexInstalledVersion(home = process.env.CODEX_HOME || join(home
   return versions.sort(compareVersions).at(-1) ?? null;
 }
 
-// Codex has no auto-update. When the user agreed, a session start launches the check below once a
-// day, detached, so the session does not wait.
-export function refreshCodex({ now = Date.now(), run = spawnDetached } = {}) {
+// Claude Code refreshes the marketplace itself, unless CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC turns that off.
+export const claudeUpdate = [
+  ['claude', 'plugin', 'marketplace', 'update', MARKETPLACE],
+  ['claude', 'plugin', 'update', PLUGIN],
+];
+
+// The CXM plugin version Claude Code has installed, or null when it has none.
+export function claudeInstalledVersion(dir = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')) {
+  const path = join(dir, 'plugins', 'installed_plugins.json');
+  const installed = existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')).plugins?.[PLUGIN] : null;
+  return installed?.[0]?.version ?? null;
+}
+
+// When the user agreed, a session start launches the update below once a day, detached, so the
+// session does not wait.
+export function refreshPlugins({ now = Date.now(), run = spawnDetached } = {}) {
   const config = loadConfig() ?? {};
-  if (config.autoUpdate !== true || now - (config.codexRefreshedAt ?? 0) < DAY_MS) return false;
-  saveConfig({ ...config, codexRefreshedAt: now });
-  run([process.execPath, join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bin', 'cxm.js'), 'hook', 'codex-update']);
+  if (config.autoUpdate !== true || now - (config.pluginsRefreshedAt ?? 0) < DAY_MS) return false;
+  saveConfig({ ...config, pluginsRefreshedAt: now });
+  run([process.execPath, join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'bin', 'cxm.js'), 'hook', 'self-update']);
   return true;
 }
 
-// Moves an installed Codex plugin to the newest release; never installs it where it is absent.
-export async function updateCodex({ latest, installed = codexInstalledVersion(), run = (cmd) => spawnSync(cmd[0], cmd.slice(1), { stdio: 'ignore' }).status } = {}) {
-  if (!installed) return false;
+// Moves each installed plugin, Claude Code's and Codex's, to the newest release; never installs one
+// where it is absent. Returns the hosts it updated.
+export async function updatePlugins({
+  latest,
+  claude = claudeInstalledVersion(),
+  codex = codexInstalledVersion(),
+  run = (cmd) => spawnSync(cmd[0], cmd.slice(1), { stdio: 'ignore' }).status,
+} = {}) {
   const newest = latest ?? (await latestPublishedVersion().catch(() => null));
-  if (!newest || compareVersions(newest, installed) <= 0) return false;
-  for (const cmd of codexPin(newest)) if (run(cmd) !== 0) return false;
-  return true;
+  if (!newest) return [];
+  const steps = { claude: claudeUpdate, codex: codexPin(newest) };
+  return Object.entries({ claude, codex })
+    .filter(([, installed]) => installed && compareVersions(newest, installed) > 0)
+    .filter(([host]) => steps[host].every((cmd) => run(cmd) === 0))
+    .map(([host]) => host);
 }
 
 function spawnDetached(argv) {
