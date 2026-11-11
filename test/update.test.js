@@ -7,7 +7,7 @@ import { test } from 'node:test';
 // The config module reads its directory when it loads, so it is set before the import.
 process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-update-'));
 process.env.CXM_TELEMETRY = '0';
-const { codexInstalledVersion, compareVersions, enableClaudeAutoUpdate, refreshCodex, updateCodex, updateNotice } = await import('../src/lib/update.js');
+const { claudeInstalledVersion, codexInstalledVersion, compareVersions, enableClaudeAutoUpdate, refreshPlugins, updatePlugins, updateNotice } = await import('../src/lib/update.js');
 const { loadConfig, saveConfig } = await import('../src/lib/config.js');
 const { install } = await import('../src/commands/install.js');
 
@@ -52,28 +52,40 @@ test('a newer version is announced, the registry is asked once a day even when i
   assert.equal(asked, 2, 'the registry is not asked');
 });
 
-test('Codex is refreshed at a session start only when the user agreed, and at most once a day', () => {
+test('the plugins are refreshed at a session start only when the user agreed, and at most once a day', () => {
   const runs = [];
   const run = (cmd) => runs.push(cmd);
   saveConfig({ autoUpdate: false });
-  assert.equal(refreshCodex({ now: DAY, run }), false);
+  assert.equal(refreshPlugins({ now: DAY, run }), false);
   saveConfig({ autoUpdate: true });
-  assert.equal(refreshCodex({ now: DAY, run }), true);
-  assert.equal(refreshCodex({ now: DAY + 1000, run }), false);
+  assert.equal(refreshPlugins({ now: DAY, run }), true);
+  assert.equal(refreshPlugins({ now: DAY + 1000, run }), false);
   assert.equal(runs.length, 1);
-  assert.deepEqual(runs[0].slice(-2), ['hook', 'codex-update']);
+  assert.deepEqual(runs[0].slice(-2), ['hook', 'self-update']);
 });
 
-test('the Codex update moves an installed plugin to the newest release tag, and never installs one', async () => {
+test('the update moves each installed plugin to the newest release, Claude Code and Codex, and never installs one', async () => {
   const ran = [];
   const run = (cmd) => (ran.push(cmd.join(' ')), 0);
-  assert.equal(await updateCodex({ latest: '0.3.0', installed: null, run }), false, 'absent: left absent');
-  assert.equal(await updateCodex({ latest: '0.3.0', installed: '0.3.0', run }), false, 'current: nothing to do');
-  assert.equal(await updateCodex({ latest: '0.3.0', installed: '0.2.1', run }), true);
-  assert.deepEqual(ran, ['codex plugin marketplace remove cxm-marketplace', 'codex plugin marketplace add cxmlabs/cxm-plugin --ref v0.3.0', 'codex plugin add cxm-agent-plugin@cxm-marketplace']);
+  assert.deepEqual(await updatePlugins({ claude: null, codex: null, latest: '0.3.1', run }), [], 'absent: left absent');
+  assert.deepEqual(await updatePlugins({ claude: '0.3.1', codex: '0.3.1', latest: '0.3.1', run }), [], 'current: nothing to do');
+  assert.deepEqual(await updatePlugins({ claude: '0.3.0', codex: '0.3.0', latest: '0.3.1', run }), ['claude', 'codex']);
+  assert.deepEqual(ran, [
+    'claude plugin marketplace update cxm-marketplace',
+    'claude plugin update cxm-agent-plugin@cxm-marketplace',
+    'codex plugin marketplace remove cxm-marketplace',
+    'codex plugin marketplace add cxmlabs/cxm-plugin --ref v0.3.1',
+    'codex plugin add cxm-agent-plugin@cxm-marketplace',
+  ]);
+  assert.deepEqual(await updatePlugins({ claude: '0.3.0', codex: null, latest: '0.3.1', run: () => 1 }), [], 'a failed command reports no update');
   const home = mkdtempSync(join(tmpdir(), 'cxm-codex-'));
   for (const v of ['0.2.0', '0.10.1', '0.9.0']) mkdirSync(join(home, 'plugins', 'cache', 'cxm-marketplace', 'cxm-agent-plugin', v), { recursive: true });
   assert.equal(codexInstalledVersion(home), '0.10.1');
+  const claude = mkdtempSync(join(tmpdir(), 'cxm-claude-'));
+  mkdirSync(join(claude, 'plugins'));
+  writeFileSync(join(claude, 'plugins', 'installed_plugins.json'), JSON.stringify({ plugins: { 'cxm-agent-plugin@cxm-marketplace': [{ version: '0.3.0' }] } }));
+  assert.equal(claudeInstalledVersion(claude), '0.3.0');
+  assert.equal(claudeInstalledVersion(mkdtempSync(join(tmpdir(), 'cxm-claude-'))), null);
 });
 
 test('install turns auto-update on unless --no-auto-update, and records the answer', async () => {

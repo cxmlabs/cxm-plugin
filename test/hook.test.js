@@ -58,10 +58,10 @@ test('a non-IaC Claude edit stays silent', () => {
   assert.equal(result.stdout, '');
 });
 
-test('a session start prints nothing, exits 0, and refreshes Codex only after the user agreed', () => {
+test('a session start prints nothing, exits 0, and refreshes the plugins only after the user agreed', () => {
   const dir = mkdtempSync(join(tmpdir(), 'cxm-hook-'));
-  // No codex on this PATH, so the refresh it starts finds nothing to run.
-  const env = { ...process.env, CXM_CONFIG_DIR: dir, CXM_TELEMETRY: '0', PATH: '/usr/bin:/bin' };
+  // No claude or codex on this PATH and an empty Claude config, so the refresh it starts finds nothing to run.
+  const env = { ...process.env, CLAUDE_CONFIG_DIR: dir, CODEX_HOME: dir, CXM_CONFIG_DIR: dir, CXM_TELEMETRY: '0', PATH: '/usr/bin:/bin' };
   const start = () => spawnSync(process.execPath, [bin, 'hook', 'session-start'], { encoding: 'utf8', env });
   let result = start();
   assert.equal(result.status, 0, result.stderr);
@@ -71,5 +71,5 @@ test('a session start prints nothing, exits 0, and refreshes Codex only after th
   result = start();
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, '');
-  assert.ok(JSON.parse(readFileSync(join(dir, 'credentials.json'), 'utf8')).codexRefreshedAt, 'the refresh ran');
+  assert.ok(JSON.parse(readFileSync(join(dir, 'credentials.json'), 'utf8')).pluginsRefreshedAt, 'the refresh ran');
 });
