@@ -1,7 +1,7 @@
 // A drawn block taken out of the conversation: its rows as CSV, its drawing as an SVG image.
 // It imports no Node module, so the reply renderer can use it too.
 import { parseFlowchart } from './diagram.js';
-import { parseBlock } from './viz.js';
+import { chartSpec, parseBlock } from './viz.js';
 
 // A cell a spreadsheet would run as a formula starts with one of these; a quote makes it text.
 const FORMULA = /^[=+\-@\t\r]/;
@@ -16,7 +16,8 @@ function cell(v) {
 const csvOf = (header, rows) => [header, ...rows].map((r) => r.map(cell).join(',')).join('\n');
 
 // The keys of the rows, the chart's own keys first, in the order they appear, under their table names.
-function chartCsv(spec) {
+function chartCsv(block) {
+  const spec = chartSpec(block);
   const rows = Array.isArray(spec.data) ? spec.data : [];
   const keys = [...new Set([spec.x, spec.series, spec.y, ...rows.flatMap((r) => Object.keys(r ?? {}))].filter(Boolean))];
   const names = new Map((Array.isArray(spec.table) ? spec.table : []).filter((c) => c?.name).map((c) => [c.key, c.name]));

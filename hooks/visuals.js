@@ -2,12 +2,12 @@
 // agent it can write them. Without this module (Codex, an older Claude Code) the agent runs `cxm viz`.
 // `h`, the element factory, is a global of the hooks module environment.
 import { toCsv, toSvg } from '../src/lib/export.js';
-import { draw, needsRows, splitReply } from '../src/lib/viz.js';
+import { CHART_SHAPE, draw, needsRows, splitReply } from '../src/lib/viz.js';
 
 const SECTION = {
   id: 'cxm-agent-plugin:visuals',
   scope: 'session',
-  text: 'CXM rich visuals are on: write a CXM chart, cube-chart, row or mermaid block as a fenced block in the reply, and it is drawn in place. Do not run `cxm viz` to draw it; run it only to export a block with --csv or --svg. Draw one picture for each part of the answer, next to its text and table. A picture never replaces the table. For 3 or more items to compare, draw a bar chart. For a series over time, draw a line chart, or a column chart for a few periods. For two periods, draw grouped bars and a diverging chart of the change. For 3 or more things that connect, draw a mermaid diagram. For an overview, draw a chart and a diagram. For one number or one lookup, draw nothing, unless the user asks for a picture.',
+  text: `CXM rich visuals are on: write a CXM chart, cube-chart, row or mermaid block as a fenced block in the reply, and it is drawn in place. A chart block is one-line JSON, ${CHART_SHAPE}, where x, y and series each name one key of the data rows. A mermaid block is a flowchart, sequenceDiagram, stateDiagram, classDiagram, erDiagram or xychart-beta. Do not run \`cxm viz\` to draw it; run it only to export a block with --csv or --svg. Draw one picture for each part of the answer, next to its text and table. A picture never replaces the table. For 3 or more items to compare, draw a bar chart. For a series over time, draw a line chart, or a column chart for a few periods. For two periods, draw grouped bars and a diverging chart of the change. For 3 or more things that connect, draw a mermaid diagram. For an overview, draw a chart and a diagram. For one number or one lookup, draw nothing, unless the user asks for a picture.`,
 };
 
 // A queried chart's rows, fetched once per block by the CLI with the user's session.
