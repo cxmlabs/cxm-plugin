@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { arrowsLand, familyOf, parseFlowchart } from '../src/lib/diagram.js';
 import { toCsv, toSvg } from '../src/lib/export.js';
-import { draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
+import { CHART_SHAPE, draw, needsRows, plain, splitReply } from '../src/lib/viz.js';
 
 const fixture = (name) => readFileSync(join(import.meta.dirname, 'fixtures', name), 'utf8');
 const runs = (lines) => lines.flat();
@@ -500,4 +500,15 @@ test('cxm viz writes --csv and --svg files and names them, and refuses a flag wi
   assert.match(readFileSync(join(dir, 'a.svg'), 'utf8'), /<svg[\s\S]*Spend by service/);
   assert.match(run('chart', 'test/fixtures/spend.json', '--csv').stderr, /--csv and --svg need a file path/);
   assert.match(run('chart', 'test/fixtures/spend.json', '--csv', '--svg', join(dir, 'b.svg')).stderr, /--csv and --svg need a file path/);
+});
+
+test('a chart reads "y" as a list of keys, and labels in "x" with a list of "series", and names the shape when it has no rows', () => {
+  const weeks = [{ w: '09-14', r: 3.2, f: 1 }, { w: '09-21', r: 1.5, f: 2 }];
+  assert.match(plain(draw('chart', JSON.stringify({ type: 'line', x: 'w', y: ['r'], data: weeks }))), /now 1\.5/);
+  const keys = plain(draw('chart', JSON.stringify({ type: 'bar', x: 'w', y: ['r', 'f'], data: weeks })));
+  assert.match(keys, /■ r .*■ f/);
+  const lists = { type: 'bar', x: ['Merged', 'Draft'], series: [{ name: 'PRs', data: [12, 3] }] };
+  assert.match(plain(draw('chart', JSON.stringify(lists))), /Merged █+ 12/);
+  assert.equal(toCsv('chart', JSON.stringify(lists)), 'x,y,series\nMerged,12,PRs\nDraft,3,PRs');
+  assert.throws(() => draw('chart', JSON.stringify({ type: 'bar', x: 'w', y: 'r' })), (e) => e.message.endsWith(CHART_SHAPE));
 });

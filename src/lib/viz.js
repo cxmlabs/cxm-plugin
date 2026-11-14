@@ -60,6 +60,22 @@ function formatX(v, xFormat) {
   return `${m[2]}-${m[3]} ${m[4] ?? '00'}:${m[5] ?? '00'}`;
 }
 
+// The chart block, as the reply instruction quotes it to an agent that has not read the shared rules.
+export const CHART_SHAPE = '{"type":"bar|line|column|pie","title":"…","x":"<key>","y":"<key>","yName":"…","series":"<key>","yFormat":"currency|number|percent","data":[{…}]}';
+
+// Two shapes an agent writes by habit, read as the chart block: `y` as a list of keys, and labels in `x` with a list of `series`.
+export function chartSpec(spec) {
+  if (Array.isArray(spec.x) && Array.isArray(spec.series) && !spec.data) {
+    const many = spec.series.length > 1;
+    const data = spec.x.flatMap((label, i) => spec.series.map((s) => ({ x: label, series: String(s?.name ?? ''), y: s?.data?.[i] })));
+    return { ...spec, x: 'x', y: 'y', series: many ? 'series' : undefined, yName: spec.yName ?? (many ? undefined : spec.series[0]?.name), data };
+  }
+  if (!Array.isArray(spec.y) || !Array.isArray(spec.data)) return spec;
+  if (spec.y.length === 1) return { ...spec, y: spec.y[0] };
+  if (spec.series) throw new Error('A chart with "series" takes one "y" key');
+  return { ...spec, y: 'y', series: 'series', data: spec.data.flatMap((r) => spec.y.map((k) => ({ [spec.x]: r?.[spec.x], series: String(k), y: r?.[k] }))) };
+}
+
 // The chat's chart block: `x`, `y` and `series` name keys of the `data` rows.
 function toSeries(spec) {
   const { x, y, data } = spec;
@@ -71,7 +87,7 @@ function toSeries(spec) {
   const twice = keys.findIndex((k, i) => keys.indexOf(k) !== i);
   if (twice !== -1) throw new Error(`A chart has two rows for one "${x}" (row ${twice + 1}); give one row per "${x}"${spec.series ? ` and "${spec.series}"` : ''}`);
   const xs = [...new Set(data.map((r) => String(r[x])))];
-  const names = spec.series ? [...new Set(data.map((r) => String(r[spec.series])))] : [spec.yName ?? y];
+  const names = spec.series ? [...new Set(data.map((r) => String(r[spec.series])))] : [String(spec.yName ?? y)];
   const value = (xv, name) => Number(data.find((r) => String(r[x]) === xv && (!spec.series || String(r[spec.series]) === name))?.[y] ?? 0);
   return { labels: xs.map((v) => formatX(v, spec.xFormat)), series: names.map((name) => ({ name, data: xs.map((xv) => value(xv, name)) })) };
 }
@@ -249,7 +265,10 @@ function asTable(spec, { labels, series }) {
 
 // One chart spec as columns of frames: the chart, and its table beside it when both fit the room, else under it.
 function chartBlocks(spec, room) {
-  if (!Array.isArray(spec.data)) throw new Error('This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first');
+  spec = chartSpec(spec);
+  if (!Array.isArray(spec.data)) {
+    throw new Error(spec.query ? 'This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first' : `A chart holds its rows in "data": ${CHART_SHAPE}`);
+  }
   if (!TYPES.includes(spec.type ?? 'bar')) throw new Error(`Unknown chart type (types: ${TYPES.join(', ')})`);
   // A query that hit its limit returned the top rows only, so their sum is not the whole.
   const top = spec.query?.limit && spec.data.length >= spec.query.limit ? spec.data.length : 0;
