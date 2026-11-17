@@ -513,12 +513,19 @@ test('a chart reads "y" as a list of keys, and labels in "x" with a list of "ser
   assert.throws(() => draw('chart', JSON.stringify({ type: 'bar', x: 'w', y: 'r' })), (e) => e.message.endsWith(CHART_SHAPE));
 });
 
-test('lines over a chart draw as a line chart under it, their values join the table, and an area draws like a line', () => {
+test('lines over a chart draw as a line chart under it, inside the room, and join the table; areas show their sum', () => {
   const spec = { type: 'bar', x: 'm', y: 'io', lines: [{ key: 'now', name: 'Cost now' }, 'after'], linesName: 'Cost', linesFormat: 'currency', table: true, data: [{ m: 'Sep', io: 9, now: 1200, after: 850 }, { m: 'Oct', io: 8, now: 1150, after: 820 }] };
-  const text = plain(draw('chart', JSON.stringify(spec), { width: 120 }));
-  assert.match(text, /Sep █+ 9/);
-  assert.match(text, /│ +Cost +│/);
-  assert.match(text, /now \$1,150 · total \$2,350/);
-  assert.match(text, /Sep +9 +\$1,200 +\$850/);
-  assert.equal(plain(draw('chart', JSON.stringify({ ...spec, type: 'area', lines: undefined }))), plain(draw('chart', JSON.stringify({ ...spec, type: 'line', lines: undefined }))));
+  for (const width of [100, 160]) {
+    const rows = plain(draw('chart', JSON.stringify(spec), { width })).split('\n');
+    assert.ok(Math.max(...rows.map((r) => [...r].length)) <= width, `fits ${width} columns`);
+    const bar = rows.findIndex((r) => /Sep █+ 9/.test(r));
+    const cost = rows.findIndex((r) => /│ +Cost +│/.test(r));
+    assert.ok(cost > bar && rows[cost].indexOf('│') === rows[bar].indexOf('│'), 'the line chart sits under the bars, in their column');
+    assert.match(rows.join('\n'), /Sep +9 +\$1,200 +\$850/);
+  }
+  const limited = { ...spec, table: undefined, query: { limit: 2 } };
+  assert.match(plain(draw('chart', JSON.stringify(limited))), /now \$1,150 · total of top 2 \$2,350/);
+  assert.throws(() => draw('chart', JSON.stringify({ ...spec, series: 'm' })), /without "series"/);
+  const area = { type: 'area', x: 'm', y: 'c', series: 's', data: [{ m: 'Sep', s: 'RDS', c: 1 }, { m: 'Sep', s: 'EC2', c: 2 }] };
+  assert.match(plain(draw('chart', JSON.stringify(area))), /total[\s\S]*RDS[\s\S]*EC2/);
 });
