@@ -8,7 +8,7 @@ const BORDER = '#334155';
 const EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
 const LOWER = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const LABEL_MAX = 28;
-const TYPES = ['bar', 'line', 'column', 'pie'];
+const TYPES = ['bar', 'line', 'area', 'column', 'pie'];
 // Labels come from cloud data; a control character in one would send a command to the terminal that prints it.
 const CONTROL = /[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 const CONTROL_BUT_LINES = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
@@ -61,7 +61,7 @@ function formatX(v, xFormat) {
 }
 
 // The chart block, as the reply instruction quotes it to an agent that has not read the shared rules.
-export const CHART_SHAPE = '{"type":"bar|line|column|pie","title":"…","x":"<key>","y":"<key>","yName":"…","series":"<key>","yFormat":"currency|number|percent","data":[{…}]}';
+export const CHART_SHAPE = '{"type":"bar|line|area|column|pie","title":"…","x":"<key>","y":"<key>","yName":"…","series":"<key>","yFormat":"currency|number|percent","lines":[{"key":"<key>","name":"…"}],"data":[{…}]}';
 
 // Two shapes an agent writes by habit, read as the chart block: `y` as a list of keys, and labels in `x` with a list of `series`.
 export function chartSpec(spec) {
@@ -264,7 +264,21 @@ function asTable(spec, { labels, series }) {
 }
 
 // One chart spec as columns of frames: the chart, and its table beside it when both fit the room, else under it.
+// Lines over a chart measure another unit: the terminal draws them as a line chart under it, at its width.
+function withLines(spec, room) {
+  const lines = spec.lines.map((l) => (typeof l === 'string' ? { key: l } : l)).filter((l) => typeof l?.key === 'string');
+  // A table beside the chart lists the line values too.
+  const table = spec.table === true && lines.length ? [{ key: spec.y, name: spec.yName ?? spec.y }, ...lines.map((l) => ({ key: l.key, name: l.name ?? l.key, format: spec.linesFormat }))] : spec.table;
+  const blocks = chartBlocks({ ...spec, lines: undefined, table }, room);
+  if (!lines.length) return blocks;
+  const data = spec.data.flatMap((r) => lines.map((l) => ({ x: r?.[spec.x], series: String(l.name ?? l.key), y: r?.[l.key] ?? 0 })));
+  const under = { type: 'line', title: spec.linesName ?? lines.map((l) => l.name ?? l.key).join(', '), x: 'x', y: 'y', series: 'series', xFormat: spec.xFormat, yFormat: spec.linesFormat, data };
+  blocks[0].splice(1, 0, chartBlocks(under, widthOf(blocks[0][0][0]))[0][0]);
+  return blocks;
+}
+
 function chartBlocks(spec, room) {
+  if (Array.isArray(spec.lines) && Array.isArray(spec.data)) return withLines(spec, room);
   spec = chartSpec(spec);
   if (!Array.isArray(spec.data)) {
     throw new Error(spec.query ? 'This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first' : `A chart holds its rows in "data": ${CHART_SHAPE}`);
@@ -275,7 +289,7 @@ function chartBlocks(spec, room) {
   spec = { ...spec, top, totalLabel: top ? `total of top ${top}` : 'total' };
   const parsed = toSeries(spec);
   parsed.labels = parsed.labels.map((l) => cut(l, LABEL_MAX));
-  const draw = spec.type === 'line' ? lineLines : spec.type === 'column' ? columnLines : spec.diverging ? divergingLines : barLines;
+  const draw = spec.type === 'line' || spec.type === 'area' ? lineLines : spec.type === 'column' ? columnLines : spec.diverging ? divergingLines : barLines;
   const chart = (w) => frame({ title: spec.title ?? spec.yName ?? '', spaced: true, lines: draw(parsed, spec, w - 4) });
   if (!spec.table) return [[chart(room)]];
   const table = frame(asTable(spec, parsed));

@@ -512,3 +512,13 @@ test('a chart reads "y" as a list of keys, and labels in "x" with a list of "ser
   assert.equal(toCsv('chart', JSON.stringify(lists)), 'x,y,series\nMerged,12,PRs\nDraft,3,PRs');
   assert.throws(() => draw('chart', JSON.stringify({ type: 'bar', x: 'w', y: 'r' })), (e) => e.message.endsWith(CHART_SHAPE));
 });
+
+test('lines over a chart draw as a line chart under it, their values join the table, and an area draws like a line', () => {
+  const spec = { type: 'bar', x: 'm', y: 'io', lines: [{ key: 'now', name: 'Cost now' }, 'after'], linesName: 'Cost', linesFormat: 'currency', table: true, data: [{ m: 'Sep', io: 9, now: 1200, after: 850 }, { m: 'Oct', io: 8, now: 1150, after: 820 }] };
+  const text = plain(draw('chart', JSON.stringify(spec), { width: 120 }));
+  assert.match(text, /Sep █+ 9/);
+  assert.match(text, /│ +Cost +│/);
+  assert.match(text, /now \$1,150 · total \$2,350/);
+  assert.match(text, /Sep +9 +\$1,200 +\$850/);
+  assert.equal(plain(draw('chart', JSON.stringify({ ...spec, type: 'area', lines: undefined }))), plain(draw('chart', JSON.stringify({ ...spec, type: 'line', lines: undefined }))));
+});
