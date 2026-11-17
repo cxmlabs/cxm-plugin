@@ -277,9 +277,9 @@ function chartFrames(spec, top) {
   spec = { ...spec, top, totalLabel: top ? `total of top ${top}` : 'total' };
   const parsed = toSeries(spec);
   parsed.labels = parsed.labels.map((l) => cut(l, LABEL_MAX));
-  // Stacked areas show their sum as the first band; percentages do not add up, so they get none.
+  // Stacked areas show their sum as one more line, first; percentages do not add up, so they get none.
   if (spec.type === 'area' && parsed.series.length > 1 && spec.yFormat !== 'percent') {
-    parsed.series = [{ name: 'total', data: parsed.labels.map((_, i) => sum(parsed.series.map((s) => s.data[i]))) }, ...parsed.series];
+    parsed.series = [{ name: spec.totalLabel, data: parsed.labels.map((_, i) => sum(parsed.series.map((s) => s.data[i]))) }, ...parsed.series];
   }
   const draw = spec.type === 'line' || spec.type === 'area' ? lineLines : spec.type === 'column' ? columnLines : spec.diverging ? divergingLines : barLines;
   return {
@@ -294,12 +294,15 @@ function chartFrames(spec, top) {
 function withLines(spec, room) {
   if (spec.series) throw new Error('"lines" draw over a chart without "series"');
   const lines = spec.lines.map((l) => (typeof l === 'string' ? { key: l } : l)).filter((l) => typeof l?.key === 'string');
-  const main = chartFrames({ ...spec, lines: undefined, table: false });
+  const unknown = lines.find((l) => !spec.data.some((r) => r?.[l.key] != null));
+  if (unknown) throw new Error(`No "data" row holds the line key "${unknown.key}"`);
+  // A listed table keeps its own columns; "table": true lists the chart value and each line.
+  const main = chartFrames({ ...spec, lines: undefined, table: Array.isArray(spec.table) ? spec.table : false });
   const data = spec.data.flatMap((r) => lines.map((l) => ({ x: r?.[spec.x], series: String(l.name ?? l.key), y: r?.[l.key] ?? 0 })));
   const title = spec.linesName ?? lines.map((l) => l.name ?? l.key).join(', ');
   const under = chartFrames({ type: 'line', title, x: 'x', y: 'y', series: 'series', xFormat: spec.xFormat, yFormat: spec.linesFormat, data }, main.spec.top);
   const [bars] = main.parsed.series;
-  const table = spec.table
+  const table = main.table ?? (spec.table
     ? frame(
         tableBlock({
           title: 'Values',
@@ -309,7 +312,7 @@ function withLines(spec, room) {
           rows: main.parsed.labels.map((x, i) => [x, bars.data[i], ...under.parsed.series.map((l) => l.data[i])]),
         }),
       )
-    : null;
+    : null);
   return layoutChart((w) => {
     const chart = main.chart(w);
     return [chart, under.chart(widthOf(chart[0]))];

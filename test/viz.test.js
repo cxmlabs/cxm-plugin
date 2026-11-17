@@ -528,9 +528,13 @@ test('lines over a chart draw as a line chart under it, inside the room, and joi
   const limited = { ...spec, table: undefined, top: 0, query: { limit: 2 } };
   assert.match(plain(draw('chart', JSON.stringify(limited))), /now \$1,150 · total of top 2 \$2,350/);
   assert.throws(() => draw('chart', JSON.stringify({ ...spec, series: 'm' })), /without "series"/);
+  assert.throws(() => draw('chart', JSON.stringify({ ...spec, lines: ['gone'] })), /line key "gone"/);
+  const listed = plain(draw('chart', JSON.stringify({ ...spec, table: [{ key: 'now', name: 'Δ', signed: true }] }), { width: 100 }));
+  assert.match(listed, /Δ/);
+  assert.doesNotMatch(listed, /Cost after/);
 });
 
-test('a stacked area draws its sum as a first band, except for percentages', () => {
+test('a stacked area draws its sum as one more line, first, except for percentages', () => {
   const area = { type: 'area', x: 'm', y: 'c', series: 's', data: [{ m: 'Sep', s: 'RDS', c: 1 }, { m: 'Sep', s: 'EC2', c: 2 }, { m: 'Oct', s: 'RDS', c: 2 }, { m: 'Oct', s: 'EC2', c: 2 }] };
   const text = plain(draw('chart', JSON.stringify(area)));
   assert.match(text, /total[\s\S]*now 4 · total 7[\s\S]*RDS[\s\S]*EC2/);
