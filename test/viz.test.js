@@ -549,4 +549,7 @@ test('a line chart of more than three series draws one row per series, and three
   for (let k = 0; k < 8; k++) assert.equal(eight.filter((r) => r.includes(`svc${k} `)).length, 1, `one row for svc${k}`);
   assert.match(eight.find((r) => r.includes('svc7 ')), /svc7 [▁▂▃▄▅▆▇█]{4,8} +now \$830 · total \$3,260/);
   assert.ok(plain(draw('chart', JSON.stringify(spec(3)))).split('\n').length > 14, 'three series keep their bands');
+  const four = plain(draw('chart', JSON.stringify({ ...spec(4), data: spec(4).data.map((r) => ({ ...r, c: r.c * 1000 })) }), { width: 60 })).split('\n');
+  assert.equal(four.length, 7, 'four series take one row each');
+  assert.ok(Math.max(...four.map((r) => [...r].length)) <= 60, 'and fit the width with large totals');
 });

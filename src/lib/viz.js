@@ -194,7 +194,8 @@ function lineLines({ labels, series }, spec, room) {
   const close = (s) => `now ${fmt(s.data.at(-1), spec.yFormat)}${spec.yFormat === 'percent' ? '' : ` · ${spec.totalLabel} ${fmt(sum(s.data), spec.yFormat)}`}`;
   // More than three series: one row each, so the block stays short enough to paste as it is.
   if (series.length > 3) {
-    const width = labels.length * 2 <= room - nameW - 30 ? 2 : 1;
+    const noteW = Math.max(...series.map((s) => len(close(s)))) + 2;
+    const width = labels.length * 2 <= room - nameW - 1 - noteW ? 2 : 1;
     return [
       ...series.map((s, i) => [
         [`${s.name.padStart(nameW)} `, MUTED],
