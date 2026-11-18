@@ -78,8 +78,7 @@ export async function hook(argv) {
   const name = argv[0];
   // A session start needs no payload: it refreshes the plugins when the user agreed, and gives the visuals instruction.
   if (name === 'session-start') {
-    // A managed machine drops a user plugin's prompt section, so a Claude Code session that draws (terminal, IDE, desktop) also gets it here.
-    // Only Claude Code sets CLAUDE_PLUGIN_ROOT for its own hooks; a Codex run started from a Claude Code shell inherits the entrypoint only.
+    // A managed machine blocks a user plugin's prompt section; CLAUDE_PLUGIN_ROOT marks a Claude Code hook, which a Codex run started from its shell lacks.
     const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT ?? '';
     const off = [process.env.CLAUDE_PLUGIN_OPTION_rich_visuals, process.env.CLAUDE_PLUGIN_OPTION_RICH_VISUALS].includes('false');
     if (process.env.CLAUDE_PLUGIN_ROOT && entrypoint && !entrypoint.startsWith('sdk') && !off) {

@@ -194,15 +194,27 @@ function lineLines({ labels, series }, spec, room) {
   const close = (s) => `now ${fmt(s.data.at(-1), spec.yFormat)}${spec.yFormat === 'percent' ? '' : ` · ${spec.totalLabel} ${fmt(sum(s.data), spec.yFormat)}`}`;
   // More than three series: one row each, so the block stays short enough to paste as it is.
   if (series.length > 3) {
-    const noteW = Math.max(...series.map((s) => len(close(s)))) + 2;
-    const width = labels.length * 2 <= room - nameW - 1 - noteW ? 2 : 1;
+    // Room goes to the line first, then to names and notes: a total is dropped, a name is cut, and a long period is averaged into fewer points.
+    const minLine = Math.min(labels.length, 12);
+    const short = series.map((s) => `now ${fmt(s.data.at(-1), spec.yFormat)}`);
+    const full = series.map(close);
+    const fits = (notes, names) => room - names - 1 - (Math.max(...notes.map(len)) + 2) >= minLine;
+    const notes = fits(full, Math.min(nameW, 10)) ? full : short;
+    const noteW = Math.max(...notes.map(len)) + 2;
+    const nameRoom = Math.max(Math.min(nameW, 10), Math.min(nameW, room - 1 - noteW - minLine));
+    const lineW = Math.max(1, room - nameRoom - 1 - noteW);
+    const points = (data) => (data.length <= lineW ? data : Array.from({ length: lineW }, (_, k) => {
+      const part = data.slice(Math.floor((k * data.length) / lineW), Math.floor(((k + 1) * data.length) / lineW));
+      return sum(part) / part.length;
+    }));
+    const width = labels.length * 2 <= lineW ? 2 : 1;
     return [
       ...series.map((s, i) => [
-        [`${s.name.padStart(nameW)} `, MUTED],
-        [s.data.map((v) => LOWER[1 + Math.round(((v - lo) / (hi - lo || 1)) * 7)].repeat(width)).join(''), PALETTE[i % PALETTE.length]],
-        [`  ${close(s)}`, FAINT],
+        [`${cut(s.name, nameRoom).padStart(nameRoom)} `, MUTED],
+        [points(s.data).map((v) => LOWER[1 + Math.round(((v - lo) / (hi - lo || 1)) * 7)].repeat(width)).join(''), PALETTE[i % PALETTE.length]],
+        [`  ${notes[i]}`, FAINT],
       ]),
-      [[`${' '.repeat(nameW)} ${labels[0]} → ${labels.at(-1)}`, FAINT]],
+      [[`${' '.repeat(nameRoom)} ${labels[0]} → ${labels.at(-1)}`, FAINT]],
     ];
   }
   const step = labels.length * 3 <= room - nameW - 24 ? 3 : 1;

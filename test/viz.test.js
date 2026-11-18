@@ -551,5 +551,12 @@ test('a line chart of more than three series draws one row per series, and three
   assert.ok(plain(draw('chart', JSON.stringify(spec(3)))).split('\n').length > 14, 'three series keep their bands');
   const four = plain(draw('chart', JSON.stringify({ ...spec(4), data: spec(4).data.map((r) => ({ ...r, c: r.c * 1000 })) }), { width: 60 })).split('\n');
   assert.equal(four.length, 7, 'four series take one row each');
-  assert.ok(Math.max(...four.map((r) => [...r].length)) <= 60, 'and fit the width with large totals');
+  // Two years of months, long service names and large totals: the names give way so the block fits.
+  const months = Array.from({ length: 24 }, (_, i) => `M${i + 1}`);
+  const names = ['Amazon Elastic Compute Cloud', 'Amazon Relational Database Service', 'Amazon Simple Storage Service', 'Amazon CloudWatch'];
+  const long = { type: 'line', x: 'm', y: 'c', series: 's', yFormat: 'currency', data: names.flatMap((s, k) => months.map((m, i) => ({ m, s, c: 120000 + k * 1000 + i }))) };
+  for (const width of [60, 100]) {
+    const rows = plain(draw('chart', JSON.stringify(long), { width })).split('\n');
+    assert.ok(Math.max(...rows.map((r) => [...r].length)) <= width, `fits ${width} columns`);
+  }
 });
