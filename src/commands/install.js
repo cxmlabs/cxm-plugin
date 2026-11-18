@@ -3,7 +3,10 @@
 // agent file it edits is the `autoUpdate` key of the CXM marketplace entry in Claude Code's user
 // settings, which no command sets, and only when the user agrees.
 import { spawnSync } from 'node:child_process';
-import { delimiter } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const SHIM = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'install-cxm-shim.sh');
 import { createInterface } from 'node:readline/promises';
 import { saveConfig, loadConfig } from '../lib/config.js';
 import { pluginVersion } from '../lib/client.js';
@@ -112,6 +115,8 @@ export async function install(argv, { run = (cmd) => spawnAgent(cmd).status, sta
     }
   }
   if (failures.length === agents.length) throw new Error(failures.join('\n'));
+  // The launcher runs the newest copy, so cxm runs the version just installed without a new session.
+  run(['sh', SHIM]);
   saveConfig({ ...(loadConfig() ?? {}), autoUpdate });
   if (autoUpdate && installed.includes('claude')) {
     // A settings file Claude Code cannot read back as JSON is left as it is.

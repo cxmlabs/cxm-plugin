@@ -15,8 +15,9 @@ are the same act.
 - `validate-manifests.mjs` — structural check of the marketplace manifests for the case where the
   `claude` CLI is absent: a renamed plugin, a manifest that stopped parsing, a declared path that
   no longer exists.
-- `install-cxm-shim.sh` — run by the `SessionStart` hook. It symlinks `cxm` into `~/.local/bin`
-  and never on top of an existing `cxm`.
+- `install-cxm-shim.sh` — run by the `SessionStart` hook and by `install`. It writes the `cxm` launcher
+  into `~/.local/bin`, which runs the newest plugin copy of either agent at each run. It replaces only
+  its own launcher or an older symlink of ours, never a foreign `cxm`.
 
 ## Known pitfalls
 

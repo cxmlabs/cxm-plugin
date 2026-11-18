@@ -1,29 +1,51 @@
 #!/usr/bin/env sh
-# Put `cxm` on PATH for marketplace installs, where nothing was npm-installed globally.
-# Skills call the bare `cxm` binary, so it has to be reachable. Relinks its own stale shim, never
-# replaces a foreign `cxm`, and tells the agent when one shadows it. Never fails a session start.
-set -e
+# Writes `cxm` into ~/.local/bin as a launcher that runs the newest installed plugin copy; never fails a session start.
 
-root="${CLAUDE_PLUGIN_ROOT:-${PLUGIN_ROOT:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}}"
-target="$root/bin/cxm.js"
-[ -x "$target" ] || exit 0
+mark='# cxm-agent-plugin launcher'
+# Ours: the launcher, or the symlink to a plugin cxm.js that earlier versions installed, broken or not;
+# a link into node_modules is a global npm install.
+ours() {
+  if [ -L "$1" ]; then
+    case "$(readlink "$1")" in */node_modules/*) return 1 ;; */bin/cxm.js) return 0 ;; esac
+    return 1
+  fi
+  [ -f "$1" ] && grep -qF "$mark" "$1"
+}
 
-# An existing cxm that is not this plugin's copy (an older plugin version, an npm install) would shadow it.
-existing="$(command -v cxm 2>/dev/null || true)"
-if [ -n "$existing" ]; then
-  [ "$(readlink "$existing" 2>/dev/null)" = "$target" ] && exit 0
-  case "$existing" in
-    "$HOME/.local/bin/cxm" | "$HOME/bin/cxm") ;; # our own shim, pointing at an older version: relink below
-    *) echo "CloudExMachina: the cxm on PATH ($existing) is not this plugin's copy and may be outdated. Run node \"$target\" instead, and tell the user to remove the old one (npm uninstall -g @cloudexmachina/cxm)."; exit 0 ;;
-  esac
-fi
+launcher() {
+  cat <<'EOF'
+#!/bin/sh
+# cxm-agent-plugin launcher: runs the newest installed copy of the plugin, of Claude Code or Codex.
+target=$(for f in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/cxm-marketplace/cxm-agent-plugin/*/bin/cxm.js "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/cxm-marketplace/cxm-agent-plugin/*/bin/cxm.js; do
+  [ -f "$f" ] && printf '%s\n' "$f"
+done | awk -F/ '{ split($(NF-2), v, "."); printf "%09d%09d%09d %s\n", v[1], v[2], v[3], $0 }' | sort | tail -n 1 | cut -d' ' -f2-)
+[ -n "$target" ] || { echo "cxm: no CloudExMachina plugin is installed. Run: npx @cloudexmachina/cxm@latest install" >&2; exit 127; }
+exec node "$target" "$@"
+EOF
+}
 
+# The first bin folder where cxm is absent or ours gets the launcher; a foreign cxm is never replaced.
+written=''
 for dir in "$HOME/.local/bin" "$HOME/bin"; do
+  path="$dir/cxm"
+  if [ -e "$path" ] || [ -L "$path" ]; then ours "$path" || continue; fi
   mkdir -p "$dir" 2>/dev/null || continue
-  ln -sf "$target" "$dir/cxm" 2>/dev/null || continue
-  case ":$PATH:" in
-    *":$dir:"*) exit 0 ;;
-    *) echo "CloudExMachina: the cxm command is at $dir/cxm, but $dir is not on PATH. Call $dir/cxm directly, and tell the user to add export PATH=\"$dir:\$PATH\" to their shell profile." ; exit 0 ;;
-  esac
+  # A file per run, renamed into place: two session starts at once never share a half-written file.
+  tmp="$path.$$.tmp"
+  if { launcher > "$tmp"; } 2>/dev/null && chmod +x "$tmp" 2>/dev/null && mv -f "$tmp" "$path" 2>/dev/null; then
+    written="$path"
+    break
+  fi
+  rm -f "$tmp" 2>/dev/null
 done
+
+[ -n "$written" ] || exit 0
+found="$(command -v cxm 2>/dev/null || true)"
+if [ "$found" != "$written" ] && ! ours "$found"; then
+  if [ -n "$found" ]; then
+    echo "CloudExMachina: the cxm on PATH ($found) is not this plugin's launcher and may be outdated. Call $written directly, and tell the user to remove the other one (npm uninstall -g @cloudexmachina/cxm)."
+  else
+    echo "CloudExMachina: the cxm command is at $written, but $(dirname "$written") is not on PATH. Call $written directly, and tell the user to add export PATH=\"$(dirname "$written"):\$PATH\" to their shell profile."
+  fi
+fi
 exit 0

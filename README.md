@@ -46,8 +46,8 @@ codex plugin add cxm-agent-plugin@cxm-marketplace
 
 #### Then sign in
 
-Start one agent session first (`claude`, then `/exit`): the plugin puts `cxm` on your PATH at
-session start, with a symlink in `~/.local/bin` (never on top of an existing `cxm`).
+The install puts `cxm` on your PATH: a launcher in `~/.local/bin` that runs the newest installed copy
+of the plugin, of Claude Code or Codex. It never replaces a `cxm` that another install put there.
 
 ```bash
 cxm login                       # opens your browser, then pick an organization
@@ -116,13 +116,13 @@ Run `cxm uninstall` first, while `cxm` still exists (or `npx @cloudexmachina/cxm
 then remove the plugin:
 
 ```bash
-cxm uninstall                   # the PATH symlink, your credentials, the Codex prompt, and in this repo what setup wrote
+cxm uninstall                   # the cxm launcher, your credentials, the Codex prompt, and in this repo what setup wrote
 claude plugin uninstall cxm-agent-plugin@cxm-marketplace
 codex plugin remove cxm-agent-plugin@cxm-marketplace
 ```
 
 `cxm uninstall` removes only what CXM wrote: the skills it installed, its own hook entries (your
-other hooks stay), its `/cxm` command, a PATH symlink that points to the plugin, and `~/.config/cxm`.
+other hooks stay), its `/cxm` command, the `cxm` launcher (or an older symlink into a plugin cache), and `~/.config/cxm`.
 Run it in each repository where you ran `cxm setup`; the machine-wide part runs once.
 
 ## Install per project, without the marketplace
