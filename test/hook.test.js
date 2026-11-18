@@ -61,7 +61,7 @@ test('a non-IaC Claude edit stays silent', () => {
 test('a session start prints nothing, exits 0, and refreshes the plugins only after the user agreed', () => {
   const dir = mkdtempSync(join(tmpdir(), 'cxm-hook-'));
   // No claude or codex on this PATH and an empty Claude config, so the refresh it starts finds nothing to run.
-  const env = { ...process.env, CLAUDE_CONFIG_DIR: dir, CODEX_HOME: dir, CXM_CONFIG_DIR: dir, CXM_TELEMETRY: '0', PATH: '/usr/bin:/bin' };
+  const env = { ...process.env, CLAUDE_CODE_ENTRYPOINT: '', CLAUDE_CONFIG_DIR: dir, CODEX_HOME: dir, CXM_CONFIG_DIR: dir, CXM_TELEMETRY: '0', PATH: '/usr/bin:/bin' };
   const start = () => spawnSync(process.execPath, [bin, 'hook', 'session-start'], { encoding: 'utf8', env });
   let result = start();
   assert.equal(result.status, 0, result.stderr);
@@ -72,4 +72,22 @@ test('a session start prints nothing, exits 0, and refreshes the plugins only af
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout, '');
   assert.ok(JSON.parse(readFileSync(join(dir, 'credentials.json'), 'utf8')).pluginsRefreshedAt, 'the refresh ran');
+});
+
+test('an interactive Claude Code session start carries the visuals instruction; a headless run, Codex, or rich_visuals off does not', async () => {
+  const { VISUALS_INSTRUCTION } = await import('../src/lib/viz.js');
+  const dir = mkdtempSync(join(tmpdir(), 'cxm-hook-'));
+  const base = { ...process.env, CLAUDE_CONFIG_DIR: dir, CODEX_HOME: dir, CXM_CONFIG_DIR: dir, CXM_TELEMETRY: '0', PATH: '/usr/bin:/bin' };
+  const start = (env) => spawnSync(process.execPath, [bin, 'hook', 'session-start'], { encoding: 'utf8', env: { ...base, ...env } });
+  for (const entrypoint of ['cli', 'claude-vscode']) {
+    const result = start({ CLAUDE_CODE_ENTRYPOINT: entrypoint });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), { hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: VISUALS_INSTRUCTION } });
+  }
+  for (const env of [{ CLAUDE_CODE_ENTRYPOINT: 'sdk-cli' }, { CLAUDE_CODE_ENTRYPOINT: 'sdk-ts' }, { CLAUDE_CODE_ENTRYPOINT: '' }, { CLAUDE_CODE_ENTRYPOINT: 'cli', CLAUDE_PLUGIN_OPTION_rich_visuals: 'false' }, { CLAUDE_CODE_ENTRYPOINT: 'cli', CLAUDE_PLUGIN_OPTION_RICH_VISUALS: 'false' }]) {
+    assert.equal(start(env).stdout, '', JSON.stringify(env));
+  }
+  assert.match(VISUALS_INSTRUCTION, /^CXM rich visuals are on/);
+  assert.match(VISUALS_INSTRUCTION, /dataviz/);
+  assert.match(VISUALS_INSTRUCTION, /HTML/);
 });

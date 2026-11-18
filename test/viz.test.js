@@ -540,3 +540,13 @@ test('a stacked area draws its sum as one more line, first, except for percentag
   assert.match(text, /total[\s\S]*now 4 · total 7[\s\S]*RDS[\s\S]*EC2/);
   assert.doesNotMatch(plain(draw('chart', JSON.stringify({ ...area, yFormat: 'percent' }))), /total/);
 });
+
+test('a line chart of more than three series draws one row per series, and three series keep their bands', () => {
+  const month = ['Jul', 'Aug', 'Sep', 'Oct'];
+  const spec = (n) => ({ type: 'line', x: 'm', y: 'c', series: 's', yFormat: 'currency', data: Array.from({ length: n }, (_, k) => month.map((m, i) => ({ m, s: `svc${k}`, c: 100 * (k + 1) + i * 10 }))).flat() });
+  const eight = plain(draw('chart', JSON.stringify(spec(8)))).split('\n');
+  assert.ok(eight.length <= 14, `${eight.length} rows`);
+  for (let k = 0; k < 8; k++) assert.equal(eight.filter((r) => r.includes(`svc${k} `)).length, 1, `one row for svc${k}`);
+  assert.match(eight.find((r) => r.includes('svc7 ')), /svc7 [▁▂▃▄▅▆▇█]{4,8} +now \$830 · total \$3,260/);
+  assert.ok(plain(draw('chart', JSON.stringify(spec(3)))).split('\n').length > 14, 'three series keep their bands');
+});

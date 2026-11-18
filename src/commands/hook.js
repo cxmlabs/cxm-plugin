@@ -1,3 +1,4 @@
+import { VISUALS_INSTRUCTION } from '../lib/viz.js';
 import { awsNudge, scanAwsCommand } from '../lib/aws-scan.js';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -76,7 +77,15 @@ async function sessionEnd(payload) {
 export async function hook(argv) {
   const name = argv[0];
   // A session start needs no payload: it only refreshes the plugins, when the user agreed to it.
-  if (name === 'session-start') return void refreshPlugins();
+  if (name === 'session-start') {
+    // A managed machine drops a user plugin's prompt section, so a Claude Code session that draws (terminal, IDE, desktop) also gets it here.
+    const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT ?? '';
+    const off = [process.env.CLAUDE_PLUGIN_OPTION_rich_visuals, process.env.CLAUDE_PLUGIN_OPTION_RICH_VISUALS].includes('false');
+    if (entrypoint && !entrypoint.startsWith('sdk') && !off) {
+      console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: VISUALS_INSTRUCTION } }));
+    }
+    return void refreshPlugins();
+  }
   if (name === 'self-update') return void (await updatePlugins());
   if (name !== 'tf-cost' && name !== 'iac-cost' && name !== 'aws-cost' && name !== 'session-end') return;
   const raw = await readStdin();
