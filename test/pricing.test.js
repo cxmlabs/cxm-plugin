@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { priceSpec } from '../src/commands/price.js';
 import { buildPricingQuery, summarizePricing } from '../src/lib/pricing.js';
 
 const C = 'pricing_rates';
@@ -18,6 +19,7 @@ test('ec2 query matches usage type and operation, not operating system and tenan
   assert.ok(eq('instance_type', 'm7g.large'));
   assert.ok(eq('region', 'eu-west-3'));
   assert.ok(eq('operation', 'RunInstances'));
+  assert.ok(q.dimensions.includes(`${C}.amortized_rate_per_unit_usd`));
   assert.deepEqual(q.filters.find((x) => x.or).or, [
     { member: `${C}.usage_type`, operator: 'equals', values: ['BoxUsage:m7g.large'] },
     { member: `${C}.usage_type`, operator: 'endsWith', values: ['-BoxUsage:m7g.large'] },
@@ -37,6 +39,11 @@ test('--service lowercases only to find ec2, rds and elasticache, and passes an 
   assert.deepEqual(buildPricingQuery({ ...spec, service: 'AmazonEC2' }), ec2);
   const cw = buildPricingQuery({ ...spec, service: 'AmazonCloudWatch' });
   assert.deepEqual(cw.filters[0].values, ['AmazonCloudWatch']);
+});
+
+test('price reads --service verbatim and defaults to ec2', () => {
+  assert.equal(priceSpec(['--service', 'AmazonCloudWatch']).service, 'AmazonCloudWatch');
+  assert.equal(priceSpec([]).service, 'ec2');
 });
 
 test('rds query adds engine + default deployment', () => {
