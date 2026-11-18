@@ -9,7 +9,7 @@ import { test } from 'node:test';
 process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-install-'));
 process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-install-claude-'));
 const { AGENTS, SHIM, agentStatus, chooseAgents, install, spawnAgent } = await import('../src/commands/install.js');
-const { removeShim } = await import('../src/commands/init.js');
+const { LAUNCHER_MARK, removeShim } = await import('../src/commands/init.js');
 
 test('installs into the agents that support plugins, narrowed by --agent; an old agent is skipped', () => {
   assert.deepEqual(chooseAgents([], (a) => (a === 'claude' ? 'ready' : 'missing')), { ready: ['claude'], outdated: [] });
@@ -121,4 +121,53 @@ test('the cxm launcher runs the newest plugin copy, reads stdin, and replaces on
   chmodSync(join(locked, '.local', 'bin'), 0o555);
   chmodSync(join(locked, 'bin'), 0o555);
   assert.deepEqual(await shim({ ...env, HOME: locked }), [0, '', '']);
+});
+
+test('the launcher runs only release copies, also in folders the shim saw, passes its arguments and exit code, and the shim warns about any older cxm first on PATH', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'cxm-launch-'));
+  const claudeDir = join(home, 'claude-config');
+  const copy = (root, version) => {
+    const dir = join(root, 'plugins', 'cache', 'cxm-marketplace', 'cxm-agent-plugin', version, 'bin');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'cxm.js'), `process.stdout.write('${version} ' + process.argv.slice(2).join('|')); process.exit(3);`);
+  };
+  copy(claudeDir, '0.3.5');
+  copy(claudeDir, '84cc3c14fa1e');
+  const bin = join(home, '.local', 'bin');
+  const tools = [dirname(process.execPath), '/usr/bin', '/bin'];
+  const env = { HOME: home, CLAUDE_CONFIG_DIR: claudeDir, PATH: [bin, ...tools].join(delimiter) };
+  const shim = (e) => new Promise((done) => execFile('sh', [SHIM], { env: e }, (err, stdout) => done([err?.code ?? 0, stdout])));
+  assert.deepEqual(await shim(env), [0, '']);
+  const plain = { HOME: home, PATH: [bin, ...tools].join(delimiter) };
+  const run = spawnSync(join(bin, 'cxm'), ['viz', 'a b'], { env: plain, encoding: 'utf8' });
+  assert.deepEqual([run.stdout, run.status], ['0.3.5 viz|a b', 3], 'a release copy, not a SHA folder, found without CLAUDE_CONFIG_DIR, with its arguments and exit code');
+  rmSync(claudeDir, { recursive: true });
+  const none = spawnSync(join(bin, 'cxm'), { env: plain, encoding: 'utf8' });
+  assert.deepEqual([none.status, none.stderr], [127, 'cxm: no CloudExMachina plugin is installed. Run: npx @cloudexmachina/cxm@latest install\n']);
+
+  // An old symlink of ours in ~/bin, first on PATH, still shadows the launcher: the agent hears it.
+  const oldBin = join(home, 'bin');
+  mkdirSync(oldBin);
+  mkdirSync(join(home, 'old-checkout', 'bin'), { recursive: true });
+  writeFileSync(join(home, 'old-checkout', 'bin', 'cxm.js'), '');
+  chmodSync(join(home, 'old-checkout', 'bin', 'cxm.js'), 0o755);
+  symlinkSync(join(home, 'old-checkout', 'bin', 'cxm.js'), join(oldBin, 'cxm'));
+  assert.match((await shim({ ...env, PATH: [oldBin, bin, ...tools].join(delimiter) }))[1], /is not this plugin's launcher/);
+
+  // The launcher reached through a symlinked bin folder is ours: no warning.
+  const linked = join(home, 'linked-bin');
+  symlinkSync(bin, linked);
+  assert.deepEqual(await shim({ ...env, PATH: [linked, ...tools].join(delimiter) }), [0, '']);
+
+  // ~/.local/bin holds a foreign cxm: the launcher goes to ~/bin, and the agent is told where it is.
+  rmSync(join(oldBin, 'cxm'));
+  writeFileSync(join(bin, 'cxm'), '#!/bin/sh\necho foreign\n', { mode: 0o755 });
+  const [code, out] = await shim({ ...env, PATH: tools.join(delimiter) });
+  assert.equal(code, 0);
+  assert.ok(readFileSync(join(oldBin, 'cxm'), 'utf8').includes(LAUNCHER_MARK));
+  assert.match(out, new RegExp(`cxm command is at ${join(oldBin, 'cxm')}`));
+
+  // An unreadable foreign file is not ours: cxm uninstall keeps it and goes on.
+  chmodSync(join(bin, 'cxm'), 0o000);
+  assert.equal(removeShim(join(bin, 'cxm')), false);
 });

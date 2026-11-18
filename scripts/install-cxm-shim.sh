@@ -12,13 +12,21 @@ ours() {
   [ -f "$1" ] && grep -qF "$mark" "$1"
 }
 
+# The config folders of this session, added to those the launcher already knows, so a plain shell finds them too.
+known="$(sed -n "s/^saved_roots='\(.*\)'$/\1/p" "$HOME/.local/bin/cxm" "$HOME/bin/cxm" 2>/dev/null | head -n 1)"
+roots="$known"
+for root in "$CLAUDE_CONFIG_DIR" "$CODEX_HOME"; do
+  case "$root" in ''|*:*|*"'"*) continue ;; esac
+  case ":$roots:" in *":$root:"*) ;; *) roots="${roots:+$roots:}$root" ;; esac
+done
+
 launcher() {
+  printf '%s\n' '#!/bin/sh' "$mark: runs the newest installed copy of the plugin, of Claude Code or Codex." "saved_roots='$roots'"
   cat <<'EOF'
-#!/bin/sh
-# cxm-agent-plugin launcher: runs the newest installed copy of the plugin, of Claude Code or Codex.
-target=$(for f in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/cxm-marketplace/cxm-agent-plugin/*/bin/cxm.js "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/cxm-marketplace/cxm-agent-plugin/*/bin/cxm.js; do
-  [ -f "$f" ] && printf '%s\n' "$f"
-done | awk -F/ '{ split($(NF-2), v, "."); printf "%09d%09d%09d %s\n", v[1], v[2], v[3], $0 }' | sort | tail -n 1 | cut -d' ' -f2-)
+# A cache folder named by a commit is no release: only folders named like a version count.
+target=$(IFS=:; for root in "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" "${CODEX_HOME:-$HOME/.codex}" $saved_roots; do
+  for f in "$root"/plugins/cache/cxm-marketplace/cxm-agent-plugin/*/bin/cxm.js; do [ -f "$f" ] && printf '%s\n' "$f"; done
+done | awk -F/ '$(NF-2) ~ /^[0-9]+\.[0-9]+\.[0-9]+/ { split($(NF-2), v, "."); printf "%09d%09d%09d %s\n", v[1], v[2], v[3], $0 }' | sort | tail -n 1 | cut -d' ' -f2-)
 [ -n "$target" ] || { echo "cxm: no CloudExMachina plugin is installed. Run: npx @cloudexmachina/cxm@latest install" >&2; exit 127; }
 exec node "$target" "$@"
 EOF
@@ -41,7 +49,8 @@ done
 
 [ -n "$written" ] || exit 0
 found="$(command -v cxm 2>/dev/null || true)"
-if [ "$found" != "$written" ] && ! ours "$found"; then
+# Only our launcher, reached by any path, is no shadow; an old symlink of ours runs an old copy.
+if [ "$found" != "$written" ] && ! grep -qsF "$mark" "$found"; then
   if [ -n "$found" ]; then
     echo "CloudExMachina: the cxm on PATH ($found) is not this plugin's launcher and may be outdated. Call $written directly, and tell the user to remove the other one (npm uninstall -g @cloudexmachina/cxm)."
   else
