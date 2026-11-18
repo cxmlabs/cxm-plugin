@@ -10,7 +10,7 @@ function getFlag(argv, name) {
 export async function price(argv) {
   const config = await requireSession();
   const spec = {
-    service: (getFlag(argv, '--service') ?? 'ec2').toLowerCase(),
+    service: getFlag(argv, '--service') ?? 'ec2',
     instanceType: getFlag(argv, '--instance-type'),
     region: getFlag(argv, '--region'),
     os: getFlag(argv, '--os'),
