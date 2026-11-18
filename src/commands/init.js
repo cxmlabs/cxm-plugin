@@ -206,6 +206,11 @@ export function uninstall() {
     removed.push(config.installedCodexPrompt);
   }
   for (const dir of [join(homedir(), '.local', 'bin'), join(homedir(), 'bin')]) if (removeShim(join(dir, 'cxm'))) removed.push(join(dir, 'cxm'));
+  const roots = join(homedir(), '.local', 'state', 'cxm-agent-plugin');
+  if (existsSync(roots)) {
+    rmSync(roots, { recursive: true, force: true });
+    removed.push(`${roots} (the config folders the launcher searches)`);
+  }
   const configDir = dirname(configPath);
   if (existsSync(configDir)) {
     rmSync(configDir, { recursive: true, force: true });

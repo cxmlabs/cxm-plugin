@@ -12,15 +12,14 @@ ours() {
   [ -f "$1" ] && grep -qF "$mark" "$1"
 }
 
-# Config folders a session used, one per line, so a plain shell finds the copies there too. Only absolute
-# paths; a line is appended once, so sessions at once never lose one.
+# Config folders sessions used, one absolute path per line and appended once, so a plain shell finds them too.
 roots="$HOME/.local/state/cxm-agent-plugin/roots"
 for root in "$CLAUDE_CONFIG_DIR" "$CODEX_HOME"; do
   case "$root" in /*) ;; *) continue ;; esac
   case "$root" in *'
 '*) continue ;; esac
   mkdir -p "$(dirname "$roots")" 2>/dev/null || continue
-  grep -qxF "$root" "$roots" 2>/dev/null || printf '%s\n' "$root" >> "$roots" 2>/dev/null
+  grep -qxF "$root" "$roots" 2>/dev/null || { printf '%s\n' "$root" >> "$roots"; } 2>/dev/null
 done
 
 launcher() {
@@ -58,7 +57,7 @@ found="$(command -v cxm 2>/dev/null || true)"
 # Only this launcher, reached by any path, is no shadow; an old launcher or symlink of ours runs an old copy.
 if [ "$found" != "$written" ] && ! cmp -s "$found" "$written"; then
   if [ -n "$found" ]; then
-    echo "CloudExMachina: the cxm on PATH ($found) is not this plugin's launcher and may be outdated. Call $written directly, and tell the user to remove the other one (npm uninstall -g @cloudexmachina/cxm)."
+    echo "CloudExMachina: the cxm on PATH ($found) is not this plugin's launcher and may be outdated. Call $written directly, and tell the user to remove the other one (rm $found, or npm uninstall -g @cloudexmachina/cxm for an npm install)."
   else
     echo "CloudExMachina: the cxm command is at $written, but $(dirname "$written") is not on PATH. Call $written directly, and tell the user to add export PATH=\"$(dirname "$written"):\$PATH\" to their shell profile."
   fi

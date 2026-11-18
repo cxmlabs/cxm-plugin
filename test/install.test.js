@@ -92,7 +92,7 @@ test('the cxm launcher runs the newest plugin copy, reads stdin, and replaces on
   assert.equal(spawnSync('cxm', { env, input: 'hi', encoding: 'utf8' }).stdout, '0.10.0 hi', 'the newest copy by version, of this marketplace only');
   rmSync(claudeDir, { recursive: true });
   assert.equal(spawnSync('cxm', { env, input: 'hi', encoding: 'utf8' }).stdout, '0.3.3 hi', 'a removed copy leaves the next one, in CODEX_HOME');
-  assert.deepEqual(await shim({ ...env, PATH: [later, '/usr/bin', '/bin'].join(delimiter) }), [0, `CloudExMachina: the cxm on PATH (${join(later, 'cxm')}) is not this plugin's launcher and may be outdated. Call ${join(bin, 'cxm')} directly, and tell the user to remove the other one (npm uninstall -g @cloudexmachina/cxm).\n`, '']);
+  assert.deepEqual(await shim({ ...env, PATH: [later, '/usr/bin', '/bin'].join(delimiter) }), [0, `CloudExMachina: the cxm on PATH (${join(later, 'cxm')}) is not this plugin's launcher and may be outdated. Call ${join(bin, 'cxm')} directly, and tell the user to remove the other one (rm ${join(later, 'cxm')}, or npm uninstall -g @cloudexmachina/cxm for an npm install).\n`, '']);
   assert.match((await shim({ ...env, PATH: '/usr/bin:/bin' }))[1], /is not on PATH/);
   assert.equal(removeShim(join(bin, 'cxm')), true, 'cxm uninstall removes the launcher');
 
@@ -145,16 +145,21 @@ test('the launcher runs only release copies, also in folders the shim saw, passe
   const none = spawnSync(join(bin, 'cxm'), { env: plain, encoding: 'utf8' });
   assert.deepEqual([none.status, none.stderr], [127, 'cxm: no CloudExMachina plugin is installed. Run: npx @cloudexmachina/cxm@latest install\n']);
 
-  // Sessions with other config folders add theirs; a relative folder is never kept.
-  const codexDir = join(home, 'codex-home');
+  // Sessions with other config folders add theirs once each; a relative folder is never kept, nor searched.
+  const codexDir = join(home, 'claude');
   copy(codexDir, '0.3.6');
   assert.deepEqual(await shim({ ...env, CLAUDE_CONFIG_DIR: 'relative/dir', CODEX_HOME: codexDir }), [0, '']);
+  assert.deepEqual(await shim({ ...env, CODEX_HOME: codexDir }), [0, '']);
   copy(claudeDir, '0.3.7');
   assert.equal(spawnSync(join(bin, 'cxm'), { env: plain, encoding: 'utf8' }).stdout, '0.3.7 ', 'both saved folders are searched');
   rmSync(join(claudeDir, 'plugins', 'cache', 'cxm-marketplace', 'cxm-agent-plugin', '0.3.7'), { recursive: true });
   assert.equal(spawnSync(join(bin, 'cxm'), { env: plain, encoding: 'utf8' }).stdout, '0.3.6 ');
   assert.equal(readFileSync(join(home, '.local', 'state', 'cxm-agent-plugin', 'roots'), 'utf8'), `${claudeDir}\n${codexDir}\n`);
   rmSync(codexDir, { recursive: true });
+  copy(join(home, 'rel'), '9.9.9');
+  const relative = spawnSync(join(bin, 'cxm'), { cwd: home, env: { ...plain, CLAUDE_CONFIG_DIR: 'rel' }, encoding: 'utf8' });
+  assert.notEqual(relative.stdout, '9.9.9 ', 'a relative config folder is never searched');
+  rmSync(join(home, 'rel'), { recursive: true });
 
   // An old symlink of ours in ~/bin, first on PATH, still shadows the launcher: the agent hears it.
   const oldBin = join(home, 'bin');
