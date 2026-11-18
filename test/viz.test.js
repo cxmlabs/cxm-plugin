@@ -512,3 +512,31 @@ test('a chart reads "y" as a list of keys, and labels in "x" with a list of "ser
   assert.equal(toCsv('chart', JSON.stringify(lists)), 'x,y,series\nMerged,12,PRs\nDraft,3,PRs');
   assert.throws(() => draw('chart', JSON.stringify({ type: 'bar', x: 'w', y: 'r' })), (e) => e.message.endsWith(CHART_SHAPE));
 });
+
+test('lines over a chart draw as a line chart under it, inside the room, and join the table and the CSV under their names', () => {
+  const spec = { type: 'bar', x: 'm', y: 'io', lines: [{ key: 'now', name: 'Cost now' }, 'after'], linesName: 'Cost', linesFormat: 'currency', table: true, data: [{ m: 'Sep', io: 9, now: '1200', after: 850 }, { m: 'Oct', io: 8, now: 1150, after: 820 }] };
+  for (const width of [60, 100]) {
+    const rows = plain(draw('chart', JSON.stringify(spec), { width })).split('\n');
+    assert.ok(Math.max(...rows.map((r) => [...r].length)) <= width, `fits ${width} columns`);
+    const bar = rows.findIndex((r) => /Sep █+ 9/.test(r));
+    const cost = rows.findIndex((r) => /│ +Cost +│/.test(r));
+    assert.ok(cost > bar && rows[cost].indexOf('│') === rows[bar].indexOf('│'), 'the line chart sits under the bars, in their column');
+    assert.match(rows.join('\n'), /Sep +9 +\$1,200 +\$850/);
+    assert.match(rows.join('\n'), /Total +17 +\$2,350 +\$1,670/);
+  }
+  assert.equal(toCsv('chart', JSON.stringify(spec)).split('\n')[0], 'm,io,Cost now,after');
+  const limited = { ...spec, table: undefined, top: 0, query: { limit: 2 } };
+  assert.match(plain(draw('chart', JSON.stringify(limited))), /now \$1,150 · total of top 2 \$2,350/);
+  assert.throws(() => draw('chart', JSON.stringify({ ...spec, series: 'm' })), /without "series"/);
+  assert.throws(() => draw('chart', JSON.stringify({ ...spec, lines: ['gone'] })), /line key "gone"/);
+  const listed = plain(draw('chart', JSON.stringify({ ...spec, table: [{ key: 'now', name: 'Δ', signed: true }] }), { width: 100 }));
+  assert.match(listed, /Δ/);
+  assert.doesNotMatch(listed, /Cost after/);
+});
+
+test('a stacked area draws its sum as one more line, first, except for percentages', () => {
+  const area = { type: 'area', x: 'm', y: 'c', series: 's', data: [{ m: 'Sep', s: 'RDS', c: 1 }, { m: 'Sep', s: 'EC2', c: 2 }, { m: 'Oct', s: 'RDS', c: 2 }, { m: 'Oct', s: 'EC2', c: 2 }] };
+  const text = plain(draw('chart', JSON.stringify(area)));
+  assert.match(text, /total[\s\S]*now 4 · total 7[\s\S]*RDS[\s\S]*EC2/);
+  assert.doesNotMatch(plain(draw('chart', JSON.stringify({ ...area, yFormat: 'percent' }))), /total/);
+});

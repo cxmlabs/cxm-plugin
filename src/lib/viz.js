@@ -8,7 +8,7 @@ const BORDER = '#334155';
 const EIGHTHS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉'];
 const LOWER = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const LABEL_MAX = 28;
-const TYPES = ['bar', 'line', 'column', 'pie'];
+const TYPES = ['bar', 'line', 'area', 'column', 'pie'];
 // Labels come from cloud data; a control character in one would send a command to the terminal that prints it.
 const CONTROL = /[\x00-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
 const CONTROL_BUT_LINES = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u2028\u2029\u202a-\u202e\u2066-\u2069]/g;
@@ -61,7 +61,9 @@ function formatX(v, xFormat) {
 }
 
 // The chart block, as the reply instruction quotes it to an agent that has not read the shared rules.
-export const CHART_SHAPE = '{"type":"bar|line|column|pie","title":"…","x":"<key>","y":"<key>","yName":"…","series":"<key>","yFormat":"currency|number|percent","data":[{…}]}';
+export const CHART_SHAPE = '{"type":"bar|line|area|column|pie","title":"…","x":"<key>","y":"<key>","yName":"…","series":"<key>","yFormat":"currency|number|percent","data":[{…}]}';
+// Other measures drawn as lines with the chart, in another unit; a chart with lines has no "series".
+export const LINES_SHAPE = '"lines":[{"key":"<key>","name":"…"}],"linesName":"…","linesFormat":"currency|number|percent"';
 
 // Two shapes an agent writes by habit, read as the chart block: `y` as a list of keys, and labels in `x` with a list of `series`.
 export function chartSpec(spec) {
@@ -263,24 +265,72 @@ function asTable(spec, { labels, series }) {
   return tableBlock({ ...base, columns: ['', ...cols.map((c) => ({ ...c, name: c.name ?? c.key }))], rows });
 }
 
-// One chart spec as columns of frames: the chart, and its table beside it when both fit the room, else under it.
-function chartBlocks(spec, room) {
+// One chart spec drawn at a width, and its table frame when it has one; `top` comes from the chart that holds these lines.
+function chartFrames(spec, top) {
   spec = chartSpec(spec);
   if (!Array.isArray(spec.data)) {
     throw new Error(spec.query ? 'This chart has no rows yet: a cube-chart needs `cxm viz` to run its query first' : `A chart holds its rows in "data": ${CHART_SHAPE}`);
   }
   if (!TYPES.includes(spec.type ?? 'bar')) throw new Error(`Unknown chart type (types: ${TYPES.join(', ')})`);
   // A query that hit its limit returned the top rows only, so their sum is not the whole.
-  const top = spec.query?.limit && spec.data.length >= spec.query.limit ? spec.data.length : 0;
+  top ??= spec.query?.limit && spec.data.length >= spec.query.limit ? spec.data.length : 0;
   spec = { ...spec, top, totalLabel: top ? `total of top ${top}` : 'total' };
   const parsed = toSeries(spec);
   parsed.labels = parsed.labels.map((l) => cut(l, LABEL_MAX));
-  const draw = spec.type === 'line' ? lineLines : spec.type === 'column' ? columnLines : spec.diverging ? divergingLines : barLines;
-  const chart = (w) => frame({ title: spec.title ?? spec.yName ?? '', spaced: true, lines: draw(parsed, spec, w - 4) });
-  if (!spec.table) return [[chart(room)]];
-  const table = frame(asTable(spec, parsed));
-  const beside = chart(room - widthOf(table[0]) - 1);
-  return widthOf(beside[0]) + 1 + widthOf(table[0]) <= room ? [[beside], [table]] : [[chart(room), table]];
+  // Stacked areas show their sum as one more line, first; percentages do not add up, so they get none.
+  if (spec.type === 'area' && parsed.series.length > 1 && spec.yFormat !== 'percent') {
+    parsed.series = [{ name: spec.totalLabel, data: parsed.labels.map((_, i) => sum(parsed.series.map((s) => s.data[i]))) }, ...parsed.series];
+  }
+  const draw = spec.type === 'line' || spec.type === 'area' ? lineLines : spec.type === 'column' ? columnLines : spec.diverging ? divergingLines : barLines;
+  return {
+    chart: (w) => frame({ title: spec.title ?? spec.yName ?? '', spaced: true, lines: draw(parsed, spec, w - 4) }),
+    table: spec.table ? frame(asTable(spec, parsed)) : null,
+    parsed,
+    spec,
+  };
+}
+
+// Lines over a chart measure another unit: the terminal draws them as a line chart under it, and lists them in its table.
+function withLines(spec, room) {
+  if (spec.series) throw new Error('"lines" draw over a chart without "series"');
+  const lines = spec.lines.map((l) => (typeof l === 'string' ? { key: l } : l)).filter((l) => typeof l?.key === 'string');
+  const unknown = lines.find((l) => !spec.data.some((r) => r?.[l.key] != null));
+  if (unknown) throw new Error(`No "data" row holds the line key "${unknown.key}"`);
+  // A listed table keeps its own columns; "table": true lists the chart value and each line.
+  const main = chartFrames({ ...spec, lines: undefined, table: Array.isArray(spec.table) ? spec.table : false });
+  const data = spec.data.flatMap((r) => lines.map((l) => ({ x: r?.[spec.x], series: String(l.name ?? l.key), y: r?.[l.key] ?? 0 })));
+  const title = spec.linesName ?? lines.map((l) => l.name ?? l.key).join(', ');
+  const under = chartFrames({ type: 'line', title, x: 'x', y: 'y', series: 'series', xFormat: spec.xFormat, yFormat: spec.linesFormat, data }, main.spec.top);
+  const [bars] = main.parsed.series;
+  const table = main.table ?? (spec.table
+    ? frame(
+        tableBlock({
+          title: 'Values',
+          format: spec.yFormat,
+          totalLabel: `T${main.spec.totalLabel.slice(1)}`,
+          columns: ['', spec.diverging ? { name: bars.name, signed: true } : bars.name, ...under.parsed.series.map((l) => ({ name: l.name, format: spec.linesFormat ?? 'number' }))],
+          rows: main.parsed.labels.map((x, i) => [x, bars.data[i], ...under.parsed.series.map((l) => l.data[i])]),
+        }),
+      )
+    : null);
+  return layoutChart((w) => {
+    const chart = main.chart(w);
+    return [chart, under.chart(widthOf(chart[0]))];
+  }, table, room);
+}
+
+// The chart's column of frames, and its table beside it when both fit the room, else under it.
+function layoutChart(column, table, room) {
+  if (!table) return [column(room)];
+  const beside = column(room - widthOf(table[0]) - 1);
+  return Math.max(...beside.map((f) => widthOf(f[0]))) + 1 + widthOf(table[0]) <= room ? [beside, [table]] : [[...column(room), table]];
+}
+
+function chartBlocks(spec, room) {
+  spec = chartSpec(spec);
+  if (Array.isArray(spec.lines) && spec.lines.length && Array.isArray(spec.data)) return withLines(spec, room);
+  const { chart, table } = chartFrames(spec);
+  return layoutChart((w) => [chart(w)], table, room);
 }
 
 function noteBlock({ title, text }) {

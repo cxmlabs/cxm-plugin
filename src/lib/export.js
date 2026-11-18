@@ -20,7 +20,8 @@ function chartCsv(block) {
   const spec = chartSpec(block);
   const rows = Array.isArray(spec.data) ? spec.data : [];
   const keys = [...new Set([spec.x, spec.series, spec.y, ...rows.flatMap((r) => Object.keys(r ?? {}))].filter(Boolean))];
-  const names = new Map((Array.isArray(spec.table) ? spec.table : []).filter((c) => c?.name).map((c) => [c.key, c.name]));
+  const named = [...(Array.isArray(spec.table) ? spec.table : []), ...(Array.isArray(spec.lines) ? spec.lines : [])];
+  const names = new Map(named.filter((c) => c?.name).map((c) => [c.key, c.name]));
   return csvOf(keys.map((k) => names.get(k) ?? k), rows.map((r) => keys.map((k) => r?.[k])));
 }
 

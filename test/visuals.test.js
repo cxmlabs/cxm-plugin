@@ -1,7 +1,7 @@
 // The Claude Code hooks module, loaded under plain Node so CI holds its switch and its prompt section.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CHART_SHAPE } from '../src/lib/viz.js';
+import { CHART_SHAPE, LINES_SHAPE } from '../src/lib/viz.js';
 import { register } from '../hooks/visuals.js';
 
 const handlers = (options) => {
@@ -21,7 +21,7 @@ test('the prompt says visuals are on only where a surface draws', async () => {
   assert.deepEqual((await compose({}, { surfaces: [] }, next)).sections, []);
   const [section] = (await compose({}, { surfaces: ['terminal'] }, next)).sections;
   assert.equal(section.id, 'cxm-agent-plugin:visuals');
-  assert.ok(section.text.includes(CHART_SHAPE), 'an agent without the shared rules still has the chart shape');
+  assert.ok(section.text.includes(CHART_SHAPE) && section.text.includes(LINES_SHAPE), 'an agent without the shared rules still has the chart shape');
 });
 
 test('a message with no text renders as Claude Code draws it', () => {
