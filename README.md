@@ -47,7 +47,8 @@ codex plugin add cxm-agent-plugin@cxm-marketplace
 #### Then sign in
 
 `npx @cloudexmachina/cxm@latest install` puts `cxm` on your PATH at once. With `claude plugin install` or
-`codex plugin add`, start one agent session first (`claude`, then `/exit`): the session puts it there.
+`codex plugin add`, start one session of that agent first (`claude` or `codex`, then exit; Codex asks you to
+trust the plugin hooks): the session puts it there.
 `cxm` is a launcher in `~/.local/bin` that runs the newest installed copy of the plugin, of Claude Code
 or Codex. It never replaces a `cxm` that another install put there.
 

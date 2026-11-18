@@ -162,7 +162,6 @@ function removeHooks(path) {
 // The first line after the shebang of the launcher scripts/install-cxm-shim.sh writes.
 export const LAUNCHER_MARK = '# cxm-agent-plugin launcher';
 
-// Only our launcher, or a symlink to a plugin cxm.js, is ours; a link into node_modules (a global npm install) or anything else stays.
 // A file nobody may read is not ours, and cxm uninstall goes on past it.
 function readable(path) {
   try {
@@ -173,6 +172,7 @@ function readable(path) {
   }
 }
 
+// Only our launcher, or a symlink to a plugin cxm.js, is ours; a link into node_modules (a global npm install) or anything else stays.
 export function removeShim(path) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
   const link = stat?.isSymbolicLink() ? readlinkSync(path) : '';
