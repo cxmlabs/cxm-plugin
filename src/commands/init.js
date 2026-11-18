@@ -159,10 +159,14 @@ function removeHooks(path) {
   return changed;
 }
 
-// Only a symlink to this plugin's cxm.js is ours; a global npm `cxm` or anything else stays.
+// The first line after the shebang of the launcher scripts/install-cxm-shim.sh writes.
+export const LAUNCHER_MARK = '# cxm-agent-plugin launcher';
+
+// Only our launcher, or a symlink to a plugin cxm.js, is ours; a global npm `cxm` or anything else stays.
 function removeShim(path) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
-  if (!stat?.isSymbolicLink() || !readlinkSync(path).endsWith(join('bin', 'cxm.js'))) return false;
+  const ours = stat?.isSymbolicLink() ? readlinkSync(path).endsWith(join('bin', 'cxm.js')) : stat?.isFile() && readFileSync(path, 'utf8').includes(LAUNCHER_MARK);
+  if (!ours) return false;
   rmSync(path);
   return true;
 }

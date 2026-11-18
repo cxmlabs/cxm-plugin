@@ -46,8 +46,8 @@ codex plugin add cxm-agent-plugin@cxm-marketplace
 
 #### Then sign in
 
-Start one agent session first (`claude`, then `/exit`): the plugin puts `cxm` on your PATH at
-session start, with a symlink in `~/.local/bin` (never on top of an existing `cxm`).
+The install puts `cxm` on your PATH: a launcher in `~/.local/bin` that runs the newest installed copy
+of the plugin, of Claude Code or Codex. It never replaces a `cxm` that another install put there.
 
 ```bash
 cxm login                       # opens your browser, then pick an organization

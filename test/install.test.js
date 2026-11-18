@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join } from 'node:path';
+import { delimiter, dirname, join } from 'node:path';
 import { test } from 'node:test';
 
 // An install writes the CXM config and Claude Code's settings, so both point at scratch directories before the import.
 process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-install-'));
 process.env.CLAUDE_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-install-claude-'));
-const { AGENTS, agentStatus, chooseAgents, install, spawnAgent } = await import('../src/commands/install.js');
+const { AGENTS, SHIM, agentStatus, chooseAgents, install, spawnAgent } = await import('../src/commands/install.js');
+const { LAUNCHER_MARK } = await import('../src/commands/init.js');
 
 test('installs into the agents that support plugins, narrowed by --agent; an old agent is skipped', () => {
   assert.deepEqual(chooseAgents([], (a) => (a === 'claude' ? 'ready' : 'missing')), { ready: ['claude'], outdated: [] });
@@ -25,7 +27,7 @@ test('runs each agent\'s own commands, refreshes and upgrades on a re-run, and f
   await install(['--yes', '--no-login'], { run, status: () => 'ready' });
   const { claude, codex } = AGENTS;
   assert.match(codex.add.join(' '), /--ref v\d+\.\d+\.\d+/, 'Codex is pinned to a release tag');
-  assert.deepEqual(ran, [claude.add, claude.refresh, claude.install, claude.upgrade, codex.reset, codex.add, codex.refresh, codex.install].map((c) => c.join(' ')));
+  assert.deepEqual(ran, [claude.add, claude.refresh, claude.install, claude.upgrade, codex.reset, codex.add, codex.refresh, codex.install, ['sh', SHIM]].map((c) => c.join(' ')));
 
   await assert.rejects(install(['--yes', '--no-login'], { run: () => 1, status: () => 'ready' }), /could not add or refresh/);
   await assert.rejects(install(['--yes', '--no-login'], { run: () => 0, status: () => 'outdated' }), /No coding agent with plugin support/);
@@ -60,4 +62,28 @@ test('install skips a node_modules/.bin copy of an agent, calls an old one outda
   assert.equal(spawnAgent(['claude', 'plugin', 'install', 'x'], { input: 'y\n' }).status, 0, 'the agent never gets input');
   const timesOut = (cmd) => (cmd[1] === '--version' ? { status: 0 } : { status: null, error: new Error('spawnSync claude ETIMEDOUT') });
   assert.throws(() => agentStatus('claude', timesOut), /did not finish: spawnSync claude ETIMEDOUT/);
+});
+
+test('the cxm launcher runs the newest plugin copy of either agent, reads stdin, and replaces only its own shim', () => {
+  const home = mkdtempSync(join(tmpdir(), 'cxm-shim-'));
+  const copy = (agent, version) => {
+    const dir = join(home, agent, 'plugins', 'cache', 'cxm-marketplace', 'cxm-agent-plugin', version, 'bin');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'cxm.js'), `process.stdin.on('data', (d) => process.stdout.write('${version} ' + d));`);
+  };
+  copy('.codex', '0.3.3');
+  copy('.claude', '0.3.4');
+  copy('.claude', '0.10.0');
+  const bin = join(home, '.local', 'bin');
+  mkdirSync(bin, { recursive: true });
+  symlinkSync(join(home, 'gone', 'bin', 'cxm.js'), join(bin, 'cxm'));
+  const env = { HOME: home, PATH: [bin, dirname(process.execPath), '/usr/bin', '/bin'].join(delimiter) };
+  assert.equal(spawnSync('sh', [SHIM], { env, encoding: 'utf8' }).status, 0);
+  assert.ok(readFileSync(join(bin, 'cxm'), 'utf8').includes(LAUNCHER_MARK), 'cxm uninstall knows the launcher as ours');
+  assert.equal(spawnSync(join(bin, 'cxm'), { env, input: 'hi', encoding: 'utf8' }).stdout, '0.10.0 hi', 'the newest copy by version, not by name');
+  rmSync(join(home, '.claude'), { recursive: true });
+  assert.equal(spawnSync(join(bin, 'cxm'), { env, input: 'hi', encoding: 'utf8' }).stdout, '0.3.3 hi', 'a removed copy leaves the next one');
+  writeFileSync(join(bin, 'cxm'), '#!/bin/sh\necho foreign\n', { mode: 0o755 });
+  assert.match(spawnSync('sh', [SHIM], { env, encoding: 'utf8' }).stdout, /not this plugin's launcher/);
+  assert.equal(readFileSync(join(bin, 'cxm'), 'utf8'), '#!/bin/sh\necho foreign\n');
 });
