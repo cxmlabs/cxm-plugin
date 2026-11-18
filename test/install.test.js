@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFile, spawnSync } from 'node:child_process';
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { test } from 'node:test';
@@ -67,16 +67,15 @@ test('install skips a node_modules/.bin copy of an agent, calls an old one outda
   assert.throws(() => agentStatus('claude', timesOut), /did not finish: spawnSync claude ETIMEDOUT/);
 });
 
-test('the cxm launcher runs the newest plugin copy, reads stdin, and replaces only its own shim, even broken', () => {
+test('the cxm launcher runs the newest plugin copy, reads stdin, and replaces only its own shim, even broken', async () => {
   const home = mkdtempSync(join(tmpdir(), 'cxm-shim-'));
-  const claudeDir = join(home, 'claude-config');
+  const [claudeDir, codexDir] = [join(home, 'claude-config'), join(home, 'codex-home')];
   const copy = (root, version, marketplace = 'cxm-marketplace') => {
     const dir = join(root, 'plugins', 'cache', marketplace, 'cxm-agent-plugin', version, 'bin');
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, 'cxm.js'), `process.stdin.on('data', (d) => process.stdout.write('${version} ' + d));`);
-    return join(dir, 'cxm.js');
   };
-  copy(join(home, '.codex'), '0.3.3');
+  copy(codexDir, '0.3.3');
   copy(claudeDir, '0.3.4');
   copy(claudeDir, '0.10.0');
   copy(claudeDir, '9.9.9', 'other-marketplace');
@@ -84,22 +83,42 @@ test('the cxm launcher runs the newest plugin copy, reads stdin, and replaces on
   mkdirSync(bin, { recursive: true });
   mkdirSync(later, { recursive: true });
   // The incident: our link broken by a removed copy, and an older foreign cxm later on PATH.
-  symlinkSync(join(home, '.codex', 'plugins', 'cache', 'cxm-marketplace', 'cxm-agent-plugin', '0.3.2', 'bin', 'cxm.js'), join(bin, 'cxm'));
+  symlinkSync(join(codexDir, 'plugins', 'cache', 'cxm-marketplace', 'cxm-agent-plugin', '0.3.2', 'bin', 'cxm.js'), join(bin, 'cxm'));
   writeFileSync(join(later, 'cxm'), '#!/bin/sh\necho 0.2.1\n', { mode: 0o755 });
-  const env = { HOME: home, CLAUDE_CONFIG_DIR: claudeDir, PATH: [bin, later, dirname(process.execPath), '/usr/bin', '/bin'].join(delimiter) };
-  const runs = Array.from({ length: 8 }, () => spawnSync('sh', [SHIM], { env, encoding: 'utf8' }));
-  assert.deepEqual(runs.map((r) => [r.status, r.stdout]), runs.map(() => [0, '']), 'runs at once all succeed, and the launcher is found first');
+  const env = { HOME: home, CLAUDE_CONFIG_DIR: claudeDir, CODEX_HOME: codexDir, PATH: [bin, later, dirname(process.execPath), '/usr/bin', '/bin'].join(delimiter) };
+  const shim = (e = env) => new Promise((done) => execFile('sh', [SHIM], { env: e }, (err, stdout, stderr) => done([err?.code ?? 0, stdout, stderr])));
+  const runs = await Promise.all(Array.from({ length: 8 }, () => shim()));
+  assert.deepEqual(runs, runs.map(() => [0, '', '']), 'session starts at once all succeed in silence, the launcher first on PATH');
   assert.equal(spawnSync('cxm', { env, input: 'hi', encoding: 'utf8' }).stdout, '0.10.0 hi', 'the newest copy by version, of this marketplace only');
   rmSync(claudeDir, { recursive: true });
-  assert.equal(spawnSync('cxm', { env, input: 'hi', encoding: 'utf8' }).stdout, '0.3.3 hi', 'a removed copy leaves the next one');
+  assert.equal(spawnSync('cxm', { env, input: 'hi', encoding: 'utf8' }).stdout, '0.3.3 hi', 'a removed copy leaves the next one, in CODEX_HOME');
+  assert.deepEqual(await shim({ ...env, PATH: [later, '/usr/bin', '/bin'].join(delimiter) }), [0, `CloudExMachina: the cxm on PATH (${join(later, 'cxm')}) is not this plugin's launcher and may be outdated. Call ${join(bin, 'cxm')} directly, and tell the user to remove the other one (npm uninstall -g @cloudexmachina/cxm).\n`, '']);
+  assert.match((await shim({ ...env, PATH: '/usr/bin:/bin' }))[1], /is not on PATH/);
   assert.equal(removeShim(join(bin, 'cxm')), true, 'cxm uninstall removes the launcher');
 
-  // An npm link to its own cxm.js is foreign: it stays, and the agent hears that it shadows ours.
-  const npm = join(home, 'npm', 'node_modules', '@cloudexmachina', 'cxm', 'bin', 'cxm.js');
-  mkdirSync(dirname(npm), { recursive: true });
-  writeFileSync(npm, '');
-  symlinkSync(npm, join(bin, 'cxm'));
-  assert.match(spawnSync('sh', [SHIM], { env, encoding: 'utf8' }).stdout, /is not this plugin's launcher/);
-  assert.equal(readlinkSync(join(bin, 'cxm')), npm);
-  assert.equal(removeShim(join(bin, 'cxm')), false, 'cxm uninstall keeps an npm link');
+  // A link to a --plugin-dir checkout is ours; an npm link and a plain file are foreign, kept by the shim and by uninstall.
+  symlinkSync(join(home, 'checkout', 'bin', 'cxm.js'), join(bin, 'cxm'));
+  assert.equal(removeShim(join(bin, 'cxm')), true);
+  assert.equal(lstatSync(join(bin, 'cxm'), { throwIfNoEntry: false }), undefined, 'a broken link is removed too');
+  for (const foreign of ['npm', 'file']) {
+    const npm = join(home, 'npm', 'node_modules', '@cloudexmachina', 'cxm', 'bin', 'cxm.js');
+    mkdirSync(dirname(npm), { recursive: true });
+    writeFileSync(npm, '');
+    if (foreign === 'npm') symlinkSync(npm, join(bin, 'cxm'));
+    else writeFileSync(join(bin, 'cxm'), '#!/bin/sh\necho foreign\n', { mode: 0o755 });
+    const before = foreign === 'npm' ? readlinkSync(join(bin, 'cxm')) : readFileSync(join(bin, 'cxm'), 'utf8');
+    await shim();
+    assert.equal(foreign === 'npm' ? readlinkSync(join(bin, 'cxm')) : readFileSync(join(bin, 'cxm'), 'utf8'), before, `a foreign ${foreign} cxm stays`);
+    assert.equal(removeShim(join(bin, 'cxm')), false, `cxm uninstall keeps a foreign ${foreign} cxm`);
+    rmSync(join(bin, 'cxm'));
+    rmSync(join(home, 'bin'), { recursive: true, force: true });
+  }
+
+  // Bin folders it cannot write to: nothing is written and nothing is printed.
+  const locked = mkdtempSync(join(tmpdir(), 'cxm-shim-locked-'));
+  mkdirSync(join(locked, '.local', 'bin'), { recursive: true });
+  mkdirSync(join(locked, 'bin'));
+  chmodSync(join(locked, '.local', 'bin'), 0o555);
+  chmodSync(join(locked, 'bin'), 0o555);
+  assert.deepEqual(await shim({ ...env, HOME: locked }), [0, '', '']);
 });

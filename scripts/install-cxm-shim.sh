@@ -2,13 +2,11 @@
 # Writes `cxm` into ~/.local/bin as a launcher that runs the newest installed plugin copy; never fails a session start.
 
 mark='# cxm-agent-plugin launcher'
-# A plugin copy in a Claude Code or Codex cache; a global npm `cxm` is not one.
-plugin_js='*/plugins/cache/*/cxm-agent-plugin/*/bin/cxm.js'
-
-# Ours: the launcher, or the symlink to a plugin copy that earlier versions installed, broken or not.
+# Ours: the launcher, or the symlink to a plugin cxm.js that earlier versions installed, broken or not;
+# a link into node_modules is a global npm install.
 ours() {
   if [ -L "$1" ]; then
-    case "$(readlink "$1")" in $plugin_js) return 0 ;; esac
+    case "$(readlink "$1")" in */node_modules/*) return 1 ;; */bin/cxm.js) return 0 ;; esac
     return 1
   fi
   [ -f "$1" ] && grep -qF "$mark" "$1"
@@ -34,7 +32,7 @@ for dir in "$HOME/.local/bin" "$HOME/bin"; do
   mkdir -p "$dir" 2>/dev/null || continue
   # A file per run, renamed into place: two session starts at once never share a half-written file.
   tmp="$path.$$.tmp"
-  if launcher > "$tmp" 2>/dev/null && chmod +x "$tmp" 2>/dev/null && mv -f "$tmp" "$path" 2>/dev/null; then
+  if { launcher > "$tmp"; } 2>/dev/null && chmod +x "$tmp" 2>/dev/null && mv -f "$tmp" "$path" 2>/dev/null; then
     written="$path"
     break
   fi
@@ -43,7 +41,7 @@ done
 
 [ -n "$written" ] || exit 0
 found="$(command -v cxm 2>/dev/null || true)"
-if [ "$found" != "$written" ]; then
+if [ "$found" != "$written" ] && ! ours "$found"; then
   if [ -n "$found" ]; then
     echo "CloudExMachina: the cxm on PATH ($found) is not this plugin's launcher and may be outdated. Call $written directly, and tell the user to remove the other one (npm uninstall -g @cloudexmachina/cxm)."
   else

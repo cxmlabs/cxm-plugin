@@ -1,6 +1,6 @@
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { configPath, loadConfig, saveConfig } from '../lib/config.js';
 import { mergeConfig, parseHostFlags } from '../lib/host-flags.js';
@@ -162,13 +162,14 @@ function removeHooks(path) {
 // The first line after the shebang of the launcher scripts/install-cxm-shim.sh writes.
 export const LAUNCHER_MARK = '# cxm-agent-plugin launcher';
 
-// Only our launcher, or a symlink into a plugin cache, is ours; a global npm `cxm` or anything else stays.
-const PLUGIN_JS = /[/\\]plugins[/\\]cache[/\\][^/\\]+[/\\]cxm-agent-plugin[/\\][^/\\]+[/\\]bin[/\\]cxm\.js$/;
+// Only our launcher, or a symlink to a plugin cxm.js, is ours; a link into node_modules (a global npm install) or anything else stays.
 export function removeShim(path) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
-  const ours = stat?.isSymbolicLink() ? PLUGIN_JS.test(readlinkSync(path)) : stat?.isFile() && readFileSync(path, 'utf8').includes(LAUNCHER_MARK);
+  const link = stat?.isSymbolicLink() ? readlinkSync(path) : '';
+  const ours = link ? link.endsWith(join('bin', 'cxm.js')) && !link.includes(`${sep}node_modules${sep}`) : stat?.isFile() && readFileSync(path, 'utf8').includes(LAUNCHER_MARK);
   if (!ours) return false;
-  rmSync(path);
+  // rmSync leaves a symlink whose target is gone in place.
+  unlinkSync(path);
   return true;
 }
 
