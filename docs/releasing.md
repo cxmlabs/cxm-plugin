@@ -93,9 +93,10 @@ workflow run. One-time setup:
    it, and a rejected version number cannot be reused.
 
 `npx @cloudexmachina/cxm …` always resolves the latest published version; a global `npm i -g
-@cloudexmachina/cxm` pins until updated. A marketplace install ships its own `cxm` via a PATH shim
-that **never replaces a `cxm` it did not create**. When a global npm `cxm` shadows it, the session
-start tells the agent to use the plugin's copy and names the `npm uninstall -g` command.
+@cloudexmachina/cxm` pins until updated. A marketplace install puts a `cxm` launcher in `~/.local/bin`
+that runs the newest installed plugin copy, and **never replaces a `cxm` it did not create**. When another
+`cxm` shadows it, the session start tells the agent to call the launcher by its path and names the
+`npm uninstall -g` command.
 
 ## Versioning
 
