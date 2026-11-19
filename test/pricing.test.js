@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { priceSpec } from '../src/commands/price.js';
+import { classifyError } from '../src/lib/telemetry.js';
 import { buildPricingQuery, summarizePricing } from '../src/lib/pricing.js';
 
 const C = 'pricing_rates';
@@ -30,6 +31,15 @@ test('ec2 query matches usage type and operation, not operating system and tenan
   assert.ok(w.filters.some((x) => x.member === `${C}.operation` && x.values[0] === 'RunInstances:0002'));
   assert.equal(w.filters.find((x) => x.or).or[0].values[0], 'DedicatedUsage:m5.large');
   assert.throws(() => buildPricingQuery({ service: 'ec2', instanceType: 'm5.large', region: 'us-east-1', os: 'BeOS' }), /--os/);
+});
+
+test('an unknown --os or --tenancy is bad input, not a crash', () => {
+  const base = { service: 'ec2', instanceType: 'm5.large', region: 'us-east-1' };
+  for (const bad of [{ os: 'BeOS' }, { tenancy: 'default' }]) {
+    let err;
+    try { buildPricingQuery({ ...base, ...bad }); } catch (e) { err = e; }
+    assert.equal(classifyError(err), 'bad_input');
+  }
 });
 
 test('--service lowercases only to find ec2, rds and elasticache, and passes an AWS service code through', () => {

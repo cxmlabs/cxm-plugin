@@ -19,7 +19,7 @@ const EC2_OPERATIONS = {
 };
 const EC2_USAGE = { Shared: 'BoxUsage', Dedicated: 'DedicatedUsage', Host: 'HostBoxUsage' };
 function known(map, value, flag) {
-  if (!Object.hasOwn(map, value)) throw new Error(`unknown ${flag} ${value}; use one of: ${Object.keys(map).join(', ')}`);
+  if (!Object.hasOwn(map, value)) throw new Error(`price requires ${flag} to be one of: ${Object.keys(map).join(', ')}`);
   return map[value];
 }
 
@@ -69,7 +69,7 @@ export function buildPricingQuery(spec) {
 const num = (r, k) => Number(r[`${CUBE}.${k}`]);
 const isHourly = (r) => (r[`${CUBE}.unit`] ?? 'Hrs') === 'Hrs';
 
-// Cheapest positive hourly rate among rows matching the predicate; a reservation's amortized rate includes its upfront fee.
+// Cheapest positive hourly rate among the matching rows. A reservation's amortized rate includes its upfront fee.
 function cheapest(rows, predicate) {
   const rates = rows.filter((r) => isHourly(r) && predicate(r)).map((r) => num(r, 'amortized_rate_per_unit_usd')).filter((n) => Number.isFinite(n) && n > 0);
   return rates.length ? Math.min(...rates) : null;
