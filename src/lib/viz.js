@@ -196,12 +196,16 @@ function lineLines({ labels, series }, spec, room) {
   if (series.length > 3) {
     // A total is dropped, then a name is cut, then a long period is averaged, so the line keeps its room.
     const minLine = Math.min(labels.length, 12);
-    const choices = [series.map(close), series.map((s) => `now ${fmt(s.data.at(-1), spec.yFormat)}`), series.map(() => '')];
+    const none = series.map(() => '');
+    const full = series.map(close);
+    const short = series.map((s) => `now ${fmt(s.data.at(-1), spec.yFormat)}`);
     const widthOf = (notes) => (notes[0] ? Math.max(...notes.map(len)) + 2 : 0);
-    const nameFor = (noteW) => Math.max(Math.min(nameW, 4), Math.min(nameW, room - 1 - noteW - minLine));
-    const notes = choices.find((n) => room - nameFor(widthOf(n)) - 1 - widthOf(n) >= minLine) ?? choices.at(-1);
+    const nameMax = Math.min(nameW, 10);
+    const nameMin = Math.min(nameW, 4);
+    const choices = [[full, nameMax], [short, nameMax], [full, nameMin], [short, nameMin], [none, nameMin]];
+    const [notes] = choices.find(([n, names]) => room - names - 1 - widthOf(n) >= minLine) ?? choices.at(-1);
     const noteW = widthOf(notes);
-    const nameRoom = nameFor(noteW);
+    const nameRoom = Math.max(nameMin, Math.min(nameMax, room - 1 - noteW - minLine));
     const lineW = Math.max(1, room - nameRoom - 1 - noteW);
     const points = (data) => (data.length <= lineW ? data : Array.from({ length: lineW }, (_, k) => {
       const part = data.slice(Math.floor((k * data.length) / lineW), Math.floor(((k + 1) * data.length) / lineW));
@@ -212,7 +216,7 @@ function lineLines({ labels, series }, spec, room) {
       ...series.map((s, i) => [
         [`${cut(s.name, nameRoom).padStart(nameRoom)} `, MUTED],
         [points(s.data).map((v) => LOWER[1 + Math.round(((v - lo) / (hi - lo || 1)) * 7)].repeat(width)).join(''), PALETTE[i % PALETTE.length]],
-        [notes[i] ? `  ${notes[i]}` : '', FAINT],
+        ...(notes[i] ? [[`  ${notes[i]}`, FAINT]] : []),
       ]),
       [[`${' '.repeat(nameRoom)} ${labels[0]} → ${labels.at(-1)}`, FAINT]],
     ];

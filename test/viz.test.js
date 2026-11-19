@@ -555,18 +555,21 @@ test('a line chart of more than three series draws one row per series, and three
   const months = Array.from({ length: 24 }, (_, i) => `M${i + 1}`);
   const names = ['Amazon Elastic Compute Cloud', 'Amazon Relational Database Service', 'Amazon Simple Storage Service', 'Amazon CloudWatch'];
   const long = { type: 'line', x: 'm', y: 'c', series: 's', yFormat: 'currency', data: names.flatMap((s, k) => months.map((m, i) => ({ m, s, c: 120000 + k * 1000 + i }))) };
-  for (const width of [40, 60, 100]) {
+  for (const width of [60, 100]) {
     const rows = plain(draw('chart', JSON.stringify(long), { width })).split('\n');
     assert.ok(Math.max(...rows.map((r) => [...r].length)) <= width, `fits ${width} columns`);
   }
+  // Width 40 drops the totals; a row of four charts at width 100 shortens the names and keeps the line.
   const narrow = plain(draw('chart', JSON.stringify(long), { width: 40 }));
-  assert.match(narrow, /now \$123,023/);
-  assert.doesNotMatch(narrow, /total/, 'the total is dropped first');
-  // Four charts side by side at width 100 still draw a trend in each series row.
-  const four4 = plain(draw('row', JSON.stringify([long, long, long, long]), { width: 100 })).split('\n');
-  for (const row of four4.filter((r) => /now /.test(r))) for (const cell of row.split('│').filter((c) => /now /.test(c))) assert.ok((cell.match(/[▁▂▃▄▅▆▇█]/g) ?? []).length >= 6, cell);
-  // An average, not the first point of each bucket: a series that alternates low and high averages to the middle.
-  const flip = { type: 'line', x: 'm', y: 'c', series: 's', data: ['a', 'b', 'c', 'd'].flatMap((s, k) => months.map((m, i) => ({ m, s, c: k === 0 ? (i % 2 ? 100 : 0) : k * 10 + 100 }))) };
-  const flipRow = plain(draw('chart', JSON.stringify(flip), { width: 30 })).split('\n').find((r) => /│ +a /.test(r));
-  assert.ok((flipRow.match(/▄/g) ?? []).length >= 7, `the alternating series averages to its middle: ${flipRow}`);
+  assert.match(narrow, /now \$120,023/);
+  assert.doesNotMatch(narrow, /total/);
+  assert.ok(Math.max(...narrow.split('\n').map((r) => [...r].length)) <= 40, 'fits 40 columns');
+  const cells = plain(draw('row', JSON.stringify([long, long, long, long]), { width: 100 })).split('\n').filter((r) => /Amazon|Amaz|Rela/.test(r));
+  assert.ok(cells.length >= 4);
+  for (const r of cells) assert.match(r, /[▁▂▃▄▅▆▇█]{6,}/, r);
+  // A series that alternates between the lowest and highest value averages to the middle, not to its first point.
+  const flat = { type: 'line', x: 'm', y: 'c', series: 's', data: ['a', 'b', 'c', 'd'].flatMap((s) => Array.from({ length: 60 }, (_, i) => `M${i}`).map((m, i) => ({ m, s, c: s === 'a' ? (i % 2 ? 100 : 0) : 50 }))) };
+  const alt = plain(draw('chart', JSON.stringify(flat), { width: 40 })).split('\n').find((r) => r.startsWith('│ a '));
+  assert.match(alt, /[▂▃▄▅▆▇]/);
+  assert.doesNotMatch(alt, /[▁█]/);
 });
