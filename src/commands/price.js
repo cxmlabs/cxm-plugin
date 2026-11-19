@@ -7,10 +7,9 @@ function getFlag(argv, name) {
   return i >= 0 ? argv[i + 1] : undefined;
 }
 
-export async function price(argv) {
-  const config = await requireSession();
-  const spec = {
-    service: (getFlag(argv, '--service') ?? 'ec2').toLowerCase(),
+export function priceSpec(argv) {
+  return {
+    service: getFlag(argv, '--service') ?? 'ec2',
     instanceType: getFlag(argv, '--instance-type'),
     region: getFlag(argv, '--region'),
     os: getFlag(argv, '--os'),
@@ -18,6 +17,11 @@ export async function price(argv) {
     deployment: getFlag(argv, '--deployment'),
     tenancy: getFlag(argv, '--tenancy'),
   };
+}
+
+export async function price(argv) {
+  const config = await requireSession();
+  const spec = priceSpec(argv);
   const count = Number(getFlag(argv, '--count') ?? 1);
   const hours = Number(getFlag(argv, '--hours') ?? 730);
 
