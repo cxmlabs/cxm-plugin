@@ -26,10 +26,9 @@ launcher() {
   cat <<'EOF'
 #!/bin/sh
 # cxm-agent-plugin launcher: runs the newest installed copy of the plugin, of Claude Code or Codex.
-# Folders the user owns, by absolute path; a cache folder named by a commit is no release.
-target=$({ printf '%s\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" "${CODEX_HOME:-$HOME/.codex}"; cat "$HOME/.local/state/cxm-agent-plugin/roots" 2>/dev/null; } | while IFS= read -r root; do
+# Session folders and saved folders the user owns, by absolute path; a cache folder named by a commit is no release.
+target=$({ printf '%s\n' "${CLAUDE_CONFIG_DIR:-$HOME/.claude}" "${CODEX_HOME:-$HOME/.codex}"; [ -f "$HOME/.local/state/cxm-agent-plugin/roots" ] && while IFS= read -r saved; do [ -O "$saved" ] && printf '%s\n' "$saved"; done < "$HOME/.local/state/cxm-agent-plugin/roots"; } | while IFS= read -r root; do
   case "$root" in (/*) ;; (*) continue ;; esac
-  [ -O "$root" ] || continue
   for f in "$root"/plugins/cache/cxm-marketplace/cxm-agent-plugin/*/bin/cxm.js; do [ -f "$f" ] && printf '%s\n' "$f"; done
 done | awk -F/ '$(NF-2) ~ /^[0-9]+\.[0-9]+\.[0-9]+/ { split($(NF-2), v, "."); printf "%09d%09d%09d %s\n", v[1], v[2], v[3], $0 }' | sort | tail -n 1 | cut -d' ' -f2-)
 [ -n "$target" ] || { echo "cxm: no CloudExMachina plugin is installed. Run: npx @cloudexmachina/cxm@latest install" >&2; exit 127; }
@@ -57,7 +56,8 @@ found="$(command -v cxm 2>/dev/null || true)"
 # Only this launcher, reached by any path, is no shadow; an old launcher or symlink of ours runs an old copy.
 if [ "$found" != "$written" ] && ! cmp -s "$found" "$written"; then
   if [ -n "$found" ]; then
-    echo "CloudExMachina: the cxm on PATH ($found) is not this plugin's launcher and may be outdated. Call $written directly, and tell the user to remove the other one (rm $found, or npm uninstall -g @cloudexmachina/cxm for an npm install)."
+    if ours "$found"; then remove="rm \"$found\", or npm uninstall -g @cloudexmachina/cxm for an npm install"; else remove="npm uninstall -g @cloudexmachina/cxm for an npm install"; fi
+    echo "CloudExMachina: the cxm on PATH ($found) is not this plugin's launcher and may be outdated. Call $written directly, and tell the user to remove the other one ($remove)."
   else
     echo "CloudExMachina: the cxm command is at $written, but $(dirname "$written") is not on PATH. Call $written directly, and tell the user to add export PATH=\"$(dirname "$written"):\$PATH\" to their shell profile."
   fi

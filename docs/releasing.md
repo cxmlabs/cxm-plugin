@@ -96,7 +96,7 @@ workflow run. One-time setup:
 @cloudexmachina/cxm` pins until updated. The first session of a marketplace install (or `npx @cloudexmachina/cxm@latest install`) puts a `cxm` launcher in `~/.local/bin`
 that runs the newest installed plugin copy, and **never replaces a `cxm` it did not create**. When another
 `cxm` shadows it, the session start tells the agent to call the launcher by its path and names the
-`npm uninstall -g` command.
+`rm` command for a file of ours, or the `npm uninstall -g` command for an npm install.
 
 ## Versioning
 

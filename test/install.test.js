@@ -92,7 +92,7 @@ test('the cxm launcher runs the newest plugin copy, reads stdin, and replaces on
   assert.equal(spawnSync('cxm', { env, input: 'hi', encoding: 'utf8' }).stdout, '0.10.0 hi', 'the newest copy by version, of this marketplace only');
   rmSync(claudeDir, { recursive: true });
   assert.equal(spawnSync('cxm', { env, input: 'hi', encoding: 'utf8' }).stdout, '0.3.3 hi', 'a removed copy leaves the next one, in CODEX_HOME');
-  assert.deepEqual(await shim({ ...env, PATH: [later, '/usr/bin', '/bin'].join(delimiter) }), [0, `CloudExMachina: the cxm on PATH (${join(later, 'cxm')}) is not this plugin's launcher and may be outdated. Call ${join(bin, 'cxm')} directly, and tell the user to remove the other one (rm ${join(later, 'cxm')}, or npm uninstall -g @cloudexmachina/cxm for an npm install).\n`, '']);
+  assert.deepEqual(await shim({ ...env, PATH: [later, '/usr/bin', '/bin'].join(delimiter) }), [0, `CloudExMachina: the cxm on PATH (${join(later, 'cxm')}) is not this plugin's launcher and may be outdated. Call ${join(bin, 'cxm')} directly, and tell the user to remove the other one (npm uninstall -g @cloudexmachina/cxm for an npm install).\n`, '']);
   assert.match((await shim({ ...env, PATH: '/usr/bin:/bin' }))[1], /is not on PATH/);
   assert.equal(removeShim(join(bin, 'cxm')), true, 'cxm uninstall removes the launcher');
 
@@ -118,9 +118,12 @@ test('the cxm launcher runs the newest plugin copy, reads stdin, and replaces on
   const locked = mkdtempSync(join(tmpdir(), 'cxm-shim-locked-'));
   mkdirSync(join(locked, '.local', 'bin'), { recursive: true });
   mkdirSync(join(locked, 'bin'));
+  mkdirSync(join(locked, '.local', 'state', 'cxm-agent-plugin'), { recursive: true });
+  chmodSync(join(locked, '.local', 'state', 'cxm-agent-plugin'), 0o555);
   chmodSync(join(locked, '.local', 'bin'), 0o555);
   chmodSync(join(locked, 'bin'), 0o555);
   assert.deepEqual(await shim({ ...env, HOME: locked }), [0, '', '']);
+  chmodSync(join(locked, '.local', 'state', 'cxm-agent-plugin'), 0o755);
 });
 
 test('the launcher runs only release copies, also in folders the shim saw, passes its arguments and exit code, and the shim warns about any older cxm first on PATH', async () => {
@@ -161,24 +164,35 @@ test('the launcher runs only release copies, also in folders the shim saw, passe
   assert.notEqual(relative.stdout, '9.9.9 ', 'a relative config folder is never searched');
   rmSync(join(home, 'rel'), { recursive: true });
 
-  // An old symlink of ours in ~/bin, first on PATH, still shadows the launcher: the agent hears it.
+  // An old symlink of ours in ~/bin, first on PATH, shadows the launcher: the shim prints a warning.
   const oldBin = join(home, 'bin');
   mkdirSync(oldBin);
   mkdirSync(join(home, 'old-checkout', 'bin'), { recursive: true });
   writeFileSync(join(home, 'old-checkout', 'bin', 'cxm.js'), '');
   chmodSync(join(home, 'old-checkout', 'bin', 'cxm.js'), 0o755);
   symlinkSync(join(home, 'old-checkout', 'bin', 'cxm.js'), join(oldBin, 'cxm'));
-  assert.match((await shim({ ...env, PATH: [oldBin, bin, ...tools].join(delimiter) }))[1], /is not this plugin's launcher/);
+  assert.match((await shim({ ...env, PATH: [oldBin, bin, ...tools].join(delimiter) }))[1], /is not this plugin's launcher.*\(rm "/);
 
   // An old launcher of ours in ~/bin, first on PATH, also runs an old version.
   rmSync(join(oldBin, 'cxm'));
   writeFileSync(join(oldBin, 'cxm'), `#!/bin/sh\n${LAUNCHER_MARK}: an older one\n`, { mode: 0o755 });
-  assert.match((await shim({ ...env, PATH: [oldBin, bin, ...tools].join(delimiter) }))[1], /is not this plugin's launcher/);
+  assert.match((await shim({ ...env, PATH: [oldBin, bin, ...tools].join(delimiter) }))[1], /is not this plugin's launcher.*\(rm "/);
 
   // The launcher reached through a symlinked bin folder is ours: no warning.
   const linked = join(home, 'linked-bin');
   symlinkSync(bin, linked);
   assert.deepEqual(await shim({ ...env, PATH: [linked, ...tools].join(delimiter) }), [0, '']);
+
+  // A foreign cxm first on PATH is not ours: the warning names no rm.
+  const foreignBin = join(home, 'foreign-bin');
+  mkdirSync(foreignBin);
+  writeFileSync(join(foreignBin, 'cxm'), '#!/bin/sh\necho foreign\n', { mode: 0o755 });
+  const foreign = (await shim({ ...env, PATH: [foreignBin, bin, ...tools].join(delimiter) }))[1];
+  assert.match(foreign, /is not this plugin's launcher/);
+  assert.doesNotMatch(foreign, /rm /);
+
+  // The -O test is for saved folders only: a session folder is searched as before.
+  assert.equal(readFileSync(SHIM, 'utf8').match(/-O /g).length, 1, 'ownership is tested once, on the saved folders');
 
   // ~/.local/bin holds a foreign cxm: the launcher goes to ~/bin, and the agent is told where it is.
   rmSync(join(oldBin, 'cxm'));

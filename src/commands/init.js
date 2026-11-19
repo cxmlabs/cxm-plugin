@@ -1,4 +1,4 @@
-import { accessSync, constants, cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -162,11 +162,10 @@ function removeHooks(path) {
 // The first line after the shebang of the launcher scripts/install-cxm-shim.sh writes.
 export const LAUNCHER_MARK = '# cxm-agent-plugin launcher';
 
-// A file nobody may read is not ours, and cxm uninstall goes on past it.
-function readable(path) {
+// A file this user cannot read is not ours; cxm uninstall skips it.
+function hasMark(path) {
   try {
-    accessSync(path, constants.R_OK);
-    return true;
+    return readFileSync(path, 'utf8').includes(LAUNCHER_MARK);
   } catch {
     return false;
   }
@@ -176,7 +175,7 @@ function readable(path) {
 export function removeShim(path) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
   const link = stat?.isSymbolicLink() ? readlinkSync(path) : '';
-  const ours = link ? link.endsWith(join('bin', 'cxm.js')) && !link.includes(`${sep}node_modules${sep}`) : stat?.isFile() && readable(path) && readFileSync(path, 'utf8').includes(LAUNCHER_MARK);
+  const ours = link ? link.endsWith(join('bin', 'cxm.js')) && !link.includes(`${sep}node_modules${sep}`) : stat?.isFile() && hasMark(path);
   if (!ours) return false;
   // rmSync leaves a symlink whose target is gone in place.
   unlinkSync(path);
