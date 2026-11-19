@@ -74,14 +74,17 @@ async function sessionEnd(payload) {
   await emitBatch(buildSessionTrace(lines, { sessionId: payload.session_id, reason: payload.reason, full: shareContent(), ours: OUR_SKILLS }));
 }
 
+// The Claude Code surfaces that draw chart blocks in the reply.
+const DRAWING_ENTRYPOINTS = ['cli', 'claude-vscode'];
+
 export async function hook(argv) {
   const name = argv[0];
   // A session start needs no payload: it refreshes the plugins when the user agreed, and gives the visuals instruction.
   if (name === 'session-start') {
     // A managed machine blocks a user plugin's prompt section; CLAUDE_PLUGIN_ROOT marks a Claude Code hook, which a Codex run started from its shell lacks.
-    const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT ?? '';
+    const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT;
     const off = [process.env.CLAUDE_PLUGIN_OPTION_rich_visuals, process.env.CLAUDE_PLUGIN_OPTION_RICH_VISUALS].includes('false');
-    if (process.env.CLAUDE_PLUGIN_ROOT && entrypoint && !entrypoint.startsWith('sdk') && !off) {
+    if (process.env.CLAUDE_PLUGIN_ROOT && DRAWING_ENTRYPOINTS.includes(entrypoint) && !off) {
       console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: VISUALS_INSTRUCTION } }));
     }
     return void refreshPlugins();
