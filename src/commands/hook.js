@@ -78,10 +78,10 @@ export async function hook(argv) {
   const name = argv[0];
   // A session start needs no payload: it refreshes the plugins when the user agreed, and gives the visuals instruction.
   if (name === 'session-start') {
-    // A managed machine blocks a user plugin's prompt section; CLAUDE_PLUGIN_ROOT marks a Claude Code hook, which a Codex run started from its shell lacks.
+    // A managed machine blocks a user plugin's prompt section; CLAUDE_PLUGIN_ROOT marks a Claude Code hook; only an entrypoint that draws gets the instruction.
     const entrypoint = process.env.CLAUDE_CODE_ENTRYPOINT ?? '';
     const off = [process.env.CLAUDE_PLUGIN_OPTION_rich_visuals, process.env.CLAUDE_PLUGIN_OPTION_RICH_VISUALS].includes('false');
-    if (process.env.CLAUDE_PLUGIN_ROOT && entrypoint && !entrypoint.startsWith('sdk') && !off) {
+    if (process.env.CLAUDE_PLUGIN_ROOT && ['cli', 'claude-vscode'].includes(entrypoint) && !off) {
       console.log(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: VISUALS_INSTRUCTION } }));
     }
     return void refreshPlugins();
