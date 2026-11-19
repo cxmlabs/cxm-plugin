@@ -35,11 +35,7 @@ test('ec2 query matches usage type and operation, not operating system and tenan
 
 test('an unknown --os or --tenancy is bad input, not a crash', () => {
   const base = { service: 'ec2', instanceType: 'm5.large', region: 'us-east-1' };
-  for (const bad of [{ os: 'BeOS' }, { tenancy: 'default' }]) {
-    let err;
-    try { buildPricingQuery({ ...base, ...bad }); } catch (e) { err = e; }
-    assert.equal(classifyError(err), 'bad_input');
-  }
+  for (const bad of [{ os: 'BeOS' }, { tenancy: 'default' }]) assert.throws(() => buildPricingQuery({ ...base, ...bad }), (e) => classifyError(e) === 'bad_input');
 });
 
 test('--service lowercases only to find ec2, rds and elasticache, and passes an AWS service code through', () => {
