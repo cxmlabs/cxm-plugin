@@ -162,11 +162,20 @@ function removeHooks(path) {
 // The first line after the shebang of the launcher scripts/install-cxm-shim.sh writes.
 export const LAUNCHER_MARK = '# cxm-agent-plugin launcher';
 
+// A file this user cannot read is not ours; cxm uninstall skips it.
+function hasMark(path) {
+  try {
+    return readFileSync(path, 'utf8').includes(LAUNCHER_MARK);
+  } catch {
+    return false;
+  }
+}
+
 // Only our launcher, or a symlink to a plugin cxm.js, is ours; a link into node_modules (a global npm install) or anything else stays.
 export function removeShim(path) {
   const stat = lstatSync(path, { throwIfNoEntry: false });
   const link = stat?.isSymbolicLink() ? readlinkSync(path) : '';
-  const ours = link ? link.endsWith(join('bin', 'cxm.js')) && !link.includes(`${sep}node_modules${sep}`) : stat?.isFile() && readFileSync(path, 'utf8').includes(LAUNCHER_MARK);
+  const ours = link ? link.endsWith(join('bin', 'cxm.js')) && !link.includes(`${sep}node_modules${sep}`) : stat?.isFile() && hasMark(path);
   if (!ours) return false;
   // rmSync leaves a symlink whose target is gone in place.
   unlinkSync(path);
@@ -196,6 +205,11 @@ export function uninstall() {
     removed.push(config.installedCodexPrompt);
   }
   for (const dir of [join(homedir(), '.local', 'bin'), join(homedir(), 'bin')]) if (removeShim(join(dir, 'cxm'))) removed.push(join(dir, 'cxm'));
+  const roots = join(homedir(), '.local', 'state', 'cxm-agent-plugin');
+  if (existsSync(roots)) {
+    rmSync(roots, { recursive: true, force: true });
+    removed.push(`${roots} (the config folders the launcher searches)`);
+  }
   const configDir = dirname(configPath);
   if (existsSync(configDir)) {
     rmSync(configDir, { recursive: true, force: true });
