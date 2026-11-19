@@ -65,6 +65,9 @@ export const CHART_SHAPE = '{"type":"bar|line|area|column|pie","title":"…","x"
 // Other measures drawn as lines with the chart, in another unit; a chart with lines has no "series".
 export const LINES_SHAPE = '"lines":[{"key":"<key>","name":"…"}],"linesName":"…","linesFormat":"currency|number|percent"';
 
+// What a Claude Code session that draws blocks is told: in its prompt where a plugin may add to it, else at its start.
+export const VISUALS_INSTRUCTION = `CXM rich visuals are on: write a CXM chart, cube-chart, row or mermaid block as a fenced block in the reply, and it is drawn in place. A chart block is one-line JSON, ${CHART_SHAPE}, where x, y and series each name one key of the data rows. To draw other measures as lines with it, add ${LINES_SHAPE} and leave out series. A mermaid block is a flowchart, sequenceDiagram, stateDiagram, classDiagram, erDiagram or xychart-beta. Do not run \`cxm viz\` to draw it; run it only to export a block with --csv or --svg. Draw one picture for each part of the answer, next to its text and table. A picture never replaces the table. Draw CXM charts and diagrams only with these blocks: never with the dataviz skill, an HTML file or an image. A chart with lines on a second axis is supported. For 3 or more items to compare, draw a bar chart. For a series over time, draw a line chart, or a column chart for a few periods. For two periods, draw grouped bars and a diverging chart of the change. For 3 or more things that connect, draw a mermaid diagram. For an overview, draw a chart and a diagram. For one number or one lookup, draw nothing, unless the user asks for a picture.`;
+
 // Two shapes an agent writes by habit, read as the chart block: `y` as a list of keys, and labels in `x` with a list of `series`.
 export function chartSpec(spec) {
   if (Array.isArray(spec.x) && Array.isArray(spec.series) && !spec.data) {
@@ -188,6 +191,36 @@ function lineLines({ labels, series }, spec, room) {
   const hi = Math.max(...all);
   const height = spec.height ?? 4;
   const nameW = Math.max(...series.map((s) => len(s.name)));
+  const close = (s) => `now ${fmt(s.data.at(-1), spec.yFormat)}${spec.yFormat === 'percent' ? '' : ` · ${spec.totalLabel} ${fmt(sum(s.data), spec.yFormat)}`}`;
+  // More than three series: one row each, so the block stays short enough to paste as it is.
+  if (series.length > 3) {
+    // A total is dropped, then a name is cut, then a long period is averaged, so the line keeps its room.
+    const minLine = Math.min(labels.length, 12);
+    const none = series.map(() => '');
+    const full = series.map(close);
+    const short = series.map((s) => `now ${fmt(s.data.at(-1), spec.yFormat)}`);
+    const widthOf = (notes) => (notes[0] ? Math.max(...notes.map(len)) + 2 : 0);
+    const nameMax = Math.min(nameW, 10);
+    const nameMin = Math.min(nameW, 4);
+    const choices = [[full, nameMax], [short, nameMax], [full, nameMin], [short, nameMin], [none, nameMin]];
+    const [notes] = choices.find(([n, names]) => room - names - 1 - widthOf(n) >= minLine) ?? choices.at(-1);
+    const noteW = widthOf(notes);
+    const nameRoom = Math.max(nameMin, Math.min(nameMax, room - 1 - noteW - minLine));
+    const lineW = Math.max(1, room - nameRoom - 1 - noteW);
+    const points = (data) => (data.length <= lineW ? data : Array.from({ length: lineW }, (_, k) => {
+      const part = data.slice(Math.floor((k * data.length) / lineW), Math.floor(((k + 1) * data.length) / lineW));
+      return sum(part) / part.length;
+    }));
+    const width = labels.length * 2 <= lineW ? 2 : 1;
+    return [
+      ...series.map((s, i) => [
+        [`${cut(s.name, nameRoom).padStart(nameRoom)} `, MUTED],
+        [points(s.data).map((v) => LOWER[1 + Math.round(((v - lo) / (hi - lo || 1)) * 7)].repeat(width)).join(''), PALETTE[i % PALETTE.length]],
+        ...(notes[i] ? [[`  ${notes[i]}`, FAINT]] : []),
+      ]),
+      [[`${' '.repeat(nameRoom)} ${labels[0]} → ${labels.at(-1)}`, FAINT]],
+    ];
+  }
   const step = labels.length * 3 <= room - nameW - 24 ? 3 : 1;
   const lines = [];
   series.forEach((s, i) => {
@@ -196,7 +229,7 @@ function lineLines({ labels, series }, spec, room) {
       const note = r === 0 ? `  max ${fmt(Math.max(...s.data), spec.yFormat)}` : r === height - 1 ? `  min ${fmt(Math.min(...s.data), spec.yFormat)}` : '';
       lines.push([[`${(r === Math.floor(height / 2) ? s.name : '').padStart(nameW)} `, MUTED], [cells.map(([t]) => t).join(''), PALETTE[i % PALETTE.length]], [note, FAINT]]);
     });
-    lines.push([[`${' '.repeat(nameW)} now ${fmt(s.data.at(-1), spec.yFormat)}${spec.yFormat === 'percent' ? '' : ` · ${spec.totalLabel} ${fmt(sum(s.data), spec.yFormat)}`}`, FAINT]]);
+    lines.push([[`${' '.repeat(nameW)} ${close(s)}`, FAINT]]);
   });
   lines.push([[`${' '.repeat(nameW)} ${labels[0]} → ${labels.at(-1)}`, FAINT]]);
   return lines;

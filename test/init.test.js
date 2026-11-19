@@ -103,12 +103,16 @@ test('uninstall removes what setup wrote and keeps the user\'s own hooks', () =>
   mkdirSync(dirname(hooksPath), { recursive: true });
   writeFileSync(hooksPath, JSON.stringify({ hooks: { PostToolUse: [{ hooks: [{ type: 'command', command: 'keep-me' }] }] } }));
   assert.equal(init(fixture).status, 0);
+  const state = join(fixture.home, '.local', 'state', 'cxm-agent-plugin');
+  mkdirSync(state, { recursive: true });
+  writeFileSync(join(state, 'roots'), '/x\n');
   const env = { ...process.env, HOME: fixture.home, CXM_CONFIG_DIR: fixture.config, CXM_TELEMETRY: '0' };
   const out = spawnSync(process.execPath, [bin, 'uninstall'], { cwd: fixture.project, encoding: 'utf8', env });
   assert.equal(out.status, 0, out.stderr);
   assert.ok(!existsSync(join(fixture.project, '.agents', 'skills', 'cxm-cost-drivers')));
   assert.ok(!existsSync(join(fixture.home, '.codex', 'prompts', 'cxm.md')));
   assert.ok(!existsSync(fixture.config));
+  assert.ok(!existsSync(state), 'the saved config folders go too');
   const commands = JSON.parse(readFileSync(hooksPath, 'utf8')).hooks.PostToolUse.flatMap((e) => e.hooks.map((h) => h.command));
   assert.deepEqual(commands, ['keep-me']);
   rmSync(fixture.base, { recursive: true, force: true });
