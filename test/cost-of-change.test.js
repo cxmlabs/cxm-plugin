@@ -43,9 +43,9 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
 
 test('the skill stops only when nothing about the cost changes, and does not duplicate the section', () => {
   assert.ok(!skill.includes('If the diff adds no paid call'), 'a removal or a multiplier is priced');
-  assert.match(skill, /unit of work, the\s+runs per month and the row filters all stay the same/);
+  assert.match(skill, /the row filters, and the accounts, regions and asset type that the call\s+iterates over all stay the same/);
   assert.match(skill, /replace it\. Add a section only when the body has none/);
-  assert.match(skill, /`costs` query with no rows for a usage type gives a baseline of 0/);
+  assert.match(skill, /If a dataset returns no rows, print `unmeasured \(no rows in <dataset>\)`/);
   assert.match(skill, /more than one tier, do this with either rate source/);
   assert.match(skill, /baseline excludes the change/);
   assert.ok(!skill.includes('Otherwise say that the baseline includes'), 'unmerged change is not in the baseline');

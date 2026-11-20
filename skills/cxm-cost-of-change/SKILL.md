@@ -106,10 +106,12 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
    the payer, print each input that needs that bill as `unmeasured`.
 4. **Billed units per unit of work.** Count them from the request that the code sends, never from
    stored data. Follow "Billed units". If the billed units of every call, the unit of work, the
-   runs per month and the row filters all stay the same before and after the diff (for example 2
+   runs per month, the row filters, and the accounts, regions and asset type that the call
+   iterates over all stay the same before and after the diff (for example 2
    of 4 statistics removed, or a batch size change on one page), say "no billed unit changes",
    show the count before and after, print no cost and no monthly total, and stop. Do not read
-   steps 5 to 12. If the unit of work, the schedule or a row filter changes, continue.
+   steps 5 to 12. If the unit of work, the schedule, a row filter, the accounts, the regions or
+   the asset type changes, continue.
 5. **Runtime node.** Find the runtime node and the image of the changed code with the
    `cxm-repo-graph` skill. Do not take a schedule or an account list from a node that only matches
    by name, or from a `deploys` edge.
@@ -214,9 +216,8 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 
 ### Count rules
 
-- If a count dataset (`assets`, accounts) returns no rows, print `unmeasured (no rows in
-  <dataset>)`. A `costs` query with no rows for a usage type gives a baseline of 0 units and 0
-  cost. If a query fails, print `unmeasured (<error>)`.
+- If a dataset returns no rows, print `unmeasured (no rows in <dataset>)`. If a query fails,
+  print `unmeasured (<error>)`.
 - If the code calls in each enabled region, print the region count as `unmeasured`, and give the
   regions in `assets` or `costs` as a lower bound.
 - Code behind a flag that is off costs 0 as merged. Give the cost when enabled on its own line.
