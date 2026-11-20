@@ -99,12 +99,15 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
    removes or multiplies, name the API operation, the payer, the unit of work (once per run, per
    account, per account and region, per asset, or per request) and the asset type that the call
    iterates over. If the diff adds no paid call, say "no billed unit changes", print no cost, and
-   stop.
+   stop. A call to a third-party service is a paid call: continue, and follow "Count rules".
 3. **Payer.** A call with a role in another account bills that account. A call with the platform
    credentials bills the platform account. If the session organization does not hold the bill of
    the payer, print each input that needs that bill as `unmeasured`.
 4. **Billed units per unit of work.** Count them from the request that the code sends, never from
-   stored data. Follow "Billed units".
+   stored data. Follow "Billed units". If the billed units of every call stay the same before and
+   after the diff (for example 2 of 4 statistics removed, or a batch size change on one page), say
+   "no billed unit changes", show the count before and after, print no cost and no monthly total,
+   and stop. Do not read steps 5 to 12.
 5. **Runtime node.** Find the runtime node and the image of the changed code with the
    `cxm-repo-graph` skill. Do not take a schedule or an account list from a node that only matches
    by name, or from a `deploys` edge.
@@ -128,9 +131,12 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
    `max_dimension_values`. Label the count a ceiling when `assets` cannot express a filter
    (`min_stored_bytes`).
 10. **Baseline.** Read the current usage and cost of the same usage type per account and region
-    with `costs`, over the 30 full days before `cur_reach.latest_day`. Filter `cur_reach` on
-    `cur_reach.cloud_provider_id = aws`. If the change already runs in the organization, end the
-    window before the date it started, or say that the baseline includes the change.
+    with `costs`, over the 30 full days before `cur_reach.latest_day`. `cur_reach.latest_day` is a
+    measure, not a dimension: query it as `{"measures":["cur_reach.latest_day"],"filters":[{"member":
+    "cur_reach.cloud_provider_id","operator":"equals","values":["aws"]}]}`. If the change already
+    runs in the organization, end the window on the day before the change merged
+    (`git log --format=%cs -1 <merge commit>`), and cite that date. Otherwise say that the baseline
+    includes the change.
 11. **Rates.** Read the effective rate from `costs` as net cost ÷ usage per usage type, with the
     `usage_charges_only` segment. Read the list rate with the list-price route, for the usage type
     of the region of the API endpoint. Follow "Rate rules".
@@ -217,9 +223,11 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 
 - Print one line first: the monthly change at the list rate and at the effective rate, the payer,
   and the organization. Then print a table with one row per input: the value, its dataset or route,
-  its filter and its window (dates). Label each floor and each ceiling.
-- Print an input that you cannot read as `unmeasured`, never as a number. If one input is
-  `unmeasured`, print the per-line amounts and no monthly total.
+  its filter and its window (dates). Label each floor and each ceiling. This table names datasets,
+  routes and filters on purpose, so that a reviewer can run each lookup again.
+- Print an input that you cannot read as `unmeasured`, never as a number. If one input of the
+  session organization is `unmeasured`, print the per-line amounts and no monthly total. The
+  `unmeasured` row of the other organizations does not block the total of the session organization.
 - Print the result as one markdown section headed `### Cost of this change`. If a pull request of
   the current branch exists (`gh pr view`), add the section to its body with
   `gh pr edit --body-file`, and keep the rest of the body. Otherwise print the section for the
