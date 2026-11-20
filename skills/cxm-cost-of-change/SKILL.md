@@ -105,13 +105,12 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
    credentials bills the platform account. If the session organization does not hold the bill of
    the payer, print each input that needs that bill as `unmeasured`.
 4. **Billed units per unit of work.** Count them from the request that the code sends, never from
-   stored data. Follow "Billed units". If the billed units of every call, the unit of work, the
-   runs per month, the row filters, and the accounts, regions and asset type that the call
-   iterates over all stay the same before and after the diff (for example 2
-   of 4 statistics removed, or a batch size change on one page), say "no billed unit changes",
-   show the count before and after, print no cost and no monthly total, and stop. Do not read
-   steps 5 to 12. If the unit of work, the schedule, a row filter, the accounts, the regions or
-   the asset type changes, continue.
+   stored data. Follow "Billed units". Then compare these inputs before and after the diff: the
+   billed units of every call, the unit of work, the runs per month, the row filters, and the
+   accounts, regions and asset type that the call iterates over. If one of them changes, continue
+   to step 5. If all of them stay the same, say "no billed unit changes". Examples: 2 of 4
+   statistics removed, or a batch size change on one page. Show the count before and after.
+   Print no cost and no monthly total. Stop, and do not read steps 5 to 12.
 5. **Runtime node.** Find the runtime node and the image of the changed code with the
    `cxm-repo-graph` skill. Do not take a schedule or an account list from a node that only matches
    by name, or from a `deploys` edge.
@@ -173,8 +172,12 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
   the list-price route with `volume_amount`. Quote `total_cost_for_volume` for a tiered cost, never
   `applicable_tier` × the whole volume. For a change on top of current usage, price the current
   usage plus the change, and the current usage alone, and give the difference. Show the formula.
-  For a usage type with more than one tier, do this with either rate source: the average net rate
-  misprices the units in a higher tier.
+- If the list-price route returns more than one tier for the usage type, do not use the average
+  net rate: it misprices the units in a higher tier. AWS applies the tiers to the total of the
+  payer. Sum the usage of that usage type over every account of the same
+  `costs.payer_account_id`. Call the route with that sum plus the change, then with that sum
+  alone, and give the difference of the two `total_cost_for_volume` values. Label it a list
+  price.
 - Copy the usage type verbatim from a `costs` row. Do not add or strip a region prefix. If the bill
   has no row for it, find it with the `search` call.
 - Map an API operation to its usage type from a `costs` row that holds both. If no row of the
@@ -185,13 +188,15 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 - Do not subtract a free tier. If the effective rate is lower than the list rate after the
   discount, give 0 as the floor and the list rate as the ceiling.
 - Say that the effective rate excludes credits, refunds, reseller discounts and tax.
-- For a usage type with usage, the rate the account pays is already net of EDP/PRA: apply no
-  discount on top. For a usage type with no usage, read the negotiated discount with the
-  discount-rate route for the usage account. Apply `rows[0].effective_discount_rate_pct` ÷ 100
-  to the list rate. Label it "blended over <product code>, latest billing month within 45 days": the route does
-  not return the month. Never carry it to another
-  account or product code. With no row, or a null rate, use 0 with the warning "no discounted usage of <product code> in <account>
-  in the last 45 days", and label the result a ceiling.
+- For a usage type with usage, the rate the account pays is already net of EDP/PRA. Apply no
+  discount on top of it.
+- For a usage type with no usage, read the negotiated discount with the discount-rate route for
+  the usage account. Apply `rows[0].effective_discount_rate_pct` ÷ 100 to the list rate. Label it
+  "blended over <product code>, latest billing month within 45 days". The route does not return
+  the month. Never carry the discount to another account or product code.
+- If the discount-rate route returns no row, or a null rate, use a discount of 0. Print the
+  warning "no discounted usage of <product code> in <account> in the last 45 days", and label the
+  result a ceiling.
 - Report each amount in its `costs.billing_currency`. Do not add two currencies. The list-price
   route returns USD: compare a list rate with an effective rate, or set a floor and a ceiling from
   them, only when `costs.billing_currency` is USD. Otherwise print the list rate in USD on its own
