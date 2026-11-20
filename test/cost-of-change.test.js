@@ -1,4 +1,4 @@
-// Each pricing-route failure maps to a branch of the skill, so a missing route prints unmeasured.
+// The skill text keeps the branches, routes and stop rules that its pricing steps rely on.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -42,14 +42,17 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
 });
 
 test('the skill stops only when nothing about the cost changes, and does not duplicate the section', () => {
-  assert.match(skill, /accounts, regions and asset type that the call iterates over\. If one of them changes, continue/);
-  assert.match(skill, /replace it\. Add a section only when the body has none/);
+  assert.match(skill, /accounts, regions and asset type that the call\s+iterates over\. If one of them changes, continue/);
+  assert.match(skill, /replace it\. The section ends at the next heading of level 3 or less/);
   assert.match(skill, /If a dataset returns no rows, print `unmeasured \(no rows in <dataset>\)`/);
   assert.match(skill, /AWS applies the tiers to the total of the\s+payer/);
   assert.match(skill, /If the diff adds, removes and multiplies no paid call, go to "No billed unit change"/);
   assert.match(skill, /If the change does not run yet, say that the baseline excludes the change/);
-  assert.match(skill, /With no row, or a null rate|returns no row, or a null rate, use a discount of 0/);
+  assert.match(skill, /With no row, or a null rate, skip this line/);
+  assert.match(skill, /returns no row, or a null rate, use a discount of 0/);
+  assert.match(skill, /the\s+payer and the usage type of every call/);
+  assert.match(skill, /after the\s+diff − the same product before the diff/);
   assert.match(skill, /### No billed unit change\n\nSay "no billed unit changes"[^#]*Print the section of\n"Output"/);
-  assert.match(skill, /Print the effective-rate change as `unmeasured \(tiered usage\s+type\)`/);
+  assert.match(skill, /`costs\.sum_current_net_unblended_cost` ÷ `costs\.sum_list_cost`/);
   assert.ok(skill.includes('"member":"costs.account_id"'), 'raw-bill example filters the account');
 });

@@ -38,10 +38,8 @@ A diff that does both gets two subtotals. Add them only for one payer and one cu
      `cxm-commitments` skill and add a line when it applies:
      - **EDP/PRA:** read the negotiated discount of the usage account that will run the resource
        with the discount-rate route (see "Pricing routes"). Its net rate is
-       `on_demand × (1 − rows[0].effective_discount_rate_pct ÷ 100)`. Label it "blended over
-       <product code>, latest billing month within 45 days". With no row, or a null
-       rate, say "no discounted usage of <product code> in <account> in the last 45 days", and
-       skip this line.
+       `on_demand × (1 − rows[0].effective_discount_rate_pct ÷ 100)`. Label it and warn as the
+        discount rules of "Rate rules" say. With no row, or a null rate, skip this line.
      - **Existing coverage:** the org's current ESR for this commitment_type (from
        `commitment_this_month_kpi`) indicates how much of similar usage is already discounted, i.e.
        whether spare Savings-Plan/RI capacity might already cover this new resource at the committed rate.
@@ -69,7 +67,8 @@ cxm api GET "/pricing/aws/discount-rate?account_id=<usage account>&product_code=
   also `applicable_tier` and `total_cost_for_volume`. Without a `region`, the region comes from the
   usage-type prefix (`EUW3-` → eu-west-3; no known prefix → us-east-1). It returns USD only.
 - Pass the usage account that the call bills (`costs.account_id`) to the discount-rate route. Never
-  pass the management account (`costs.payer_account_id`). The route returns `rows` and
+  pass `costs.payer_account_id` in place of a different `costs.account_id`. When the two are
+  equal, pass that account. The route returns `rows` and
   `row_count`, with at most one row. The row holds `effective_discount_rate_pct`, a percent, null
   when the list price is 0. With no row it also returns `product_code_verified` and
   `suggested_action`.
@@ -107,9 +106,10 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
    the payer, print each input that needs that bill as `unmeasured`.
 4. **Billed units per unit of work.** Count them from the request that the code sends, never from
    stored data. Follow "Billed units". Then compare these inputs before and after the diff: the
-   billed units of every call, the unit of work, the runs per month, the row filters, and the
-   accounts, regions and asset type that the call iterates over. If one of them changes, continue
-   to step 5. If all of them stay the same, show the count before and after, and go to "No billed
+   payer and the usage type of every call, the billed units of every call, the unit of work, the
+   runs per month, the row filters, and the accounts, regions and asset type that the call
+   iterates over. If one of them changes, continue to step 5. A change of payer is a removal on
+   the old payer and an addition on the new payer: give each one a subtotal. If all of them stay the same, show the count before and after, and go to "No billed
    unit change". For example, a diff removes 2 of 4 statistics of a metric, or changes the batch
    size and keeps one page.
 5. **Runtime node.** Find the runtime node and the image of the changed code with the
@@ -146,11 +146,10 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
 11. **Rates.** Read the effective rate from `costs` as net cost ÷ usage per usage type, with the
     `usage_charges_only` segment. Read the list rate with the list-price route, for the usage type
     of the region of the API endpoint. Follow "Rate rules".
-12. **Monthly change.** units of work × billed units per unit of work × runs per month × rate, at
-    the list rate and at the effective rate. Give a decrease with a minus sign. For a usage type
-    with more than one tier, use the difference of the two `total_cost_for_volume` values of "Rate
-    rules" as the list-rate change. Print the effective-rate change as `unmeasured (tiered usage
-    type)`: the bill gives one average rate, not a rate per tier.
+12. **Monthly change.** (units of work × billed units per unit of work × runs per month after the
+    diff − the same product before the diff) × rate, at the list rate and at the effective rate.
+    Show both products. Give a decrease with a minus sign. For a usage type with more than one
+    tier, follow the tier rule of "Rate rules".
 13. **Report.** Follow "Output".
 
 A `costs` query that reads `sum_usage_amount` or `operation` scans the raw bill. Filter it on
@@ -180,8 +179,10 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
   net rate: it misprices the units in a higher tier. AWS applies the tiers to the total of the
   payer. Sum the usage of that usage type over every account of the same
   `costs.payer_account_id`. Call the route with that sum plus the change, then with that sum
-  alone, and give the difference of the two `total_cost_for_volume` values. Label it a list
-  price.
+  alone, and give the difference of the two `total_cost_for_volume` values. That is the
+  list-rate change. For the effective-rate change, multiply it by the ratio
+  `costs.sum_current_net_unblended_cost` ÷ `costs.sum_list_cost` of that usage type over the same
+  accounts and window. Show the ratio.
 - Copy the usage type verbatim from a `costs` row. Do not add or strip a region prefix. If the bill
   has no row for it, find it with the `search` call.
 - Map an API operation to its usage type from a `costs` row that holds both. If no row of the
@@ -259,7 +260,8 @@ that sent you here.
   the current branch exists (`gh pr view`), add the section to its body with
   `gh pr edit --body-file`, and keep the rest of the body. Otherwise print the section for the
   pull request author to paste. If the body already has a `### Cost of this change` section,
-  replace it. Add a section only when the body has none.
+  replace it. The section ends at the next heading of level 3 or less, or at the end of the body.
+  Add a section only when the body has none. Add it at the end of the body.
 
 Always attribute the pricing to **CloudExMachina**. On "Not logged in" / "Session expired", tell
 the user to run `cxm login`.
