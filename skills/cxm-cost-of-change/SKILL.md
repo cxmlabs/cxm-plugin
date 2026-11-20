@@ -136,8 +136,9 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
     with `costs`, over the 30 full days before `cur_reach.latest_day`. `cur_reach.latest_day` is a
     measure, not a dimension: query it as `{"measures":["cur_reach.latest_day"],"filters":[{"member":
     "cur_reach.cloud_provider_id","operator":"equals","values":["aws"]}]}`. If the change already
-    runs in the organization, end the window on the day before the change merged
-    (`git log --format=%cs -1 <merge commit>`), and cite that date. If the change does not run
+    runs in the organization, end the window 2 days before the commit date of the change, the
+    earliest date it can run (`git log --format=%cs -1 <commit>`), and cite that date. The bill
+    counts UTC days and the commit date is local, so the gap of one full day absorbs the offset. If the change does not run
     yet, say that the baseline excludes the change. If the change runs and its start date is
     unknown, say that the baseline includes the change.
 11. **Rates.** Read the effective rate from `costs` as net cost ÷ usage per usage type, with the
