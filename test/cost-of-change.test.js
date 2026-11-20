@@ -1,7 +1,4 @@
-// The cost-of-change skill branches on what `cxm api` prints when a pricing route fails. These
-// tests hold the two ends together: orgApi() puts the status and detail.code in the error, and the
-// skill names a branch for each status and code, so a route that is not deployed yet prints
-// `unmeasured`, never a price.
+// Each pricing-route failure maps to a branch of the skill, so a missing route prints unmeasured.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
@@ -42,4 +39,16 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
   assert.ok(skill.includes('cxm api GET "/pricing/aws/list-price?'), 'list-price route');
   assert.ok(skill.includes('cxm api GET "/pricing/aws/discount-rate?'), 'discount-rate route');
   assert.ok(!skill.includes('commitment_edp_monthly'), 'commitment_edp_monthly covers commitment fees only');
+});
+
+test('the skill stops only when nothing about the cost changes, and does not duplicate the section', () => {
+  assert.ok(!skill.includes('If the diff adds no paid call'), 'a removal or a multiplier is priced');
+  assert.match(skill, /unit of work, the\s+runs per month and the row filters all stay the same/);
+  assert.match(skill, /replace it\. Add a section only when the body has none/);
+  assert.match(skill, /`costs` query with no rows for a usage type gives a baseline of 0/);
+  assert.match(skill, /more than one tier, do this with either rate source/);
+  assert.match(skill, /baseline excludes the change/);
+  assert.ok(!skill.includes('Otherwise say that the baseline includes'), 'unmerged change is not in the baseline');
+  assert.ok(!skill.includes('has no negotiated discount on that product code'));
+  assert.ok(skill.includes('"member":"costs.account_id"'), 'raw-bill example filters the account');
 });

@@ -39,8 +39,9 @@ A diff that does both gets two subtotals. Add them only for one payer and one cu
      - **EDP/PRA:** read the negotiated discount of the usage account that will run the resource
        with the discount-rate route (see "Pricing routes"). Its net rate is
        `on_demand × (1 − rows[0].effective_discount_rate_pct ÷ 100)`. Label it "blended over
-       <product code>, latest billing month within 45 days". With no row, say that the account
-       has no negotiated discount on that product code, and skip this line.
+       <product code>, latest billing month within 45 days". With no row, or a null
+       rate, say "no discounted usage of <product code> in <account> in the last 45 days", and
+       skip this line.
      - **Existing coverage:** the org's current ESR for this commitment_type (from
        `commitment_this_month_kpi`) indicates how much of similar usage is already discounted, i.e.
        whether spare Savings-Plan/RI capacity might already cover this new resource at the committed rate.
@@ -98,16 +99,17 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
 2. **Paid calls.** Read the diff (`git diff <base>...HEAD`). For each paid call that the diff adds,
    removes or multiplies, name the API operation, the payer, the unit of work (once per run, per
    account, per account and region, per asset, or per request) and the asset type that the call
-   iterates over. If the diff adds no paid call, say "no billed unit changes", print no cost, and
-   stop. A call to a third-party service is a paid call: continue, and follow "Count rules".
+   iterates over. If the diff adds, removes and multiplies no paid call, say "no billed unit
+   changes", print no cost, and stop. A call to a third-party service is a paid call: continue, and follow "Count rules".
 3. **Payer.** A call with a role in another account bills that account. A call with the platform
    credentials bills the platform account. If the session organization does not hold the bill of
    the payer, print each input that needs that bill as `unmeasured`.
 4. **Billed units per unit of work.** Count them from the request that the code sends, never from
-   stored data. Follow "Billed units". If the billed units of every call stay the same before and
-   after the diff (for example 2 of 4 statistics removed, or a batch size change on one page), say
-   "no billed unit changes", show the count before and after, print no cost and no monthly total,
-   and stop. Do not read steps 5 to 12.
+   stored data. Follow "Billed units". If the billed units of every call, the unit of work, the
+   runs per month and the row filters all stay the same before and after the diff (for example 2
+   of 4 statistics removed, or a batch size change on one page), say "no billed unit changes",
+   show the count before and after, print no cost and no monthly total, and stop. Do not read
+   steps 5 to 12. If the unit of work, the schedule or a row filter changes, continue.
 5. **Runtime node.** Find the runtime node and the image of the changed code with the
    `cxm-repo-graph` skill. Do not take a schedule or an account list from a node that only matches
    by name, or from a `deploys` edge.
@@ -135,8 +137,9 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
     measure, not a dimension: query it as `{"measures":["cur_reach.latest_day"],"filters":[{"member":
     "cur_reach.cloud_provider_id","operator":"equals","values":["aws"]}]}`. If the change already
     runs in the organization, end the window on the day before the change merged
-    (`git log --format=%cs -1 <merge commit>`), and cite that date. Otherwise say that the baseline
-    includes the change.
+    (`git log --format=%cs -1 <merge commit>`), and cite that date. If the change does not run
+    yet, say that the baseline excludes the change. If the change runs and its start date is
+    unknown, say that the baseline includes the change.
 11. **Rates.** Read the effective rate from `costs` as net cost ÷ usage per usage type, with the
     `usage_charges_only` segment. Read the list rate with the list-price route, for the usage type
     of the region of the API endpoint. Follow "Rate rules".
@@ -153,7 +156,9 @@ cxm analytics query '{"measures":["costs.sum_usage_amount","costs.sum_current_ne
   "dimensions":["costs.account_id","costs.region","costs.usage_type","costs.billing_currency"],
   "segments":["costs.usage_charges_only"],
   "filters":[{"member":"costs.product_code","operator":"equals","values":["AmazonCloudWatch"]},
-             {"member":"costs.operation","operator":"equals","values":["GetMetricData"]}],
+             {"member":"costs.operation","operator":"equals","values":["GetMetricData"]},
+             {"member":"costs.account_id","operator":"equals","values":["<account>"]},
+             {"member":"costs.usage_type","operator":"equals","values":["<usage type>"]}],
   "timeDimensions":[{"dimension":"costs.billing_day","dateRange":["<start>","<end>"]}]}' --timeout 300
 ```
 
@@ -165,6 +170,8 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
   the list-price route with `volume_amount`. Quote `total_cost_for_volume` for a tiered cost, never
   `applicable_tier` × the whole volume. For a change on top of current usage, price the current
   usage plus the change, and the current usage alone, and give the difference. Show the formula.
+  For a usage type with more than one tier, do this with either rate source: the average net rate
+  misprices the units in a higher tier.
 - Copy the usage type verbatim from a `costs` row. Do not add or strip a region prefix. If the bill
   has no row for it, find it with the `search` call.
 - Map an API operation to its usage type from a `costs` row that holds both. If no row of the
@@ -177,10 +184,10 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 - Say that the effective rate excludes credits, refunds, reseller discounts and tax.
 - For a usage type with usage, the rate the account pays is already net of EDP/PRA: apply no
   discount on top. For a usage type with no usage, read the negotiated discount with the
-  discount-rate route for the usage account, and apply `rows[0].effective_discount_rate_pct` ÷ 100
-  to the list rate. Label it "blended over <product code>, latest billing month within 45 days":
-  the route does not return the month. Never carry it to another account or product code. With no
-  row, or a null rate, use 0 with the warning "no discounted usage of <product code> in <account>
+  discount-rate route for the usage account. Apply `rows[0].effective_discount_rate_pct` ÷ 100
+  to the list rate. Label it "blended over <product code>, latest billing month within 45 days": the route does
+  not return the month. Never carry it to another
+  account or product code. With no row, or a null rate, use 0 with the warning "no discounted usage of <product code> in <account>
   in the last 45 days", and label the result a ceiling.
 - Report each amount in its `costs.billing_currency`. Do not add two currencies. The list-price
   route returns USD: compare a list rate with an effective rate, or set a floor and a ceiling from
@@ -206,8 +213,9 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 
 ### Count rules
 
-- If a dataset returns no rows, print `unmeasured (no rows in <dataset>)`. If a query fails, print
-  `unmeasured (<error>)`.
+- If a count dataset (`assets`, accounts) returns no rows, print `unmeasured (no rows in
+  <dataset>)`. A `costs` query with no rows for a usage type gives a baseline of 0 units and 0
+  cost. If a query fails, print `unmeasured (<error>)`.
 - If the code calls in each enabled region, print the region count as `unmeasured`, and give the
   regions in `assets` or `costs` as a lower bound.
 - Code behind a flag that is off costs 0 as merged. Give the cost when enabled on its own line.
@@ -231,7 +239,8 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 - Print the result as one markdown section headed `### Cost of this change`. If a pull request of
   the current branch exists (`gh pr view`), add the section to its body with
   `gh pr edit --body-file`, and keep the rest of the body. Otherwise print the section for the
-  pull request author to paste.
+  pull request author to paste. If the body already has a `### Cost of this change` section,
+  replace it. Add a section only when the body has none.
 
 Always attribute the pricing to **CloudExMachina**. On "Not logged in" / "Session expired", tell
 the user to run `cxm login`.
