@@ -78,15 +78,16 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
 
 - On HTTP 422, read `detail.code` and follow it:
   - `no_price_found`: the filter did not match. It is never a zero price. Search the catalog.
-  - `no_usage_type_found`: search once with other words. Then print `unmeasured (no_usage_type_found)`.
+  - `no_usage_type_found`: search once with other words. Then print `unmeasured (no_usage_type_found: no usage type matched the search)`.
   - `ambiguous_usage_type`: take the rate from the `costs` row of that usage type. Else print the
-    list rate as `unmeasured (ambiguous_usage_type)`. The route takes no parameter that narrows it,
+    list rate as `unmeasured (ambiguous_usage_type: several prices share this usage type)`. The route takes no parameter that narrows it,
     and `cxm api` cuts the candidate list.
   - `too_many_products`: use `cxm price --instance-type` for an instance. Else print `unmeasured`.
   - `no_aws_datasource`: the organization holds no AWS bill. Print each input that needs it as
     `unmeasured`, and do not call the route again.
   - `unknown_service_id`: copy `product_code` from a `costs` row and call once again.
-  - Any other code, or a discount-rate error: print `unmeasured (<code>)`.
+  - Any other code, or a discount-rate error: print `unmeasured (<code>: <reason>)`, where
+    `<reason>` says in plain words what failed, from `detail.message`.
   - A validation 422 carries a list in `detail` and no code: fix the parameter.
 - On HTTP 404 from either route, print each input that needs it as `unmeasured (route not deployed)`.
 - Never print a missing price or a failed discount lookup as 0.
@@ -96,11 +97,11 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
 1. **Organization.** Run `cxm whoami` and name the organization of the session. Say that the
    answer covers this organization only. Print the cost for each other organization that the code
    reaches as `unmeasured`.
-2. **Paid calls.** Read the diff (`git diff <base>...HEAD`). For each paid call that the diff adds,
-   removes or multiplies, name the API operation, the payer, the unit of work (once per run, per
-   account, per account and region, per asset, or per request) and the asset type that the call
-   iterates over. If the diff adds, removes and multiplies no paid call, say "no billed unit
-   changes", print no cost, and stop. A call to a third-party service is a paid call: continue, and follow "Count rules".
+2. **Paid calls.** Read the diff (`git diff <base>...HEAD`). Find each paid call that the diff
+   adds, removes or multiplies. A call to a third-party service is a paid call. For each paid call,
+   name the API operation, the payer, the unit of work and the asset type that the call iterates
+   over. The unit of work is once per run, per account, per account and region, per asset, or per
+   request. If the diff adds, removes and multiplies no paid call, go to "No billed unit change".
 3. **Payer.** A call with a role in another account bills that account. A call with the platform
    credentials bills the platform account. If the session organization does not hold the bill of
    the payer, print each input that needs that bill as `unmeasured`.
@@ -108,9 +109,9 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
    stored data. Follow "Billed units". Then compare these inputs before and after the diff: the
    billed units of every call, the unit of work, the runs per month, the row filters, and the
    accounts, regions and asset type that the call iterates over. If one of them changes, continue
-   to step 5. If all of them stay the same, say "no billed unit changes". Examples: 2 of 4
-   statistics removed, or a batch size change on one page. Show the count before and after.
-   Print no cost and no monthly total. Stop, and do not read steps 5 to 12.
+   to step 5. If all of them stay the same, show the count before and after, and go to "No billed
+   unit change". For example, a diff removes 2 of 4 statistics of a metric, or changes the batch
+   size and keeps one page.
 5. **Runtime node.** Find the runtime node and the image of the changed code with the
    `cxm-repo-graph` skill. Do not take a schedule or an account list from a node that only matches
    by name, or from a `deploys` edge.
@@ -137,16 +138,19 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
     with `costs`, over the 30 full days before `cur_reach.latest_day`. `cur_reach.latest_day` is a
     measure, not a dimension: query it as `{"measures":["cur_reach.latest_day"],"filters":[{"member":
     "cur_reach.cloud_provider_id","operator":"equals","values":["aws"]}]}`. If the change already
-    runs in the organization, end the window 2 days before the commit date of the change, the
-    earliest date it can run (`git log --format=%cs -1 <commit>`), and cite that date. The bill
-    counts UTC days and the commit date is local, so the gap of one full day absorbs the offset. If the change does not run
-    yet, say that the baseline excludes the change. If the change runs and its start date is
+    runs in the organization, end the window 2 days before the commit date of the change
+    (`git log --format=%cs -1 <commit>`). Cite that date. The change cannot run before its commit
+    date. The bill uses UTC days and the commit date uses local time. The extra day covers the
+    difference. If the change does not run yet, say that the baseline excludes the change. If the change runs and its start date is
     unknown, say that the baseline includes the change.
 11. **Rates.** Read the effective rate from `costs` as net cost ÷ usage per usage type, with the
     `usage_charges_only` segment. Read the list rate with the list-price route, for the usage type
     of the region of the API endpoint. Follow "Rate rules".
 12. **Monthly change.** units of work × billed units per unit of work × runs per month × rate, at
-    the list rate and at the effective rate. Give a decrease with a minus sign.
+    the list rate and at the effective rate. Give a decrease with a minus sign. For a usage type
+    with more than one tier, use the difference of the two `total_cost_for_volume` values of "Rate
+    rules" as the list-rate change. Print the effective-rate change as `unmeasured (tiered usage
+    type)`: the bill gives one average rate, not a rate per tier.
 13. **Report.** Follow "Output".
 
 A `costs` query that reads `sum_usage_amount` or `operation` scans the raw bill. Filter it on
@@ -208,7 +212,9 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 - GetMetricData bills up to 5 statistics of one metric in one request as one metric. Billed
   metrics per asset = the sum of ⌈statistics ÷ 5⌉ per metric. A metric with 4 statistics bills 1;
   removing 2 of its 4 statistics changes 0 billed metrics. A change of batch size, period or time
-  window changes no billed metric, unless it changes the number of pages.
+  window changes no billed metric, unless it changes the number of pages. If the code can put
+  the statistics of one metric in two requests, the metric bills once in each request. Count
+  ⌈statistics ÷ 5⌉ per request in that case.
 - A requested metric with no data still bills.
 - Count each page of a paged response as one more request with the same billed units. If the code
   cannot bound the page count, print it as `unmeasured`.
@@ -233,6 +239,12 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 - A third-party metered service is priced only from a dataset with a quantity measure:
   `github_workflow_costs` gives `net_amount` ÷ `quantity`, grouped by `sku`. A third-party cost
   dataset without a quantity measure gives no rate: print it as `unmeasured`.
+
+### No billed unit change
+
+Say "no billed unit changes". Print no cost, no monthly total and no rate. Print the section of
+"Output" with this line and the count before and after. Do not read the steps that follow the step
+that sent you here.
 
 ### Output
 

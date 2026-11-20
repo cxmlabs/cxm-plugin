@@ -42,13 +42,14 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
 });
 
 test('the skill stops only when nothing about the cost changes, and does not duplicate the section', () => {
-  assert.ok(!skill.includes('If the diff adds no paid call'), 'a removal or a multiplier is priced');
   assert.match(skill, /accounts, regions and asset type that the call iterates over\. If one of them changes, continue/);
   assert.match(skill, /replace it\. Add a section only when the body has none/);
   assert.match(skill, /If a dataset returns no rows, print `unmeasured \(no rows in <dataset>\)`/);
   assert.match(skill, /AWS applies the tiers to the total of the\s+payer/);
-  assert.match(skill, /baseline excludes the change/);
-  assert.ok(!skill.includes('Otherwise say that the baseline includes'), 'unmerged change is not in the baseline');
-  assert.ok(!skill.includes('has no negotiated discount on that product code'));
+  assert.match(skill, /If the diff adds, removes and multiplies no paid call, go to "No billed unit change"/);
+  assert.match(skill, /If the change does not run yet, say that the baseline excludes the change/);
+  assert.match(skill, /With no row, or a null rate|returns no row, or a null rate, use a discount of 0/);
+  assert.match(skill, /### No billed unit change\n\nSay "no billed unit changes"[^#]*Print the section of\n"Output"/);
+  assert.match(skill, /Print the effective-rate change as `unmeasured \(tiered usage\s+type\)`/);
   assert.ok(skill.includes('"member":"costs.account_id"'), 'raw-bill example filters the account');
 });
