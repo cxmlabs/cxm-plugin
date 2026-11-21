@@ -87,7 +87,7 @@
               "required": ["value", "unit"],
               "if": { "properties": { "value": { "type": "number" } } },
               "then": { "required": ["grade", "cite"] },
-              "else": { "required": ["reason"] },
+              "else": { "required": ["reason"], "not": { "anyOf": [{ "required": ["grade"] }, { "required": ["cite"] }] } },
               "properties": {
                 "value": { "oneOf": [{ "type": "number" }, { "const": "unmeasured" }] },
                 "unit": { "type": "string", "minLength": 1 },

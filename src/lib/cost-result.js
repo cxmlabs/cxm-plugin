@@ -69,7 +69,11 @@ export function validateCostResult(value) {
     }
     if (!list(r?.factors, `${path}.factors`, (f, fpath) => {
       text(f?.unit, `${fpath}.unit`);
-      if (f?.value === UNMEASURED) return text(f.reason, `${fpath}.reason`);
+      if (f?.value === UNMEASURED) {
+        text(f.reason, `${fpath}.reason`);
+        need(f.grade === undefined && f.cite === undefined, fpath, 'an unmeasured factor has no grade and no cite');
+        return;
+      }
       need(isNumber(f?.value), `${fpath}.value`, `must be a number or ${UNMEASURED}`);
       grade(f?.grade, `${fpath}.grade`);
       need(Object.hasOwn(citations, f?.cite), `${fpath}.cite`, `cite ${f?.cite} is not defined in citations`);

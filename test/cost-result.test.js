@@ -32,8 +32,10 @@ test('each faulty cost result names its fault', () => {
     'no-doubts': /doubts: must be a list/,
     'failed-with-amount': /a failed result holds an amount/,
     'failed-with-doubt': /a failed result holds a doubt or a citation/,
+    'failed-with-citation': /a failed result holds a doubt or a citation/,
     'no-factor': /results\[0\]\.factors: must hold a factor/,
     'unmeasured-no-reason': /results\[0\]\.factors\[0\]\.reason/,
+    'unmeasured-with-cite': /results\[0\]\.factors\[0\]: an unmeasured factor has no grade and no cite/,
   };
   for (const [name, expected] of Object.entries(faults)) {
     const found = validateCostResult(fixture(name));
