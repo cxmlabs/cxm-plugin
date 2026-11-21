@@ -1,9 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Cost-of-change result",
-  "description": "The structured form of the result in output.md. It holds the same values as the markdown section. When status is no_billed_unit_change, each amount and each doubt effect is in billed units per run, not in $/mo.",
+  "description": "The structured form of the result in output.md. It holds the same values as the markdown section. When status is no_billed_unit_change, each amount and each doubt effect is in billed units per run, not in $/mo. The validator alone checks that each cite names a key of citations.",
   "type": "object",
   "required": ["schema_version", "organization", "status", "headlines", "targets", "results", "citations", "doubts"],
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "failed" } } },
+      "then": {
+        "required": ["failed"],
+        "properties": { "headlines": { "maxItems": 0 }, "targets": { "maxItems": 0 }, "results": { "maxItems": 0 } }
+      }
+    },
+    {
+      "if": { "properties": { "status": { "const": "no_billed_unit_change" } } },
+      "then": { "properties": { "headlines": { "maxItems": 0 }, "targets": { "maxItems": 0 } } }
+    }
+  ],
   "properties": {
     "schema_version": { "const": 1 },
     "organization": { "type": "string", "minLength": 1 },
@@ -45,8 +58,8 @@
             "type": "object",
             "required": ["list", "effective"],
             "properties": {
-              "list": { "$ref": "#/$defs/range" },
-              "effective": { "$ref": "#/$defs/range" }
+              "list": { "oneOf": [{ "$ref": "#/$defs/range" }, { "const": "unmeasured" }] },
+              "effective": { "oneOf": [{ "$ref": "#/$defs/range" }, { "const": "unmeasured" }] }
             }
           }
         }
@@ -58,6 +71,8 @@
       "items": {
         "type": "object",
         "required": ["id", "target", "item", "amount", "factors"],
+        "if": { "properties": { "amount": { "type": "object" } } },
+        "then": { "required": ["grade"] },
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "target": { "type": "string", "minLength": 1 },
@@ -70,6 +85,9 @@
             "items": {
               "type": "object",
               "required": ["value", "unit"],
+              "if": { "properties": { "value": { "type": "number" } } },
+              "then": { "required": ["grade", "cite"] },
+              "else": { "required": ["reason"] },
               "properties": {
                 "value": { "oneOf": [{ "type": "number" }, { "const": "unmeasured" }] },
                 "unit": { "type": "string", "minLength": 1 },

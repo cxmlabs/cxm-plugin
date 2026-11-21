@@ -46,8 +46,7 @@ export function validateCostResult(value) {
     grade(t?.runs_here?.grade, `${path}.runs_here.grade`);
     text(t?.runs_here?.basis, `${path}.runs_here.basis`);
     grade(t?.grade, `${path}.grade`);
-    range(t?.amounts?.list, `${path}.amounts.list`);
-    range(t?.amounts?.effective, `${path}.amounts.effective`);
+    for (const kind of ['list', 'effective']) if (t?.amounts?.[kind] !== UNMEASURED) range(t?.amounts?.[kind], `${path}.amounts.${kind}`);
   });
 
   const citations = isObject(value.citations) ? value.citations : {};
@@ -90,6 +89,10 @@ export function validateCostResult(value) {
     text(value.failed?.unit_of_work, 'failed.unit_of_work');
     const amounts = [value.headlines, value.targets, value.results].some((v) => Array.isArray(v) && v.length > 0);
     need(!amounts, 'status', 'a failed result holds an amount');
+  }
+  if (value.status === 'no_billed_unit_change') {
+    const held = [value.headlines, value.targets].some((v) => Array.isArray(v) && v.length > 0);
+    need(!held, 'status', 'a no billed unit change result holds a headline or a target');
   }
   return faults;
 }

@@ -15,6 +15,16 @@ test('a valid cost result has no fault', () => {
   }
 });
 
+test('an unmeasured target amount is valid, and a billed-unit result holds no headline', () => {
+  const unmeasured = structuredClone(fixture('valid'));
+  unmeasured.targets[0].amounts = { list: 'unmeasured', effective: 'unmeasured' };
+  assert.deepEqual(validateCostResult(unmeasured), []);
+  const billed = { ...fixture('no-billed-unit-change'), headlines: fixture('valid').headlines };
+  assert.match(validateCostResult(billed).join(), /a no billed unit change result holds a headline or a target/);
+  assert.deepEqual(schema.properties.results.items.properties.factors.items.then.required, ['grade', 'cite']);
+  assert.ok(schema.allOf.some((r) => r.then.required?.includes('failed')));
+});
+
 test('each faulty cost result names its fault', () => {
   const faults = {
     'factor-no-grade': /results\[0\]\.factors\[0\]\.grade/,

@@ -162,6 +162,8 @@ values as the markdown section. Print no figure in it that the section does not 
   `doubts` entry for each doubt. When the section prints "No doubt", `doubts` is an empty list.
 - A factor that the section prints as `unmeasured` has the value `unmeasured` and a `reason`. It has
   no grade and no cite.
+- A target row that the table prints as `unmeasured` has the value `unmeasured` in `amounts.list` and
+  `amounts.effective`.
 - For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets` and
   `results` empty.
 - For no billed unit change, leave `headlines` and `targets` empty. `results` holds the count before
