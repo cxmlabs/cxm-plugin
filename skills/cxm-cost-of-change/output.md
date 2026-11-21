@@ -23,7 +23,8 @@ Give each number one grade. The grade says how the number was obtained.
 - **G2.** A value that was measured on one target and is used for another drops one grade. Cite it
   as "analog of `<target>`".
 - **G3.** A C value that an independent A or B source confirms within ±20 % becomes B. A larger
-  gap is a doubt, and the measured value applies.
+  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as steps 4 and 6
+  of `SKILL.md` say.
 - **G4.** Print a floor or a ceiling as a bound. If ceiling ÷ floor is more than 3, the result is
   C at best. A floor of 0 that a free allowance sets is exempt from this ratio.
 - **G5.** A D factor makes the result D. An assumption is a D factor: it cites its basis and gives
@@ -48,7 +49,7 @@ Organization: <name>. <floor or ceiling label, when one applies>
 <id> <target> <item> = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] …
 
 **Doubts**
-1. <assumption or unknown> — effect: <low>–<high> $/mo — resolve: <dataset, route, tool or owner>.
+1. <assumption or unknown> — effect: <low>–<high or unmeasured> $/mo — resolve: <dataset, route, tool or owner>.
 
 <details><summary>Citations</summary>
 <cite> <value> <unit> = <formula over cites or constants> ; <source> [<grade>]
@@ -79,9 +80,9 @@ A leaf source has one of five forms:
 ### Doubts
 
 The doubts block always prints. Each doubt names an assumption or an unknown. It gives its effect
-in $/mo as a low and a high value, and it says how to resolve it: a dataset, a route, a tool
-or an owner. When no factor is C or D, no bound applies and no input is `unmeasured`, print this line in place of
-the list:
+in $/mo as a low and a high value. The high value is `unmeasured` when no source gives it. Each doubt says how to resolve it: a dataset, a route, a tool
+or an owner. When no factor is C or D, no bound applies, no input is `unmeasured` and no G3 gap exists, print this
+line in place of the list:
 
 `No doubt: every factor is A or B.`
 
@@ -111,6 +112,8 @@ Print the section with these parts:
 
 A change adds one scheduled CI job. The job runs a log query on the staging account. The example
 shows two payers, so it has two headlines. It also shows two targets of the cloud payer.
+The rows for other targets wait for the deployment-target step. Until then, the skill prints only the
+row of the session organization.
 
 **Staging AWS account: +$0.064/mo list, $0–0.064/mo effective, grade B**
 **CI provider organization: +$4.19 per 30 days list, grade C**
@@ -131,7 +134,7 @@ Organization: the session organization.
 1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: 0–0.064 $/mo, at most one more scan of both halves — resolve: count the "hit the row limit" warnings in the CI logs.
 2. The free tier is account-wide, so the effective cost is $0 to $0.064 — effect: 0–0.064 $/mo — resolve: read the free-tier usage of the payer account.
 3. The production row is C until a CloudTrail count of the job exists — effect: 0–0.064 $/mo — resolve: count the job calls in the audit log of the production account.
-4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`), so the analog overstates the minutes of the merged job by one third at most: 768.5 × 1/3 = 256 min, at $0.005/min [B:c9] — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
+4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`). The analog overstates the minutes of the merged job by one third at most. That is 768.5 × 1/3 = 256 min, at $0.005/min [B:c9] — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
 
 <details><summary>Citations</summary>
 

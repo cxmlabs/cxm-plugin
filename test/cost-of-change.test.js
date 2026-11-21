@@ -84,4 +84,6 @@ test('step 6 gives the runs-per-month factor with its grade and cron citation', 
 test('the skill returns its result and never reads or writes a pull request', () => {
   for (const name of readdirSync(skillDir)) assert.doesNotMatch(read(name), /\bgh (pr|api)\b|--body-file/, `${name} names a pull request command`);
   assert.ok(skill.includes('The caller decides where the result goes.'));
+  const pointer = skillOnly.slice(skillOnly.indexOf('### Output'));
+  assert.ok(pointer.includes('Print the result as `output.md` says.'));
 });
