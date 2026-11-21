@@ -45,9 +45,8 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
   assert.ok(!skill.includes('commitment_edp_monthly'), 'commitment_edp_monthly covers commitment fees only');
 });
 
-test('the skill stops only when nothing about the cost changes, and does not duplicate the section', () => {
+test('the skill stops only when nothing about the cost changes, and keeps its count and rate rules', () => {
   assert.match(skill, /accounts, regions and asset type that the call\s+iterates over\. If one of them changes, continue/);
-  assert.match(skill, /The caller decides where the result goes\./);
   assert.match(skill, /If a dataset returns no rows, print `unmeasured \(no rows in <dataset>\)`/);
   assert.match(skill, /AWS applies the tiers to the total of the\s+payer/);
   assert.match(skill, /If the diff adds, removes and multiplies no paid call, go to "No billed unit change"/);
@@ -62,13 +61,18 @@ test('the skill stops only when nothing about the cost changes, and does not dup
 });
 
 test('every result line carries grades and citations, and the doubts block always prints', () => {
-  for (const grade of ['A', 'B', 'C', 'D']) assert.match(output, new RegExp(`\\| ${grade} \\|`), `grade ${grade}`);
+  const names = { A: 'Measured in the target', B: 'Measured from the bill', C: 'Derived from code', D: 'Assumed' };
+  for (const [grade, name] of Object.entries(names)) assert.ok(output.includes(`| ${grade} | ${name} |`), `grade ${grade}`);
   for (const rule of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7']) assert.ok(output.includes(`**${rule}.**`), `rule ${rule}`);
   assert.ok(output.includes('[<grade>:<cite>]'));
   assert.ok(output.includes('The doubts block always prints.'));
   assert.ok(output.includes('No doubt: every factor is A or B.'));
   assert.ok(output.includes('<details><summary>Citations</summary>'));
   assert.ok(output.includes('**FAILED: required count not run: <count> (unit of work: <unit>).**'));
+  const none = output.slice(output.indexOf('### No billed unit change'), output.indexOf('## Worked example'));
+  assert.ok(none.includes('"no billed unit changes"'));
+  assert.match(none, /count before and after the diff, each with its grade and its citation/);
+  assert.ok(none.includes('The doubts block.'));
 });
 
 test('step 6 gives the runs-per-month factor with its grade and cron citation', () => {

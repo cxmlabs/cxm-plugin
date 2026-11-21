@@ -245,9 +245,8 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 
 ### No billed unit change
 
-Say "no billed unit changes". Print no cost, no monthly total and no rate. Print the section of
-"Output" with this line and the count before and after. Do not read the steps that follow the step
-that sent you here.
+Say "no billed unit changes". Print the section of
+"Output" for this case. Do not read the steps that follow the step that sent you here.
 
 ### Output
 
