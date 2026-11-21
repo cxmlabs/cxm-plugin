@@ -89,9 +89,10 @@ line in place of the list:
 
 ### Unmeasured inputs
 
-- Print an input that you cannot read as `unmeasured`, never as a number. If one input of the
-  session organization is `unmeasured`, print the per-line amounts and no monthly total. The
-  `unmeasured` row of the other organizations does not block the total of the session organization.
+- Print an input that you cannot read as `unmeasured`, never as a number. Print `unmeasured` only as
+  the stop rule of `measurement.md` allows. Attempt each required count of `measurement.md`: a required
+  count not attempted fails the run. The `unmeasured` row of the other organizations does not block
+  the total of the session organization.
 
 ### A failed run
 
@@ -99,7 +100,7 @@ When the skill must stop because a required count did not run, print only this l
 
 **FAILED: required count not run: <count> (unit of work: <unit>).**
 
-Print no table, no result line and no doubts block. Until the skill names a required count, no run fails: print a failed query as `unmeasured`.
+Print no table, no result line and no doubts block. `measurement.md` names the required counts. A failed query of any other input prints as `unmeasured`, as its stop rule allows.
 
 ### No billed unit change
 

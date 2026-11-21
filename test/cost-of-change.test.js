@@ -8,7 +8,8 @@ const skillDir = new URL('../skills/cxm-cost-of-change/', import.meta.url);
 const read = (name) => readFileSync(new URL(name, skillDir), 'utf8');
 const skillOnly = read('SKILL.md');
 const output = read('output.md');
-const skill = `${skillOnly}\n${output}`;
+const measurement = read('measurement.md');
+const skill = `${skillOnly}\n${output}\n${measurement}`;
 const config = { baseUrl: 'https://example.test', organizationId: 'org', accessToken: 't' };
 
 async function failWith(status, body) {
@@ -99,4 +100,30 @@ test('the shared rules name a structured result, not a pull request body', () =>
   const shared = readFileSync(new URL('../skills/cxm-shared-rules.md', import.meta.url), 'utf8');
   assert.ok(shared.includes('Exception for a structured result or a document that a caller publishes'));
   assert.ok(!shared.includes('pull request body'));
+});
+
+const phrase = (text) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
+
+test('the skill prints unmeasured only from the stop rule', () => {
+  for (const rule of ['S1', 'S2', 'S3', 'S4', 'S5']) assert.ok(measurement.includes(`**${rule}.**`), `stop rule ${rule}`);
+  const map = measurement.slice(measurement.indexOf('## Source map'));
+  const rows = ['Runs per month', 'Accounts', 'Assets per account and region', 'Regions', 'Pages', 'Bytes per query', 'Bytes scanned',
+    'Object sizes', 'Flag state', 'GitHub orgs', 'Units a job iterates over'];
+  for (const row of rows) assert.ok(map.includes(`\n| ${row}`), `source map row ${row}`);
+  assert.equal(map.split('\n').filter((line) => line.startsWith('| ')).length, rows.length + 1, 'the source map holds the 11 rows and a header');
+  assert.match(measurement, /error text of the attempted query/);
+  for (const order of ['print the runs per month as `unmeasured`', 'print the account count as `unmeasured`',
+    'If the code cannot bound the page count, print it as `unmeasured`',
+    'Print the bytes per query as `unmeasured`, and give the floor runs × 10 MB × rate', 'print the region count as `unmeasured`']) {
+    assert.doesNotMatch(skill, phrase(order), order);
+  }
+  const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
+  assert.ok(code.indexOf('measurement.md') > 0 && code.indexOf('measurement.md') < code.indexOf('1. **Organization.**'));
+});
+
+test('a required count that was not attempted fails the run', () => {
+  const counts = measurement.slice(measurement.indexOf('## Required counts'), measurement.indexOf('## Source map'));
+  for (const count of ['Accounts', 'Assets per account and region', 'GitHub orgs', 'Runs per month']) assert.ok(counts.includes(count), count);
+  assert.ok(measurement.includes('A required count not attempted fails the run.'));
+  assert.doesNotMatch(skill, phrase('print the per-line amounts and no monthly total'));
 });
