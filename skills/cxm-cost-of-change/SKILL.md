@@ -93,6 +93,9 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
 
 ## Price a code change
 
+Read `measurement.md` in the base directory of this skill first. It sets the source map, the stop rule
+and the required counts. Print `unmeasured` only as its stop rule allows.
+
 1. **Organization.** Run `cxm whoami` and name the organization of the session. Say that the
    answer covers this organization only. Print the cost for each other organization that the code
    reaches as `unmeasured`.
@@ -119,14 +122,14 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
    `file:line@sha`. Show the run count as a factor: `21.74 runs/mo [C:c1]`, with the citation
    `c1 21.74 = 5 × 365.25 ÷ 7 ÷ 12 ; cron "0 4 * * 1-5" at <file>:<line>@<sha> [C]`. A weekday
    cron gives 21.74 runs per month; a daily cron gives 30.44. Use the bill only as a ceiling: the
-   bill names no caller. If no schedule is readable, print the runs per month as `unmeasured`.
-   Never infer a run count from the bill.
+   bill names no caller. If no schedule is readable, take the runs per month from the "Runs per month"
+   row of the source map. Never infer a run count from the bill.
 7. **Accounts.** For code that runs with the CXM crawler's roles, take the accounts from the
    `scoped_accounts_only` segment of `costs`: the accounts where the crawler has read access, among
    those with cost rows in the window. Do not take only the accounts where the bill shows the call
    now. For other code that calls into other accounts, take the accounts from the list that the
-   code or its configuration declares, with file and line. Else print the account count as
-   `unmeasured`.
+   code or its configuration declares, with file and line. Else take the accounts from the "Accounts"
+   row of the source map.
 8. **Assets.** Count the affected assets per account and region with `assets`. Filter
    `assets.asset_type` on the inventory table that the code iterates over, and
    `assets.inventory_status` on `live`. Print the date of the count.
@@ -220,20 +223,19 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
   ⌈statistics ÷ 5⌉ per request in that case.
 - A requested metric with no data still bills.
 - Count each page of a paged response as one more request with the same billed units. If the code
-  cannot bound the page count, print it as `unmeasured`.
+  cannot bound the page count, take it from the "Pages" row of the source map.
 - Price the success path. Print the retry count of the code as a ceiling only.
 - The query service (product code `AmazonAthena`) bills each query's scan rounded up to the next
-  MB, with a 10 MB minimum. Print the bytes per query as `unmeasured`, and give the floor
-  runs × 10 MB × rate.
+  MB, with a 10 MB minimum. Take the bytes per query from the "Bytes per query" row of the source map.
 - List each call that the diff causes indirectly, such as a KMS `Decrypt` for each S3 `GetObject`
   on a key-encrypted bucket without a bucket key. Price it, or print it as `unmeasured`.
 
 ### Count rules
 
 - If a dataset returns no rows, print `unmeasured (no rows in <dataset>)`. If a query fails,
-  print `unmeasured (<error>)`.
-- If the code calls in each enabled region, print the region count as `unmeasured`, and give the
-  regions in `assets` or `costs` as a lower bound.
+  print `unmeasured (<error>)`. Do both only when the stop rule of `measurement.md` allows it.
+- If the code calls in each enabled region, take the region count from the "Regions" row of the
+  source map. Label the regions of `assets` or `costs` a lower bound.
 - Code behind a flag that is off costs 0 as merged. Give the cost when enabled on its own line.
 - Do not claim a decrease larger than the current cost of that usage type in the payer accounts.
 - A token count per model call and a request count per route are not in a dataset. The exceptions
