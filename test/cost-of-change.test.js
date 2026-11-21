@@ -72,7 +72,7 @@ test('every result line carries grades and citations, and the doubts block alway
   const none = output.slice(output.indexOf('### No billed unit change'), output.indexOf('## Worked example'));
   assert.ok(none.includes('"no billed unit changes"'));
   assert.match(none, /count before and after the diff, each with its grade and its citation/);
-  assert.ok(none.includes('The doubts block.'));
+  assert.ok(none.includes('The doubts block. In this case, give the effect of each doubt in billed units per run, not in $/mo.'));
 });
 
 test('step 6 gives the runs-per-month factor with its grade and cron citation', () => {
@@ -82,6 +82,6 @@ test('step 6 gives the runs-per-month factor with its grade and cron citation', 
 });
 
 test('the skill returns its result and never reads or writes a pull request', () => {
-  for (const name of readdirSync(skillDir)) assert.ok(!read(name).includes('gh pr'), `${name} names a pull request command`);
+  for (const name of readdirSync(skillDir)) assert.doesNotMatch(read(name), /\bgh (pr|api)\b|--body-file/, `${name} names a pull request command`);
   assert.ok(skill.includes('The caller decides where the result goes.'));
 });

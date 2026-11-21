@@ -2,7 +2,7 @@
 
 This file sets the format of every result of the skill. A result shows each number with a grade, a
 formula and a source. Print the result as one markdown section headed `### Cost of this change`.
-The caller decides where the result goes.
+The caller decides where the result goes. The skill never reads or writes a pull request.
 
 ## Grades
 
@@ -26,21 +26,19 @@ Give each number one grade. The grade says how the number was obtained.
   gap is a doubt, and the measured value applies.
 - **G4.** Print a floor or a ceiling as a bound. If ceiling ÷ floor is more than 3, the result is
   C at best. A floor of 0 that a free allowance sets is exempt from this ratio.
-- **G5.** A D factor makes the result D. The headline prints the low–high range.
+- **G5.** A D factor makes the result D. An assumption is a D factor: it cites its basis and gives
+  a low value and a high value. The headline prints the low–high range.
 - **G6.** The total takes the lowest grade of the targets that hold 10 % or more of it. A target
   with an unknown run status makes the total a floor, C at best.
 - **G7.** A catalog rate is A. A bill effective rate is B. A discount-rate route is B. An assumed
   discount is D.
-
-An assumption is a D factor. It cites its basis and gives a low value and a high value. The
-headline then prints the low–high range.
 
 ## Format of the result
 
 ```
 ### Cost of this change
 
-**<payer>: +$<list>/mo list, +$<effective>/mo effective, grade <G>**
+**<payer>: <±$list>/mo list, <±$effective>/mo effective, grade <G>**
 Organization: <name>. <floor or ceiling label, when one applies>
 
 | Target | Runs here? | Δ list /mo | Δ effective /mo | Grade |
@@ -58,6 +56,7 @@ Organization: <name>. <floor or ceiling label, when one applies>
 ```
 
 - Print one headline for each payer and each currency. Never add two currencies.
+- A decrease takes a minus sign.
 - Until the skill reads more than one deployment target, the target table has one row: the session
   organization.
 - Print each result line with its whole formula. Each factor carries `[<grade>:<cite>]`.
@@ -81,7 +80,8 @@ A leaf source has one of five forms:
 
 The doubts block always prints. Each doubt names an assumption or an unknown. It gives its effect
 in $/mo as a low and a high value, and it says how to resolve it: a dataset, a route, a tool
-or an owner. When no factor is C or D and no bound applies, print this line in place of the list:
+or an owner. When no factor is C or D, no bound applies and no input is `unmeasured`, print this line in place of
+the list:
 
 `No doubt: every factor is A or B.`
 
@@ -105,7 +105,7 @@ Print the section with these parts:
 
 1. The line "no billed unit changes". Print no cost, no monthly total and no rate.
 2. The count before and after the diff, each with its grade and its citation.
-3. The doubts block.
+3. The doubts block. In this case, give the effect of each doubt in billed units per run, not in $/mo.
 
 ## Worked example
 
@@ -131,7 +131,7 @@ Organization: the session organization.
 1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: 0–0.064 $/mo, at most one more scan of both halves — resolve: count the "hit the row limit" warnings in the CI logs.
 2. The free tier is account-wide, so the effective cost is $0 to $0.064 — effect: 0–0.064 $/mo — resolve: read the free-tier usage of the payer account.
 3. The production row is C until a CloudTrail count of the job exists — effect: 0–0.064 $/mo — resolve: count the job calls in the audit log of the production account.
-4. The nightly job changed after the merge, so its minutes are an analog — effect: –3.84 to +3.84 $/mo for a change of 100 % in its minutes — resolve: read `github_workflow_costs` again 30 days after the change.
+4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`), so the analog overstates the minutes of the merged job by one third at most: 768.5 × 1/3 = 256 min, at $0.005/min [B:c9] — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
 
 <details><summary>Citations</summary>
 
@@ -145,8 +145,3 @@ Organization: the session organization.
 - `c9 $0.005/min = $0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min ; github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18} [B] ; the marginal rate is the list rate, because the included minutes are used up`
 
 </details>
-
-## Where the result goes
-
-Print the result as one markdown section headed `### Cost of this change`. The caller decides where
-the result goes. The skill never reads or writes a pull request.
