@@ -115,10 +115,12 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
 5. **Runtime node.** Find the runtime node and the image of the changed code with the
    `cxm-repo-graph` skill. Do not take a schedule or an account list from a node that only matches
    by name, or from a `deploys` edge.
-6. **Runs per month.** Take them from the schedule that the code declares, and cite its file and
-   line. A weekday cron such as `0 4 * * 1-5` gives 5 × 365.25 ÷ 7 ÷ 12 = 21.74 runs per month; a
-   daily cron gives 30.44. Use the bill only as a ceiling: the bill names no caller. If no schedule
-   is readable, print the runs per month as `unmeasured`. Never infer a run count from the bill.
+6. **Runs per month.** Take them from the schedule that the code declares, and cite its
+   `file:line@sha`. Show the run count as a factor: `21.74 runs/mo [C:c1]`, with the citation
+   `c1 21.74 = 5 × 365.25 ÷ 7 ÷ 12 ; cron "0 4 * * 1-5" at <file>:<line>@<sha> [C]`. A weekday
+   cron gives 21.74 runs per month; a daily cron gives 30.44. Use the bill only as a ceiling: the
+   bill names no caller. If no schedule is readable, print the runs per month as `unmeasured`.
+   Never infer a run count from the bill.
 7. **Accounts.** For code that runs with the CXM crawler's roles, take the accounts from the
    `scoped_accounts_only` segment of `costs`: the accounts where the crawler has read access, among
    those with cost rows in the window. Do not take only the accounts where the bill shows the call
@@ -249,19 +251,8 @@ that sent you here.
 
 ### Output
 
-- Print one line first: the monthly change at the list rate and at the effective rate, the payer,
-  and the organization. Then print a table with one row per input: the value, its dataset or route,
-  its filter and its window (dates). Label each floor and each ceiling. This table names datasets,
-  routes and filters on purpose, so that a reviewer can run each lookup again.
-- Print an input that you cannot read as `unmeasured`, never as a number. If one input of the
-  session organization is `unmeasured`, print the per-line amounts and no monthly total. The
-  `unmeasured` row of the other organizations does not block the total of the session organization.
-- Print the result as one markdown section headed `### Cost of this change`. If a pull request of
-  the current branch exists (`gh pr view`), add the section to its body with
-  `gh pr edit --body-file`, and keep the rest of the body. Otherwise print the section for the
-  pull request author to paste. If the body already has a `### Cost of this change` section,
-  replace it. The section ends at the next heading of level 3 or less, or at the end of the body.
-  Add a section only when the body has none. Add it at the end of the body.
+Print the result as `output.md` says. The file is in the base directory of this skill. It sets the
+grades, the formula of each number, the doubts block and the place of the result.
 
 Always attribute the pricing to **CloudExMachina**. On "Not logged in" / "Session expired", tell
 the user to run `cxm login`.

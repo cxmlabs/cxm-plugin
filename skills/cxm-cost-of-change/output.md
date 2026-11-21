@@ -1,0 +1,144 @@
+# Output of the cost-of-change skill
+
+This file sets the format of every result of the skill. A result shows each number with a grade, a
+formula and a source. Print the result as one markdown section headed `### Cost of this change`.
+The caller decides where the result goes.
+
+## Grades
+
+Give each number one grade. The grade says how the number was obtained.
+
+| Grade | Name | What qualifies |
+|---|---|---|
+| A | Measured in the target | Live metric, run history, object listing or manifest, audit log, crawled inventory or metrics that are 7 days old or less. A catalog list price. |
+| B | Measured from the bill | Usage and cost rows of the accounts of the target, an effective rate, the discount-rate route. The citation states the attribution. |
+| C | Derived from code | Cron, loop bound, page size, default argument, pinned library default, a local run over public inputs. |
+| D | Assumed | No source above. The citation gives its basis, a low value and a high value. |
+
+`unmeasured` is not a grade. Print `unmeasured` only as the rest of this skill allows.
+
+### Grade rules
+
+- **G1.** A product or a sum takes the lowest grade of its factors.
+- **G2.** A value that was measured on one target and is used for another drops one grade. Cite it
+  as "analog of `<target>`".
+- **G3.** A C value that an independent A or B source confirms within ±20 % becomes B. A larger
+  gap is a doubt, and the measured value applies.
+- **G4.** Print a floor or a ceiling as a bound. If ceiling ÷ floor is more than 3, the result is
+  C at best.
+- **G5.** A D factor makes the result D. The headline prints the low–high range.
+- **G6.** The total takes the lowest grade of the targets that hold 10 % or more of it. A target
+  with an unknown run status makes the total a floor, C at best.
+- **G7.** A catalog rate is A. A bill effective rate is B. A discount-rate route is B. An assumed
+  discount is D.
+
+An assumption is a D factor. It cites its basis and gives a low value and a high value. The
+headline then prints the low–high range.
+
+## Format of the result
+
+```
+### Cost of this change
+
+**<payer>: +$<list>/mo list, +$<effective>/mo effective, grade <G>**
+Organization: <name>. <floor or ceiling label, when one applies>
+
+| Target | Runs here? | Δ list /mo | Δ effective /mo | Grade |
+|---|---|---|---|---|
+
+**Result lines**
+<id> <target> <item> = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] …
+
+**Doubts**
+1. <assumption or unknown> — effect: <low>–<high> $/mo — resolve: <rung, tool or owner>.
+
+<details><summary>Citations</summary>
+<cite> <value> <unit> = <formula over cites or constants> ; <source> [<grade>]
+</details>
+```
+
+- Print one headline for each payer and each currency. Never add two currencies.
+- Until the skill reads more than one deployment target, the target table has one row: the session
+  organization.
+- Print each result line with its whole formula. Each factor carries `[<grade>:<cite>]`.
+- A citation holds its own formula, and the cites and sources of that formula. Follow the chain
+  down to a leaf source.
+- Label each floor and each ceiling.
+- This format names datasets, routes and filters on purpose, so that a reviewer can run each lookup
+  again.
+
+### Source forms
+
+A leaf source has one of five forms:
+
+- `file:line@sha`: a line of code at a commit.
+- `dataset{measures; filters; window}`: a dataset query. Give the dates of the window.
+- `route?params`: a call to a route of the API.
+- `tool(params)`: a call to a tool.
+- `public:<url>@<date>`: a public page, with the date of the read.
+
+### Doubts
+
+The doubts block always prints. Each doubt names an assumption or an unknown. It gives its effect
+in $/mo as a low and a high value, and it says how to resolve it: a rung of the source map, a tool
+or an owner. When no factor is C or D and no bound applies, print this line in place of the list:
+
+`No doubt: every factor is A or B.`
+
+### Unmeasured inputs
+
+- Print an input that you cannot read as `unmeasured`, never as a number. If one input of the
+  session organization is `unmeasured`, print the per-line amounts and no monthly total. The
+  `unmeasured` row of the other organizations does not block the total of the session organization.
+
+### A failed run
+
+When the skill must stop because a required count did not run, print only this line:
+
+**FAILED: required count not run: <count> (unit of work: <unit>).**
+
+Print no table, no result line and no doubts block. The rest of the skill says when a run fails.
+
+### No billed unit change
+
+Print the section with these parts:
+
+1. The line "no billed unit changes". Print no cost, no monthly total and no rate.
+2. The count before and after the diff, each with its grade and its citation.
+3. The doubts block.
+
+## Worked example
+
+A change adds one scheduled CI job. The job runs a log query on the staging account. This example shows
+two targets.
+
+**Staging AWS account: +$0.064/mo list, $0–0.064/mo effective, grade B**
+Organization: the session organization.
+
+| Target | Runs here? | Δ list /mo | Grade |
+|---|---|---|---|
+| the staging account, one region | yes [A: 22 runs in 30 days, CI run history] | +$0.064 | B |
+| production and other tenants | no [C: both callers assume the staging reader role and pass the staging region] | $0 | C |
+
+**Result lines**
+- `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6]`
+
+<details><summary>Citations</summary>
+
+- `c1 21.74 = 5 × 365.25 ÷ 7 ÷ 12 ; cron "30 5 * * 1-5" at <workflow>.yml:15@<sha> [C] ; confirmed by 22 runs in 30 days [A] → B`
+- `c2 36 h = 12 h window (<workflow>.yml:54@<sha>) + 24 h baseline (<script>.py:216@<sha>) [C]`
+- `c3 0.0139 GB/h = 9.99 GB ÷ 30 ÷ 24 ; costs{sum_usage_amount; EUW3-DataProcessing-Bytes; asset_arn under the 3 prefixes of <script>.py:231@<sha>; 2026-10-20..2026-11-18} [B]`
+- `c4 0.50 GB/run = c2 × c3 [C] ; bill difference +11.75 GB/mo against 10.9 GB/mo predicted, within ±20 % → B`
+- `c6 $0.0059/GB = /pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes [A]`
+
+</details>
+
+**Doubts**
+1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: the result rises above $0.064/mo by an amount that is not measured — resolve: count the "hit the row limit" warnings in the CI logs.
+2. The free tier is account-wide, so the effective cost is $0 to $0.064 — effect: 0–0.064 $/mo — resolve: read the free-tier usage of the payer account.
+3. The production row is C until a CloudTrail count of the job exists — effect: 0–0.064 $/mo — resolve: count the job calls in the audit log of the production account.
+
+## Where the result goes
+
+Print the result as one markdown section headed `### Cost of this change`. The caller decides where
+the result goes. The skill never reads or writes a pull request.
