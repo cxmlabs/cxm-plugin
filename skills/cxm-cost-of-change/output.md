@@ -3,6 +3,7 @@
 This file sets the format of every result of the skill. A result shows each number with a grade, a
 formula and a source. Print the result as one markdown section headed `### Cost of this change`.
 The caller decides where the result goes. The skill never reads or writes a pull request.
+End the answer with the structured block that "Structured block" sets.
 
 ## Grades
 
@@ -94,7 +95,7 @@ line in place of the list:
 
 ### A failed run
 
-When the skill must stop because a required count did not run, print only this line:
+When the skill must stop because a required count did not run, print only this line, then the structured block:
 
 **FAILED: required count not run: <count> (unit of work: <unit>).**
 
@@ -148,3 +149,24 @@ Organization: the session organization.
 - `c9 $0.005/min = $0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min ; github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18} [B] ; the marginal rate is the list rate, because the included minutes are used up`
 
 </details>
+
+## Structured block
+
+End the answer with exactly one fenced block whose info string is `cxm-cost-result`. The block holds
+one JSON object that follows `cost-result.schema.json` in this directory. Build it from the same
+values as the markdown section. Print no figure in it that the section does not print.
+
+- `status` is `priced`, `no_billed_unit_change` or `failed`.
+- Make one `headlines` entry for each headline, one `targets` entry for each row of the table, one
+  `results` entry for each result line with its `factors`, one `citations` key for each cite, and one
+  `doubts` entry for each doubt. When the section prints "No doubt", `doubts` is an empty list.
+- A factor that the section prints as `unmeasured` has the value `unmeasured` and a `reason`. It has
+  no grade and no cite.
+- A target row that the table prints as `unmeasured` has the value `unmeasured` in `amounts.list` and
+  `amounts.effective`.
+- For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets`,
+  `results`, `doubts` and `citations` empty.
+- For no billed unit change, leave `headlines` and `targets` empty. `results` holds the count before
+  and the count after the diff. Each amount and each doubt effect is in billed units per run.
+
+The skill does not validate or publish this block. The caller does.

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "organization": "the session organization",
+  "status": "failed",
+  "headlines": [
+    {
+      "payer": "Staging AWS account",
+      "currency": "USD",
+      "list": {
+        "low": 1,
+        "high": 1,
+        "unit": "$/mo"
+      },
+      "grade": "B",
+      "bound": "none"
+    }
+  ],
+  "targets": [],
+  "results": [],
+  "citations": {},
+  "doubts": [],
+  "failed": {
+    "count": "the runs of the job in 30 days",
+    "unit_of_work": "one run"
+  }
+}
