@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "organization": "the session organization",
+  "status": "priced",
+  "headlines": [],
+  "targets": [],
+  "results": [
+    {
+      "id": "R1",
+      "target": "staging",
+      "item": "Logs query",
+      "amount": "unmeasured",
+      "factors": [
+        {
+          "value": "unmeasured",
+          "unit": "GB/run"
+        }
+      ]
+    }
+  ],
+  "citations": {
+    "c1": {
+      "value": 2,
+      "unit": "GB/run",
+      "formula": "a formula",
+      "source": "a source",
+      "grade": "B"
+    }
+  },
+  "doubts": []
+}

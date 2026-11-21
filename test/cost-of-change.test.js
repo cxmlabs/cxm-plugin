@@ -87,3 +87,15 @@ test('the skill returns its result and never reads or writes a pull request', ()
   const pointer = skillOnly.slice(skillOnly.indexOf('### Output'));
   assert.ok(pointer.includes('Print the result as `output.md` says.'));
 });
+
+test('the skill ends its answer with one cxm-cost-result block', () => {
+  assert.ok(output.includes('exactly one fenced block whose info string is `cxm-cost-result`'));
+  assert.ok(output.includes('`cost-result.schema.json`'));
+  assert.equal(JSON.parse(read('cost-result.schema.json')).properties.status.enum.length, 3);
+});
+
+test('the shared rules name a structured result, not a pull request body', () => {
+  const shared = readFileSync(new URL('../skills/cxm-shared-rules.md', import.meta.url), 'utf8');
+  assert.ok(shared.includes('Exception for a structured result or a document that a caller publishes'));
+  assert.ok(!shared.includes('pull request body'));
+});

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "organization": "the session organization",
+  "status": "failed",
+  "headlines": [],
+  "targets": [],
+  "results": [
+    {
+      "id": "R1",
+      "target": "staging",
+      "item": "Logs query",
+      "amount": {
+        "low": 1,
+        "high": 1,
+        "unit": "$/mo"
+      },
+      "grade": "B",
+      "factors": [
+        {
+          "value": 2,
+          "unit": "GB/run",
+          "grade": "B",
+          "cite": "c1"
+        }
+      ]
+    }
+  ],
+  "citations": {
+    "c1": {
+      "value": 2,
+      "unit": "GB/run",
+      "formula": "a formula",
+      "source": "a source",
+      "grade": "B"
+    }
+  },
+  "doubts": [],
+  "failed": {
+    "count": "the runs of the job in 30 days",
+    "unit_of_work": "one run"
+  }
+}
