@@ -2,38 +2,22 @@
   "schema_version": 1,
   "organization": "the session organization",
   "status": "failed",
-  "headlines": [],
-  "targets": [],
-  "results": [
+  "headlines": [
     {
-      "id": "R1",
-      "target": "staging",
-      "item": "Logs query",
-      "amount": {
+      "payer": "Staging AWS account",
+      "currency": "USD",
+      "list": {
         "low": 1,
         "high": 1,
         "unit": "$/mo"
       },
       "grade": "B",
-      "factors": [
-        {
-          "value": 2,
-          "unit": "GB/run",
-          "grade": "B",
-          "cite": "c1"
-        }
-      ]
+      "bound": "none"
     }
   ],
-  "citations": {
-    "c1": {
-      "value": 2,
-      "unit": "GB/run",
-      "formula": "a formula",
-      "source": "a source",
-      "grade": "B"
-    }
-  },
+  "targets": [],
+  "results": [],
+  "citations": {},
   "doubts": [],
   "failed": {
     "count": "the runs of the job in 30 days",

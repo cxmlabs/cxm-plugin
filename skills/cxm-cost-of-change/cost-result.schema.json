@@ -9,7 +9,7 @@
       "if": { "properties": { "status": { "const": "failed" } } },
       "then": {
         "required": ["failed"],
-        "properties": { "headlines": { "maxItems": 0 }, "targets": { "maxItems": 0 }, "results": { "maxItems": 0 } }
+        "properties": { "headlines": { "maxItems": 0 }, "targets": { "maxItems": 0 }, "results": { "maxItems": 0 }, "doubts": { "maxItems": 0 }, "citations": { "maxProperties": 0 } }
       }
     },
     {
@@ -129,7 +129,7 @@
       }
     },
     "failed": {
-      "description": "Required when status is failed. Then headlines, targets and results are empty.",
+      "description": "Required when status is failed. Then headlines, targets, results and doubts are empty lists, and citations is an empty object.",
       "type": "object",
       "required": ["count", "unit_of_work"],
       "properties": {

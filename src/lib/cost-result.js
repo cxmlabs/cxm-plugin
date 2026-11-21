@@ -89,6 +89,8 @@ export function validateCostResult(value) {
     text(value.failed?.unit_of_work, 'failed.unit_of_work');
     const amounts = [value.headlines, value.targets, value.results].some((v) => Array.isArray(v) && v.length > 0);
     need(!amounts, 'status', 'a failed result holds an amount');
+    const kept = (Array.isArray(value.doubts) && value.doubts.length > 0) || Object.keys(citations).length > 0;
+    need(!kept, 'status', 'a failed result holds a doubt or a citation');
   }
   if (value.status === 'no_billed_unit_change') {
     const held = [value.headlines, value.targets].some((v) => Array.isArray(v) && v.length > 0);

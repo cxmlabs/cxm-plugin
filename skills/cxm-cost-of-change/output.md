@@ -95,7 +95,7 @@ line in place of the list:
 
 ### A failed run
 
-When the skill must stop because a required count did not run, print only this line:
+When the skill must stop because a required count did not run, print only this line, then the structured block:
 
 **FAILED: required count not run: <count> (unit of work: <unit>).**
 
@@ -164,8 +164,8 @@ values as the markdown section. Print no figure in it that the section does not 
   no grade and no cite.
 - A target row that the table prints as `unmeasured` has the value `unmeasured` in `amounts.list` and
   `amounts.effective`.
-- For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets` and
-  `results` empty.
+- For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets`,
+  `results`, `doubts` and `citations` empty.
 - For no billed unit change, leave `headlines` and `targets` empty. `results` holds the count before
   and the count after the diff. Each amount and each doubt effect is in billed units per run.
 

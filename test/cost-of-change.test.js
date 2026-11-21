@@ -91,6 +91,7 @@ test('the skill returns its result and never reads or writes a pull request', ()
 test('the skill ends its answer with one cxm-cost-result block', () => {
   assert.ok(output.includes('exactly one fenced block whose info string is `cxm-cost-result`'));
   assert.ok(output.includes('`cost-result.schema.json`'));
+  assert.ok(output.includes('print only this line, then the structured block:'));
   assert.equal(JSON.parse(read('cost-result.schema.json')).properties.status.enum.length, 3);
 });
 

@@ -31,6 +31,7 @@ test('each faulty cost result names its fault', () => {
     'undefined-cite': /cite c9 is not defined in citations/,
     'no-doubts': /doubts: must be a list/,
     'failed-with-amount': /a failed result holds an amount/,
+    'failed-with-doubt': /a failed result holds a doubt or a citation/,
     'no-factor': /results\[0\]\.factors: must hold a factor/,
     'unmeasured-no-reason': /results\[0\]\.factors\[0\]\.reason/,
   };
