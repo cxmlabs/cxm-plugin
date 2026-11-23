@@ -76,8 +76,8 @@ test('every result line carries grades and citations, and the doubts block alway
   assert.ok(none.includes('The doubts block. In this case, give the effect of each doubt in billed units per run, not in $/mo.'));
 });
 
-test('step 6 gives the runs-per-month factor with its grade and cron citation', () => {
-  const step6 = skillOnly.slice(skillOnly.indexOf('6. **Runs per month.**'), skillOnly.indexOf('7. **Accounts.**'));
+test('the runs-per-month step gives the runs-per-month factor with its grade and cron citation', () => {
+  const step6 = skillOnly.slice(skillOnly.indexOf('. **Runs per month.**'), skillOnly.indexOf('. **Accounts.**'));
   assert.ok(step6.includes('21.74 runs/mo [C:c1]'));
   assert.ok(step6.includes('@<sha>'));
 });
@@ -136,4 +136,20 @@ test('a required count that was not attempted fails the run', () => {
   assert.match(measurement, phrase('prints only the FAILED line of `output.md`, then the structured block.'));
   assert.match(skillOnly, phrase('per account and region, per asset, per GitHub org, or per request'));
   assert.doesNotMatch(skill, phrase('print the per-line amounts and no monthly total'));
+});
+
+test('the skill lists every deployment target before it names a payer', () => {
+  const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
+  const targets = code.indexOf('. **Deployment targets.**');
+  assert.ok(targets > 0 && targets < code.indexOf('. **Payer.**'), 'Deployment targets comes before Payer');
+  const step = code.slice(targets, code.indexOf('. **Payer.**'));
+  assert.ok(step.includes('Runs here? unknown — no access: <error>'));
+  for (const source of ['`deploys` edge', "git tag --list 'deploy/*' --contains <sha>", '`gh run list`', '`costs` and `assets`']) assert.ok(step.includes(source), source);
+  assert.match(step, phrase('A target that is not attempted fails the run'));
+  assert.match(step, phrase('names the missing datasource'));
+  assert.ok(output.includes('| Target | Runs here? |') && output.includes('`runs_here.value`'));
+  assert.doesNotMatch(code, phrase('Print the cost for each other organization'));
+  assert.match(code, phrase('A schedule and a run count never come from it.'));
+  assert.doesNotMatch(output, phrase('Until the skill reads more than one deployment target'));
+  assert.doesNotMatch(output, phrase('wait for the deployment-target step'));
 });

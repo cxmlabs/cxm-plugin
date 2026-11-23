@@ -97,49 +97,70 @@ Read `measurement.md` in the base directory of this skill first. It sets the sou
 and the required counts. Print `unmeasured` only as its stop rule allows.
 
 1. **Organization.** Run `cxm whoami` and name the organization of the session. Say that the
-   answer covers this organization only. Print the cost for each other organization that the code
-   reaches as `unmeasured`.
+   answer covers this organization only. Step 3 lists each target that the code reaches, including
+   each target that another organization holds.
 2. **Paid calls.** Read the diff (`git diff <base>...HEAD`). Find each paid call that the diff
    adds, removes or multiplies. A call to a third-party service is a paid call. For each paid call,
    name the API operation, the payer, the unit of work and the asset type that the call iterates
    over. The unit of work is once per run, per account, per account and region, per asset, per GitHub org, or per
    request. If the diff adds, removes and multiplies no paid call, go to "No billed unit change".
-3. **Payer.** A call with a role in another account bills that account. A call with the platform
+3. **Deployment targets.** List every target that runs the changed code, before you name a payer.
+   Do this for each changed file:
+   - Find its deployable unit: a CI workflow (jobs, schedule, role variables, `--region`, matrix,
+     `environment:`), an image, an infrastructure resource, or a schedule in code or infrastructure.
+   - Expand the unit into targets. For infrastructure, follow the `deploys` edges of the
+     `cxm-repo-graph` skill from each Terraform workspace that uses the module or image to its
+     accounts. A target is a workspace × account × region. For CI, a target is a job × role × region
+     × matrix entry. For release state, read `git tag --list 'deploy/*' --contains <sha>` and
+     `gh run list`. For the accounts of the tenants, read the account names in `costs` and `assets`
+     of the organization.
+   - Answer "Runs here?" for each target, with its grade: A for a run history count, a metric or an
+     audit log count. B for bill usage after the deploy date. C for code, configuration or a deploy
+     marker. D for an assumption.
+   - Give each target one row of the target table, and price each target on its own. Never copy a
+     measurement to another target without G2 of `output.md`.
+   - If the organization cannot reach a target, keep its row as
+     `Runs here? unknown — no access: <error>`, with grade D. The total becomes a floor (G6). Add a
+     doubt that names the missing datasource.
+   - A target that is not attempted fails the run. Print the FAILED line of `output.md` with
+     `Deployment targets` as the count, then the structured block.
+4. **Payer.** A call with a role in another account bills that account. A call with the platform
    credentials bills the platform account. If the session organization does not hold the bill of
    the payer, print each input that needs that bill as `unmeasured`.
-4. **Billed units per unit of work.** Count them from the request that the code sends, never from
+5. **Billed units per unit of work.** Count them from the request that the code sends, never from
    stored data. Follow "Billed units". Then compare these inputs before and after the diff: the
    payer and the usage type of every call, the billed units of every call, the unit of work, the
    runs per month, the row filters, and the accounts, regions and asset type that the call
-   iterates over. If one of them changes, continue to step 5. A change of payer is a removal on
+   iterates over. If one of them changes, continue to step 6. A change of payer is a removal on
    the old payer and an addition on the new payer: give each one a subtotal. If all of them stay the same, show the count before and after, and go to "No billed
    unit change". For example, a diff removes 2 of 4 statistics of a metric, or changes the batch
    size and keeps one page.
-5. **Runtime node.** Find the runtime node and the image of the changed code with the
-   `cxm-repo-graph` skill. Do not take a schedule or an account list from a node that only matches
-   by name, or from a `deploys` edge.
-6. **Runs per month.** Take them from the schedule that the code declares, and cite its
+6. **Runtime node.** Find the runtime node and the image of the changed code with the
+   `cxm-repo-graph` skill. Do not take a schedule or a run count from a node that only matches
+   by name, or from a `deploys` edge. A `deploys` edge names a candidate target for step 3. A
+   schedule and a run count never come from it.
+7. **Runs per month.** Take them from the schedule that the code declares, and cite its
    `file:line@sha`. Show the run count as a factor: `21.74 runs/mo [C:c1]`, with the citation
    `c1 21.74 = 5 × 365.25 ÷ 7 ÷ 12 ; cron "0 4 * * 1-5" at <file>:<line>@<sha> [C]`. A weekday
    cron gives 21.74 runs per month; a daily cron gives 30.44. Use the bill only as a ceiling: the
    bill names no caller. If no schedule is readable, take the runs per month from the "Runs per month"
    row of the source map. Never infer a run count from the bill.
-7. **Accounts.** For code that runs with the CXM crawler's roles, take the accounts from the
+8. **Accounts.** For code that runs with the CXM crawler's roles, take the accounts from the
    `scoped_accounts_only` segment of `costs`: the accounts where the crawler has read access, among
    those with cost rows in the window. Do not take only the accounts where the bill shows the call
    now. For other code that calls into other accounts, take the accounts from the list that the
    code or its configuration declares, with file and line. Else take the accounts from the "Accounts"
    row of the source map.
-8. **Assets.** Count the affected assets per account and region with `assets`. Filter
+9. **Assets.** Count the affected assets per account and region with `assets`. Filter
    `assets.asset_type` on the inventory table that the code iterates over, and
    `assets.inventory_status` on `live`. Print the date of the count.
-9. **Row filters.** Apply each filter that the code puts on the rows before the call. For the
+10. **Row filters.** Apply each filter that the code puts on the rows before the call. For the
    metrics crawler, read the `source_filter`, `min_stored_bytes` and `max_dimension_values` of the
    service entry in `aws_services_metrics.yml`, and cite file and line. Filter `assets` on the
    column that `source_filter` names when `assets` has it. Cap each account-region count at
    `max_dimension_values`. Label the count a ceiling when `assets` cannot express a filter
    (`min_stored_bytes`).
-10. **Baseline.** Read the current usage and cost of the same usage type per account and region
+11. **Baseline.** Read the current usage and cost of the same usage type per account and region
     with `costs`, over the 30 full days before `cur_reach.latest_day`. `cur_reach.latest_day` is a
     measure, not a dimension: query it as `{"measures":["cur_reach.latest_day"],"filters":[{"member":
     "cur_reach.cloud_provider_id","operator":"equals","values":["aws"]}]}`. If the change already
@@ -148,14 +169,14 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
     date. The bill uses UTC days and the commit date uses local time. The extra day covers the
     difference. If the change does not run yet, say that the baseline excludes the change. If the change runs and its start date is
     unknown, say that the baseline includes the change.
-11. **Rates.** Read the effective rate from `costs` as net cost ÷ usage per usage type, with the
+12. **Rates.** Read the effective rate from `costs` as net cost ÷ usage per usage type, with the
     `usage_charges_only` segment. Read the list rate with the list-price route, for the usage type
     of the region of the API endpoint. Follow "Rate rules".
-12. **Monthly change.** (units of work × billed units per unit of work × runs per month after the
+13. **Monthly change.** (units of work × billed units per unit of work × runs per month after the
     diff − the same product before the diff) × rate, at the list rate and at the effective rate.
     Show both products. Give a decrease with a minus sign. For a usage type with more than one
     tier, follow the tier rule of "Rate rules".
-13. **Report.** Follow "Output".
+14. **Report.** Follow "Output".
 
 A `costs` query that reads `sum_usage_amount` or `operation` scans the raw bill. Filter it on
 `costs.account_id`, `costs.product_code`, `costs.usage_type` and the dates, and pass

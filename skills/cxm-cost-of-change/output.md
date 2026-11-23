@@ -24,7 +24,7 @@ Give each number one grade. The grade says how the number was obtained.
 - **G2.** A value that was measured on one target and is used for another drops one grade. Cite it
   as "analog of `<target>`".
 - **G3.** A C value that an independent A or B source confirms within ±20 % becomes B. A larger
-  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as steps 4 and 6
+  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as steps 5 and 7
   of `SKILL.md` say.
 - **G4.** Print a floor or a ceiling as a bound. If ceiling ÷ floor is more than 3, the result is
   C at best. A floor of 0 that a free allowance sets is exempt from this ratio.
@@ -59,8 +59,9 @@ Organization: <name>. <floor or ceiling label, when one applies>
 
 - Print one headline for each payer and each currency. Never add two currencies.
 - A decrease takes a minus sign.
-- Until the skill reads more than one deployment target, the target table has one row: the session
-  organization.
+- The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
+  `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
+  organization cannot reach, the cell is `unknown — no access: <error>`, with grade D.
 - Print each result line with its whole formula. Each factor carries `[<grade>:<cite>]`.
 - A citation holds its own formula, and the cites and sources of that formula. Follow the chain
   down to a leaf source.
@@ -91,8 +92,8 @@ line in place of the list:
 
 - Print an input that you cannot read as `unmeasured`, never as a number. Print `unmeasured` only as
   the stop rule of `measurement.md` allows. Attempt each required count of `measurement.md`: a required
-  count not attempted fails the run. The `unmeasured` row of the other organizations does not block
-  the total of the session organization.
+  count not attempted fails the run. The row of a target that the organization cannot reach does not
+  block the total. It makes the total a floor, as G6 says.
 
 ### A failed run
 
@@ -114,8 +115,7 @@ Print the section with these parts:
 
 A change adds one scheduled CI job. The job runs a log query on the staging account. The example
 shows two payers, so it has two headlines. It also shows two targets of the cloud payer.
-The rows for other targets wait for the deployment-target step. Until then, the skill prints only the
-row of the session organization.
+Step 3 of `SKILL.md` lists the targets. Each target has one row.
 
 **Staging AWS account: +$0.064/mo list, $0–0.064/mo effective, grade B**
 **CI provider organization: +$4.19 per 30 days list, grade C**
@@ -174,7 +174,7 @@ Read `cost-result.schema.json` before you write the block.
 - A factor that the section prints as `unmeasured` has the value `unmeasured` and a `reason`. It has
   no grade and no cite.
 - A target row that the table prints as `unmeasured` has the value `unmeasured` in `amounts.list` and
-  `amounts.effective`.
+  `amounts.effective`. A target with `Runs here? unknown` has `runs_here.value` `unknown`.
 - For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets`,
   `results`, `doubts` and `citations` empty.
 - For no billed unit change, leave `headlines` and `targets` empty. `results` holds the count before
