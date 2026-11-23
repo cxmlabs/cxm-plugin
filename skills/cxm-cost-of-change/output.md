@@ -156,7 +156,15 @@ Organization: the session organization.
 End the answer with exactly one fenced block whose info string is `cxm-cost-result`. The block holds
 one JSON object that follows `cost-result.schema.json` in this directory. Build it from the same
 values as the markdown section. Print no figure in it that the section does not print.
+Read `cost-result.schema.json` before you write the block.
 
+- `schema_version` is the number 1.
+- Each amount is `{"low": <number>, "high": <number>, "unit": "<unit>"}`. This holds for
+  `headlines[].list`, `headlines[].effective`, `targets[].amounts.list`, `targets[].amounts.effective`
+  and `results[].amount`. A single value has `low` equal to `high`. Only `targets[].amounts` and
+  `results[].amount` may be the text `unmeasured` in place of this object.
+- Each `citations` value is `{"value": <number>, "unit": "<unit>", "formula": "<text>", "source": "<text>", "grade": "<A to D>"}`.
+- A factor `value` is a number or `unmeasured`.
 - `status` is `priced`, `no_billed_unit_change` or `failed`.
 - Make one `headlines` entry for each headline, one `targets` entry for each row of the table, one
   `results` entry for each result line with its `factors`, one `citations` key for each cite, and one
