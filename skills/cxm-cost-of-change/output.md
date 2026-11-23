@@ -161,6 +161,7 @@ Organization: the session organization.
 - `R1 staging Logs query (aws, call) = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6] ; bill: confirmed [c4]`
 - `R2 CI provider <log watch workflow> (github, compute) = $0.349 per 30 days [B] = 69.8 billed min [B:c7] × $0.005/min [B:c9]`
 - `R3 CI provider <nightly E2E workflow> (github, compute) = $3.84 per 30 days [C] = 768.5 billed min [C:c8] × $0.005/min [B:c9] ; bill: none [c8]`
+- `R4 staging AssumeRole (aws, call) = $0 [B] = 0 $/request [B:c10] ; not billed: the token service has no price list and no bill row [c10]`
 
 **Doubts**
 1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: 0–0.064 $/mo, at most one more scan of both halves — resolve: count the "hit the row limit" warnings in the CI logs.
@@ -203,6 +204,7 @@ Read `cost-result.schema.json` before you write the block.
   `doubts` entry for each doubt. When the section prints "No doubt", `doubts` is an empty list.
 - A factor that the section prints as `unmeasured` has the value `unmeasured` and a `reason`. It has
   no grade and no cite. It keeps its unit.
+- A not-billed line is a `results` entry with amount `{low: 0, high: 0, unit}`, one factor of value 0 with its unit, grade and cite, and the grade of that cite.
 - A target row that the table prints as `unmeasured` has the value `unmeasured` in `amounts.list` and
   `amounts.effective`. A target with `Runs here? unknown` has `runs_here.value` `unknown`.
 - For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets`,
@@ -231,7 +233,8 @@ The block of the worked example. Give every field it shows.
   "results": [
     {"id": "R1", "target": "staging", "item": "Logs query", "amount": {"low": 0.064, "high": 0.064, "unit": "$/mo"}, "grade": "B", "factors": [{"value": 21.74, "unit": "runs/mo", "grade": "B", "cite": "c1"}, {"value": 0.5, "unit": "GB/run", "grade": "B", "cite": "c4"}, {"value": 0.0059, "unit": "$/GB", "grade": "A", "cite": "c6"}]},
     {"id": "R2", "target": "CI provider", "item": "<log watch workflow>", "amount": {"low": 0.349, "high": 0.349, "unit": "$/30 days"}, "grade": "B", "factors": [{"value": 69.8, "unit": "billed min", "grade": "B", "cite": "c7"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]},
-    {"id": "R3", "target": "CI provider", "item": "<nightly E2E workflow>", "amount": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}, "grade": "C", "factors": [{"value": 768.5, "unit": "billed min", "grade": "C", "cite": "c8"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]}
+    {"id": "R3", "target": "CI provider", "item": "<nightly E2E workflow>", "amount": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}, "grade": "C", "factors": [{"value": 768.5, "unit": "billed min", "grade": "C", "cite": "c8"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]},
+    {"id": "R4", "target": "staging", "item": "AssumeRole", "amount": {"low": 0, "high": 0, "unit": "$/mo"}, "grade": "B", "factors": [{"value": 0, "unit": "$/request", "grade": "B", "cite": "c10"}]}
   ],
   "citations": {
     "c1": {"value": 21.74, "unit": "runs/mo", "formula": "5 × 365.25 ÷ 7 ÷ 12", "source": "cron \"30 5 * * 1-5\" at <workflow>.yml:15@<sha> [C]; confirmed by 22 runs in 30 days [A]", "grade": "B"},
@@ -241,7 +244,8 @@ The block of the worked example. Give every field it shows.
     "c6": {"value": 0.0059, "unit": "$/GB", "formula": "/pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes", "source": "/pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes", "grade": "A"},
     "c7": {"value": 69.8, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <log watch workflow>; 2026-10-20..2026-11-18}", "grade": "B"},
     "c8": {"value": 768.5, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18}; analog per G2, because the job changed after the merge; bill: none, no after window yet", "grade": "C"},
-    "c9": {"value": 0.005, "unit": "$/min", "formula": "$0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min", "source": "github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18}; the marginal rate is the list rate, because the included minutes are used up", "grade": "B"}
+    "c9": {"value": 0.005, "unit": "$/min", "formula": "$0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min", "source": "github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18}; the marginal rate is the list rate, because the included minutes are used up", "grade": "B"},
+    "c10": {"value": 0, "unit": "$/request", "formula": "no price list, no bill row", "source": "/pricing/aws/list-price?service_code=AWSSecurityTokenService: no price list; costs{sum_current_net_unblended_cost; product_code contains Security; last 30 days}: 0 rows", "grade": "B"}
   },
   "doubts": [
     {"text": "A window with 10,000 rows or more scans both halves again (<script>.py:176@<sha>)", "effect_low": 0, "effect_high": 0.064, "resolve": "count the \"hit the row limit\" warnings in the CI logs"},

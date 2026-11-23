@@ -97,6 +97,7 @@ test('the skill ends its answer with one cxm-cost-result block', () => {
   assert.ok(output.includes('"low"'));
   assert.ok(output.includes('"effect_low": <number>'));
   assert.ok(output.includes('The block of the worked example. Give every field it shows.'));
+  assert.ok(output.includes('A not-billed line is a `results` entry with amount `{low: 0, high: 0, unit}`, one factor of value 0 with its unit, grade and cite, and the grade of that cite.'));
   const example = output.match(/```json\n([\s\S]*?)\n```/);
   assert.ok(example, 'output.md holds no json example of the block');
   assert.deepEqual(validateCostResult(JSON.parse(example[1])), []);
