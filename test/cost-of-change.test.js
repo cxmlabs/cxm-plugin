@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
+import { validateCostResult } from '../src/lib/cost-result.js';
 import { orgApi } from '../src/lib/http.js';
 
 const skillDir = new URL('../skills/cxm-cost-of-change/', import.meta.url);
@@ -94,6 +95,10 @@ test('the skill ends its answer with one cxm-cost-result block', () => {
   assert.ok(output.includes('Read `cost-result.schema.json` before you write the block.'));
   assert.ok(output.includes('"low"'));
   assert.ok(output.includes('"effect_low": <number>'));
+  assert.ok(output.includes('The block of the worked example. Give every field it shows.'));
+  const example = output.match(/```json\n([\s\S]*?)\n```/);
+  assert.ok(example, 'output.md holds no json example of the block');
+  assert.deepEqual(validateCostResult(JSON.parse(example[1])), []);
   assert.ok(output.includes('print only this line, then the structured block:'));
   assert.equal(JSON.parse(read('cost-result.schema.json')).properties.status.enum.length, 3);
 });
