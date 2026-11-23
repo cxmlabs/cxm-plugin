@@ -242,3 +242,18 @@ test('each unit of work names its trigger and counts it from its source-map row'
   assert.ok(row('CI minutes per run').includes('`timeout-minutes`'));
   assert.match(skillOnly, phrase('request count per route are not in a dataset. The exception is the "Requests per month" row'));
 });
+
+test('each datasource prices at the marginal rate of its bill', () => {
+  const map = measurement.slice(measurement.indexOf('## Rate map')).split(/\n## /)[0];
+  assert.ok(map.startsWith('## Rate map'), 'measurement.md has no section "## Rate map"');
+  const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name} |`));
+  assert.ok(row('AWS') && row('GitHub'), 'one row for AWS and one for GitHub');
+  for (const text of ['"Monthly change" of `SKILL.md`', 'returns no row, or a null rate, use a discount of 0', '`costs.pricing_term` = `OnDemand`', '`Reserved`']) {
+    assert.match(map, phrase(text), text);
+  }
+  for (const text of ['sum_gross_amount', 'sum_net_amount', 'sum_discount_quantity', 'sum_quantity']) assert.ok(row('GitHub').includes(text), text);
+  assert.ok(map.includes('unmeasured (no rate rule: <datasource>)'));
+  assert.doesNotMatch(skillOnly, /#### Rate rules|routes cover AWS only/);
+  assert.doesNotMatch(skill, phrase('`github_workflow_costs` gives `net_amount` ÷ `quantity`'));
+  assert.ok(output.includes('github_costs.sum_gross_amount ÷ sum_quantity') && !output.includes('github_workflow_costs{gross_amount'));
+});

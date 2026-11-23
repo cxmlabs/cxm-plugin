@@ -45,6 +45,53 @@ Each unit of work needs the counts of its row. Attempt each count through its ro
 A required count that every rung failed to give prints as `unmeasured`, with the error text of each
 rung, as S2 says.
 
+## Rate map
+
+Each datasource has one row. The rate is the marginal rate: what one more unit adds after the included
+allowance, the tiers, the commitments and the negotiated discount. A datasource with no row prints
+`unmeasured (no rate rule: <datasource>)`. The rate map is the proof that no source exists (S2).
+
+| Datasource | Quantity measure | Usage dimension | List rate | Effective rate | Service terms and marginal-rate rule |
+|---|---|---|---|---|---|
+| AWS | `costs.sum_usage_amount` | `costs.usage_type` | The list-price route, for the usage type of the region of the API endpoint [A]. | `costs` net cost ÷ usage per usage type, with the `usage_charges_only` segment [B]. The discount-rate route when the usage type has no usage [B]. | The AWS rules below. |
+| GitHub | `github_costs.sum_quantity` | `github_costs.sku` | `github_costs.sum_gross_amount` ÷ `sum_quantity` per `sku` [B]. | `github_costs.sum_net_amount` ÷ `sum_quantity` per `sku` [B]. | Never `costs.sum_list_cost`: it equals the net amount for GitHub. When `sum_discount_quantity` < `sum_quantity` in the billing period, the included allowance is used up, and the marginal unit bills at the list rate. Otherwise the floor is 0 and the ceiling is the list rate. |
+
+**AWS rules**
+
+- Prefer the rate the account pays: net cost ÷ usage per usage type from `costs`. Otherwise use
+  the list-price route with `volume_amount`. Quote `total_cost_for_volume` for a tiered cost, never
+  `applicable_tier` × the whole volume. For a change on top of current usage, price the current
+  usage plus the change, and the current usage alone, and give the difference. Show the formula.
+- Copy the usage type verbatim from a `costs` row. Do not add or strip a region prefix. If the bill
+  has no row for it, find it with the `search` call.
+- Map an API operation to its usage type from a `costs` row that holds both. If no row of the
+  organization holds the pair, search the catalog. If the search finds nothing, print the rate as
+  `unmeasured`.
+- Take the unit from the `unit` that the route returns. Group usage by `costs.usage_type`. Do not
+  add the usage of two usage types.
+- Do not subtract a free tier. If the effective rate is lower than the list rate after the
+  discount, give 0 as the floor and the list rate as the ceiling.
+- Say that the effective rate excludes credits, refunds, reseller discounts and tax.
+- For a usage type with usage, the rate the account pays is already net of EDP/PRA. Apply no
+  discount on top of it.
+- For a usage type with no usage, read the negotiated discount with the discount-rate route for
+  the usage account. Apply `rows[0].effective_discount_rate_pct` ÷ 100 to the list rate. Label it
+  "blended over <product code>, latest billing month within 45 days". The route does not return
+  the month. Never carry the discount to another account or product code.
+- If the discount-rate route returns no row, or a null rate, use a discount of 0. Print the
+  warning "no discounted usage of <product code> in <account> in the last 45 days", and label the
+  result a ceiling.
+- Report each amount in its `costs.billing_currency`. Do not add two currencies. The list-price
+  route returns USD: compare a list rate with an effective rate, or set a floor and a ceiling from
+  them, only when `costs.billing_currency` is USD. Otherwise print the list rate in USD on its own
+  line. For another datasource, follow its row of the rate map.
+- Print each amount with 2 significant digits at least, and the billed units beside it.
+- Tiers: "Monthly change" of `SKILL.md` applies them to the total of the payer.
+- Commitment: when a usage type has `costs.pricing_term` = `OnDemand` usage in the window, the marginal
+  unit bills at the on-demand rate. When all its usage is `Reserved`, give 0 as the floor and the
+  on-demand rate as the ceiling. Add the doubt that the use of a commitment is known over its life only
+  (`commitments.lifetime_usage_rate`).
+
 ## Source map
 
 Cite each value that the inventory gives as "latest inventory, crawled at <date of the last crawl>". Read
