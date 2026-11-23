@@ -63,5 +63,7 @@ test('the skill prices a third-party service from the published rate, not from a
   assert.ok(rules.includes('unmeasured (no published rate: <datasource>)'));
   assert.match(rules, /state the quantity of the change in the published `unit`/);
   assert.ok(rules.includes('unmeasured (unit: <unit>)'));
-  assert.ok(!rules.includes('`github_workflow_costs` gives `net_amount` ÷ `quantity`'));
+  assert.doesNotMatch(rules, /github_workflow_costs|net_amount`?\s*(÷|\/|divided by)/);
+  assert.match(rules, /`cxm price --datasource` with no\s+value/);
+  assert.ok(rules.includes('--unit <unit>') && !rules.includes('[--unit <unit>]'));
 });

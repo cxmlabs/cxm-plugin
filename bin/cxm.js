@@ -59,6 +59,7 @@ Everything else
   price --service <ec2|rds|elasticache> --instance-type <t> --region <r>
         [--os/--engine/--deployment/--count/--hours]
                                                 On-demand and committed rates for one resource
+  price --datasource                            List the datasources with a published rate
   price --datasource <d>                        List the priced dimensions of a third-party service
   price --datasource <d> --dimension <x> [--unit <u>] [--billing-period YYYY-MM] [--quantity n]
                                                 Published billed unit rate of a third-party service

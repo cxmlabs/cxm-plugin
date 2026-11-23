@@ -38,8 +38,8 @@ const SERVICE = {
   elasticache: { product: 'AmazonElastiCache', extra: (s) => (s.engine ? [f('cache_engine', s.engine)] : []) },
 };
 
-function f(member, value) {
-  return { member: `${CUBE}.${member}`, operator: 'equals', values: [value] };
+function f(member, value, cube = CUBE) {
+  return { member: `${cube}.${member}`, operator: 'equals', values: [value] };
 }
 
 export function buildPricingQuery(spec) {
@@ -106,20 +106,21 @@ export function summarizePricing(rows, { hours = 730, count = 1 } = {}) {
 
 const RATES = 'third_party_unit_rates';
 const RATE_MEMBERS = ['datasource', 'dimension', 'unit', 'billing_period', 'unit_rate_usd', 'rate_source'];
+const RATED = { member: `${RATES}.unit_rate_usd`, operator: 'set' };
 
 // The analytics layer publishes the rate; the newest billing period comes first, and the CLI reads that one row.
 export function buildUnitRateQuery(spec) {
   if (!spec.datasource || !spec.dimension) throw new Error('price requires --datasource and --dimension');
-  const eq = (member, value) => ({ member: `${RATES}.${member}`, operator: 'equals', values: [value] });
   return {
     dimensions: RATE_MEMBERS.map((m) => `${RATES}.${m}`),
     filters: [
-      eq('datasource', spec.datasource),
-      eq('dimension', spec.dimension),
-      ...(spec.unit ? [eq('unit', spec.unit)] : []),
-      ...(spec.billingPeriod ? [eq('billing_period', spec.billingPeriod)] : []),
+      f('datasource', spec.datasource, RATES),
+      f('dimension', spec.dimension, RATES),
+      RATED,
+      ...(spec.unit ? [f('unit', spec.unit, RATES)] : []),
+      ...(spec.billingPeriod ? [f('billing_period', spec.billingPeriod, RATES)] : []),
     ],
-    order: { [`${RATES}.billing_period`]: 'desc' },
+    order: [[`${RATES}.billing_period`, 'desc'], [`${RATES}.unit`, 'asc'], [`${RATES}.rate_source`, 'asc']],
     limit: 1,
   };
 }
@@ -131,8 +132,17 @@ export function buildRateDimensionsQuery(spec) {
   if (!spec.datasource) throw new Error('price requires --datasource');
   return {
     dimensions: DIMENSION_MEMBERS.map((m) => `${RATES}.${m}`),
-    filters: [{ member: `${RATES}.datasource`, operator: 'equals', values: [spec.datasource] }],
+    filters: [f('datasource', spec.datasource, RATES), RATED],
     order: [[`${RATES}.billing_period`, 'desc'], [`${RATES}.dimension`, 'asc']],
+    limit: RATE_DIMENSIONS_LIMIT,
+  };
+}
+
+export function buildRateDatasourcesQuery() {
+  return {
+    dimensions: [`${RATES}.datasource`],
+    filters: [RATED],
+    order: [[`${RATES}.datasource`, 'asc']],
     limit: RATE_DIMENSIONS_LIMIT,
   };
 }
@@ -140,7 +150,11 @@ export function buildRateDimensionsQuery(spec) {
 const unprefixed = (row, members) => Object.fromEntries(members.map((m) => [m, row[`${RATES}.${m}`]]));
 
 export function unitRateRow(rows) {
-  return rows.length ? unprefixed(rows[0], RATE_MEMBERS) : null;
+  return rows.length && rows[0][`${RATES}.unit_rate_usd`] != null ? unprefixed(rows[0], RATE_MEMBERS) : null;
+}
+
+export function rateDatasourceNames(rows) {
+  return rows.map((r) => r[`${RATES}.datasource`]);
 }
 
 export function rateDimensionRows(rows) {

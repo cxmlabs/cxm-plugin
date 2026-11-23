@@ -1,6 +1,6 @@
 import { requireSession } from '../lib/config.js';
 import { cubeLoad } from '../lib/http.js';
-import { RATE_DIMENSIONS_LIMIT, buildPricingQuery, buildRateDimensionsQuery, buildUnitRateQuery, rateDimensionRows, summarizePricing, unitRateRow } from '../lib/pricing.js';
+import { RATE_DIMENSIONS_LIMIT, buildPricingQuery, buildRateDatasourcesQuery, buildRateDimensionsQuery, buildUnitRateQuery, rateDatasourceNames, rateDimensionRows, summarizePricing, unitRateRow } from '../lib/pricing.js';
 
 function getFlag(argv, name) {
   const i = argv.indexOf(name);
@@ -41,13 +41,23 @@ export function rateDimensionsResult(spec, rows, { organization }) {
   return { source: 'CloudExMachina', organization, spec, dimensions: rateDimensionRows(rows), limit_reached: rows.length >= RATE_DIMENSIONS_LIMIT };
 }
 
+export function rateDatasourcesResult(rows, { organization }) {
+  if (!rows.length) return { source: 'CloudExMachina', result: 'no_rate_found', hint: 'No datasource has a published rate.' };
+  return { source: 'CloudExMachina', organization, datasources: rateDatasourceNames(rows), limit_reached: rows.length >= RATE_DIMENSIONS_LIMIT };
+}
+
 async function rateDimensions(config, spec) {
   const rows = await cubeLoad(config, buildRateDimensionsQuery(spec), { maxWaitMs: 60000 });
   console.log(JSON.stringify(rateDimensionsResult(spec, rows, { organization: config.organizationId }), null, 2));
 }
 
-async function unitRate(config, argv) {
+export async function unitRate(config, argv) {
   const spec = unitRateSpec(argv);
+  if (!spec.datasource) {
+    const rows = await cubeLoad(config, buildRateDatasourcesQuery(), { maxWaitMs: 60000 });
+    console.log(JSON.stringify(rateDatasourcesResult(rows, { organization: config.organizationId }), null, 2));
+    return;
+  }
   if (!spec.dimension) return rateDimensions(config, spec);
   const quantity = getFlag(argv, '--quantity');
   if (quantity !== undefined && !Number.isFinite(Number(quantity))) throw new Error('price requires --quantity to be a number');
