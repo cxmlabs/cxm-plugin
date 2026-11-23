@@ -185,6 +185,8 @@ test('the skill lists every billing dimension of a service before it prices one'
   assert.match(dims, phrase('Print the dimensions table as `output.md` says.'));
   assert.ok(output.includes('| Dimension | Moved? | Reason | Driver | Grade |'), 'output.md holds the dimensions table');
   assert.ok(output.includes('List every dimension that the bill and the catalog give'));
+  assert.ok(output.includes('A C result line with no bill outcome is not finished.'));
+  assert.ok(output.includes('It keeps its unit.'));
   const finished = 'Print one dimensions table for each service that a result line names. A result line with no dimensions table for its service is not finished.';
   assert.match(dims, phrase(finished));
   assert.match(output, phrase('print one dimensions table for each service that a result line names'));
