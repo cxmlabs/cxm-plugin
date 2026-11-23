@@ -24,8 +24,8 @@ Give each number one grade. The grade says how the number was obtained.
 - **G2.** A value that was measured on one target and is used for another drops one grade. Cite it
   as "analog of `<target>`".
 - **G3.** A C value that an independent A or B source confirms within ±20 % becomes B. A larger
-  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as steps 5 and 7
-  of `SKILL.md` say.
+  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as "Runs per month"
+  of `SKILL.md` says.
 - **G4.** Print a floor or a ceiling as a bound. If ceiling ÷ floor is more than 3, the result is
   C at best. A floor of 0 that a free allowance sets is exempt from this ratio.
 - **G5.** A D factor makes the result D. An assumption is a D factor: it cites its basis and gives
@@ -69,7 +69,7 @@ Organization: <name>. <floor or ceiling label, when one applies>
   List every dimension that the bill and the catalog give for the service, also each dimension that is
   not moved, with its reason. For example, a log query moves ingestion, storage and query scan; object
   storage moves request tiers, storage and data transfer.
-- The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
+- The target table has one row for each deployment target that "Deployment targets" of `SKILL.md` lists. The
   `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
   organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes
   grade A, B or C.
@@ -130,7 +130,7 @@ Print the section with these parts:
 
 A change adds one scheduled CI job. The job runs a log query on the staging account. The example
 shows two payers, so it has two headlines. It also shows three targets of the cloud payer and two targets of the CI payer.
-Step 3 of `SKILL.md` lists the targets. Each target has one row.
+"Deployment targets" of `SKILL.md` lists the targets. Each target has one row.
 
 **Staging AWS account: +$0.064/mo list, $0–0.064/mo effective, grade B**
 **CI provider organization: +$4.19 per 30 days list, grade C**

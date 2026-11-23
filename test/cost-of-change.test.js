@@ -78,7 +78,7 @@ test('every result line carries grades and citations, and the doubts block alway
 });
 
 test('the runs-per-month step gives the runs-per-month factor with its grade and cron citation', () => {
-  const step7 = skillOnly.slice(skillOnly.indexOf('. **Runs per month.**'), skillOnly.indexOf('. **Accounts.**'));
+  const step7 = skillOnly.slice(skillOnly.indexOf('**Runs per month.**'), skillOnly.indexOf('**Accounts.**'));
   assert.ok(step7.includes('21.74 runs/mo [C:c1]'));
   assert.ok(step7.includes('@<sha>'));
 });
@@ -131,7 +131,7 @@ test('the skill prints unmeasured only from the stop rule', () => {
     assert.doesNotMatch(skill, phrase(order), order);
   }
   const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
-  assert.ok(code.indexOf('measurement.md') > 0 && code.indexOf('measurement.md') < code.indexOf('1. **Organization.**'));
+  assert.ok(code.indexOf('measurement.md') > 0 && code.indexOf('measurement.md') < code.indexOf('### 1. What the change bills'));
 });
 
 test('a required count that was not attempted fails the run', () => {
@@ -145,9 +145,9 @@ test('a required count that was not attempted fails the run', () => {
 
 test('the skill lists every deployment target before it names a payer', () => {
   const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
-  const targets = code.indexOf('. **Deployment targets.**');
-  assert.ok(targets > 0 && targets < code.indexOf('. **Payer.**'), 'Deployment targets comes before Payer');
-  const step = code.slice(targets, code.indexOf('. **Payer.**'));
+  const targets = code.indexOf('**Deployment targets.**');
+  assert.ok(targets > 0 && targets < code.indexOf('**Payer.**'), 'Deployment targets comes before Payer');
+  const step = code.slice(targets, code.indexOf('**Payer.**'));
   assert.ok(step.includes('Runs here? unknown — no access: <error>'));
   for (const source of ['`deploys` edge', "git tag --list 'deploy/*' --contains <file-sha>", '`gh run list`', '`costs` and `assets`']) assert.ok(step.includes(source), source);
   assert.match(step, phrase('A target that is not attempted fails the run'));
@@ -159,7 +159,7 @@ test('the skill lists every deployment target before it names a payer', () => {
     'For a file that the diff adds, run the same command on the file of its deployable unit.',
     'A job, image or schedule with no run yet, such as one that the diff adds before merge, takes its Runs here? from code or configuration (C).',
     'An empty release history never gives no.',
-    'A target row counts only the units of work that the code deployed on that target reaches: its accounts of step 8, its regions and assets of step 9. Never count the units of another target. The total is the sum of the rows.',
+    'A target row counts only the units of work that the code deployed on that target reaches: its accounts of "Accounts", its regions and assets of "Assets". Never count the units of another target. The total is the sum of the rows.',
     'Keep a row for each candidate target, also when its answer is no: it prints $0, with the grade of its evidence. Never drop a candidate target from the table.',
     'Answer from the run history of the window: count the runs that reached the call. Never answer from one run.',
     'A count of 0 gives no only when the schedule of the code fires inside the window. If the schedule fires less often, or the job runs on an event, answer from code or configuration (C).',
@@ -203,8 +203,19 @@ test('the skill lists every billing dimension of a service before it prices one'
   for (const outcome of ['`confirmed within ±20 %`', '`change below the bill noise of <usage type>`', 'A larger gap is a doubt.',
     'An A value then applies.', 'A B value from the bill stays a ceiling.']) assert.match(dims, phrase(outcome), outcome);
   assert.match(output, phrase('A larger gap is a doubt. An A value then applies. A B value from the bill stays a ceiling'));
-  const paid = skillOnly.slice(skillOnly.indexOf('. **Paid calls.**'), skillOnly.indexOf('. **Deployment targets.**'));
-  assert.ok(paid.includes('"Billing dimensions" of `measurement.md`'), 'step 2 points to the section');
+  const paid = skillOnly.slice(skillOnly.indexOf('### 1. What the change bills'), skillOnly.indexOf('### 2. Unit of work'));
+  assert.ok(paid.includes('"Billing dimensions" of `measurement.md`'), 'section 1 points to the section');
   const indirect = skillOnly.match(/- List each call that the diff causes indirectly[^]*?(?=\n- |\n\n)/)[0];
   assert.ok(indirect.includes('Billing dimensions'), 'the indirect-calls line points to the section');
+});
+
+test('the code-change steps follow the seven sections of the method', () => {
+  const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
+  const headings = ['### 1. What the change bills', '### 2. Unit of work', '### 3. Units on each target', '### 4. Billing dimensions',
+    '### 5. Rates', '### 6. Monthly change', '### Output', '### No billed unit change'];
+  const at = headings.map((heading) => code.indexOf(`\n${heading}\n`));
+  assert.ok(at.every((index, n) => index > 0 && (n === 0 || index > at[n - 1])), `the eight headings in order: ${at}`);
+  const bills = code.slice(at[0], at[1]);
+  assert.ok(bills.includes('unmeasured (no datasource: <kind>)'));
+  assert.ok(bills.includes('unmeasured (no quantity measure: <datasource>)'));
 });
