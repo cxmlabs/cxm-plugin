@@ -63,11 +63,13 @@ Organization: <name>. <floor or ceiling label, when one applies>
 
 - Print one headline for each payer and each currency. Never add two currencies.
 - A decrease takes a minus sign.
-- After the target table, print one dimensions table for each service that the change touches, as
-  `measurement.md` sets in "Billing dimensions". `Moved?` is `moved` or `not moved`. Each moved dimension
-  also has its own result line. List every dimension that the bill and the catalog give for the service,
-  also each dimension that is not moved, with its reason. For object storage, this includes request tiers,
-  storage and data transfer.
+- After the target table, print one dimensions table for each service that a result line names, as
+  `measurement.md` sets in "Billing dimensions". A result line with no dimensions table for its service is
+  not finished. `Moved?` is `moved` or `not moved`. Each moved dimension also has its own result line.
+  List every dimension that the bill and the catalog give for the service, also each dimension that is
+  not moved, with its reason. For a log query, the service is the log service: list ingestion, storage and
+  query scan. For object storage, this includes request tiers, storage and data transfer, in the table of
+  that service.
 - The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
   `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
   organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes

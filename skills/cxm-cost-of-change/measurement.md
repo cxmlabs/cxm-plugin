@@ -111,4 +111,5 @@ For each service that the change touches (a call, a resource it creates, or data
    G3 holds in every outcome. A larger gap is a doubt. An A value then applies. A B value from the bill
    stays a ceiling. When the change does not run yet, no after window exists. Keep C and name the missing
    window in a doubt.
-7. **Print.** Print the dimensions table as `output.md` says.
+7. **Print.** Print the dimensions table as `output.md` says. Print one dimensions table for each service
+   that a result line names. A result line with no dimensions table for its service is not finished.

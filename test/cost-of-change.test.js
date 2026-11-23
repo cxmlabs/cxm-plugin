@@ -185,6 +185,12 @@ test('the skill lists every billing dimension of a service before it prices one'
   assert.match(dims, phrase('Print the dimensions table as `output.md` says.'));
   assert.ok(output.includes('| Dimension | Moved? | Reason | Driver | Grade |'), 'output.md holds the dimensions table');
   assert.ok(output.includes('List every dimension that the bill and the catalog give'));
+  const finished = 'Print one dimensions table for each service that a result line names. A result line with no dimensions table for its service is not finished.';
+  assert.match(dims, phrase(finished));
+  assert.match(output, phrase('print one dimensions table for each service that a result line names'));
+  assert.match(output, phrase('A result line with no dimensions table for its service is not finished.'));
+  assert.match(output, phrase('For a log query, the service is the log service: list ingestion, storage and query scan.'));
+  assert.match(output, phrase('For object storage, this includes request tiers, storage and data transfer, in the table of that service.'));
   assert.ok(dims.includes('1. Bill noise.') && dims.indexOf('1. Bill noise.') < dims.indexOf('2. Bill cap.') && dims.indexOf('2. Bill cap.') < dims.indexOf('3. `confirmed within ±20 %`'));
   assert.match(dims, phrase('the bill caps it. The headline takes the bill value [B] as a ceiling'));
   assert.match(dims, phrase('Compare each moved dimension that has a C result with the bill of its usage types, before and after the merge or deploy date (G3 of `output.md`).'));
