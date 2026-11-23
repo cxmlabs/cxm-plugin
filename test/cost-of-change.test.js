@@ -61,6 +61,9 @@ test('the skill prices a third-party service from the published rate, not from a
   const rules = skill.slice(skill.indexOf('### Count rules'), skill.indexOf('### No billed unit change'));
   assert.ok(rules.includes('cxm price --datasource'));
   assert.ok(rules.includes('unmeasured (no published rate: <datasource>)'));
+  assert.ok(rules.includes('unmeasured (no published rate: <service>)'));
+  assert.match(rules, /If the\s+dimension listing or the rate answer is `no_rate_found`/);
+  assert.doesNotMatch(rules, /If any\s+answer is/);
   assert.match(rules, /state the quantity of the change in the published `unit`/);
   assert.ok(rules.includes('unmeasured (unit: <unit>)'));
   assert.doesNotMatch(rules, /github_workflow_costs|net_amount`?\s*(÷|\/|divided by)/);
