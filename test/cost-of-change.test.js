@@ -170,3 +170,24 @@ test('the skill lists every deployment target before it names a payer', () => {
   assert.doesNotMatch(output, phrase('Until the skill reads more than one deployment target'));
   assert.doesNotMatch(output, phrase('wait for the deployment-target step'));
 });
+
+test('the skill lists every billing dimension of a service before it prices one', () => {
+  const start = measurement.indexOf('## Billing dimensions');
+  assert.ok(start > 0, 'measurement.md has no section "## Billing dimensions"');
+  const dims = measurement.slice(start).split(/\n## /)[0];
+  assert.ok(dims.includes('`costs.usage_type`'), 'the bill lists the dimensions');
+  assert.match(dims, phrase('list-price `search` call'));
+  assert.ok(dims.includes('`moved`') && dims.includes('`not moved`'));
+  assert.match(dims, phrase('daily volume × the retention days'));
+  assert.match(dims, phrase('(`file:line@sha`)'));
+  assert.match(dims, phrase('D factor'));
+  assert.match(dims, phrase('`costs.sum_usage_amount` by `costs.asset_arn`'));
+  assert.match(dims, phrase('Compare each moved dimension that has a C result with the bill of its usage types, before and after the merge or deploy date (G3 of `output.md`).'));
+  for (const outcome of ['`confirmed within ±20 %`', '`change below the bill noise of <usage type>`', 'A larger gap is a doubt.',
+    'An A value then applies.', 'A B value from the bill stays a ceiling.']) assert.ok(dims.includes(outcome), outcome);
+  assert.match(output, phrase('A larger gap is a doubt. An A value then applies. A B value from the bill stays a ceiling'));
+  const paid = skillOnly.slice(skillOnly.indexOf('. **Paid calls.**'), skillOnly.indexOf('. **Deployment targets.**'));
+  assert.ok(paid.includes('"Billing dimensions" of `measurement.md`'), 'step 2 points to the section');
+  const indirect = skillOnly.match(/- List each call that the diff causes indirectly[^]*?(?=\n- |\n\n)/)[0];
+  assert.ok(indirect.includes('Billing dimensions'), 'the indirect-calls line points to the section');
+});

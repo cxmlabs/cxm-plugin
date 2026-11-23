@@ -103,7 +103,9 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
    adds, removes or multiplies. A call to a third-party service is a paid call. For each paid call,
    name the API operation, the payer, the unit of work and the asset type that the call iterates
    over. The unit of work is once per run, per account, per account and region, per asset, per GitHub org, or per
-   request. If the diff adds, removes and multiplies no paid call, go to "No billed unit change".
+   request. Then list the billing dimensions that each call, resource or data write moves, as
+   "Billing dimensions" of `measurement.md` says.
+   If the diff adds, removes and multiplies no paid call, go to "No billed unit change".
 3. **Deployment targets.** List every target that runs the changed code, before you name a payer.
    Do this for each changed file:
    - Find its deployable unit: a CI workflow (jobs, schedule, role variables, `--region`, matrix,
@@ -261,7 +263,8 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 - The query service (product code `AmazonAthena`) bills each query's scan rounded up to the next
   MB, with a 10 MB minimum. Take the bytes per query from the "Bytes per query" row of the source map.
 - List each call that the diff causes indirectly, such as a KMS `Decrypt` for each S3 `GetObject`
-  on a key-encrypted bucket without a bucket key. Price it, or print it as `unmeasured`.
+  on a key-encrypted bucket without a bucket key. Price it, or print it as `unmeasured`. Follow
+  "Billing dimensions" of `measurement.md` for the dimensions that it moves.
 
 ### Count rules
 

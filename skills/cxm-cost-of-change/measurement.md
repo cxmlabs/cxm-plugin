@@ -66,3 +66,36 @@ doubts block. `<usage type>`, `<window>` and the filters are those of the lookup
 | Flag state | The connected flag service: not available yet. | none | Default value in the code. | Basis, low value, high value. |
 | GitHub orgs | Datasources of the organization: not available yet. | Distinct `github_costs.org` in the window. | none | none |
 | Units a job iterates over | Count in the logs or in the outputs of the job: not available yet. | Distinct accounts of the provider cost view: `costs` or `github_costs`. | Loop bound in the code. | Basis, low value, high value. |
+
+## Billing dimensions
+
+A change can move more than one billing dimension. A log line is billed at ingestion, then as storage for
+its retention, then by each query that scans it. List the dimensions of each service before you price one.
+
+For each service that the change touches (a call, a resource it creates, or data it writes):
+
+1. **List.** Read two sources. First, the usage types that the organization pays today for the product
+   code in the target accounts: `costs.usage_type`, grouped. Second, the catalog usage types of the service
+   and region: the list-price `search` call of `SKILL.md`. The catalog shows a dimension that the bill does
+   not show yet. Write no dimension from memory.
+2. **Mark.** Mark each dimension `moved` or `not moved`, with a one-line reason and a citation. A change
+   moves a dimension directly (the call or the resource itself) or through what it produces (data that it
+   writes is ingested, then stored, then read). Price no read that a caller outside the diff makes.
+3. **Drive.** Name the driver of each moved dimension and its unit (bytes, hours, requests, GB-month).
+   Measure the driver with the source map.
+4. **Store.** For a stored dimension, price the steady state: daily volume × the retention days. Read the
+   retention from the code or the infrastructure code (`file:line@sha`). When no retention is set, use a
+   D factor with a low value and a high value.
+5. **Read.** For a dimension billed by the volume that a call reads, take the bytes per run as the sum of
+   the bytes that the resources it reads ingested in the read window. For log groups, read
+   `costs.sum_usage_amount` by `costs.asset_arn` on the ingestion usage type.
+6. **Compare.** Compare each moved dimension that has a C result with the bill of its usage types, before
+   and after the merge or deploy date (G3 of `output.md`). Use the dates of the baseline step of
+   `SKILL.md`. Print the comparison as a citation with one outcome:
+   - `confirmed within ±20 %`: C becomes B.
+   - A gap: A larger gap is a doubt. An A value then applies. A B value from the bill stays a ceiling.
+   - `change below the bill noise of <usage type>`: the bill gives a ceiling only.
+
+   When the change does not run yet, no after window exists. Keep C and name the missing window in a doubt.
+7. **Print.** After the target table, print one dimensions table per service. Its columns are dimension,
+   moved or not moved, reason, driver and grade. Give each moved dimension its own result line.
