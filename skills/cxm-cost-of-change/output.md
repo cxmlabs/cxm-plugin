@@ -159,15 +159,15 @@ Organization: the session organization.
 
 **Result lines**
 - `R1 staging Logs query (aws, call) = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6] ; bill: confirmed [c4]`
-- `R2 CI provider <log watch workflow> (github, compute) = $0.349 per 30 days [B] = 69.8 billed min [B:c7] × $0.005/min [B:c9]`
-- `R3 CI provider <nightly E2E workflow> (github, compute) = $3.84 per 30 days [C] = 768.5 billed min [C:c8] × $0.005/min [B:c9] ; bill: none [c8]`
+- `R2 CI provider <log watch workflow> (github, compute) = $0.349 per 30 days [B] = 21.74 runs/mo [B:c1] × 3.21 min/run [B:c7] × $0.005/min [B:c9]`
+- `R3 CI provider <nightly E2E workflow> (github, compute) = $3.84 per 30 days [C] = 32.47 runs/mo [A:c11] × 23.67 min/run [C:c8] × $0.005/min [B:c9] ; bill: none [c8]`
 - `R4 staging AssumeRole (aws, call) = $0 [B] = 0 $/request [B:c10] ; not billed: the token service has no price list and no bill row [c10]`
 
 **Doubts**
 1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: 0–0.064 $/mo, at most one more scan of both halves — resolve: count the "hit the row limit" warnings in the CI logs.
 2. The free tier is account-wide, so the effective cost is $0 to $0.064 — effect: 0–0.064 $/mo — resolve: read the free-tier usage of the payer account.
 3. The production row is C until a CloudTrail count of the job exists — effect: 0–0.064 $/mo — resolve: count the job calls in the audit log of the production account.
-4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`). The analog overstates the minutes of the merged job by one third at most. That is 768.5 × 1/3 = 256 min, at $0.005/min [B:c9]. No after window exists yet, so the bill outcome of R3 is `bill: none` — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
+4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`). The analog overstates the minutes of the merged job by one third at most. That is 768.5 billed min × 1/3 = 256 min, at $0.005/min [B:c9]. No after window exists yet, so the bill outcome of R3 is `bill: none` — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
 
 <details><summary>Citations</summary>
 
@@ -176,9 +176,10 @@ Organization: the session organization.
 - `c3 0.0139 GB/h = 9.99 GB ÷ 30 ÷ 24 ; costs{sum_usage_amount; EUW3-DataProcessing-Bytes; asset_arn under the 3 prefixes of <script>.py:231@<sha>; 2026-10-20..2026-11-18} [B]`
 - `c4 0.50 GB/run = c2 × c3 [C] ; bill difference +11.75 GB/mo against 10.9 GB/mo predicted, within ±20 % ; bill: confirmed → B`
 - `c6 $0.0059/GB = /pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes [A]`
-- `c7 69.8 min = CI minutes per run × CI runs per month ; github_workflow_costs{billable_minutes; workflow is <log watch workflow>; 2026-10-20..2026-11-18} [B]`
-- `c8 768.5 min = CI minutes per run × CI runs per month ; github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18} [B] ; analog per G2, because the job changed after the merge ; bill: none, no after window yet → C`
+- `c7 3.21 min/run = 69.8 billed min ÷ 21.74 runs ; github_workflow_costs{billable_minutes; workflow is <log watch workflow>; 2026-10-20..2026-11-18} ÷ c1 [B]`
+- `c8 23.67 min/run = 768.5 billed min ÷ 32.47 runs ; github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18} ÷ c11 [B] ; analog per G2, because the job changed after the merge ; bill: none, no after window yet → C`
 - `c9 $0.005/min = $0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min ; github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18} [B] ; the marginal rate is the list rate, because the included minutes are used up`
+- `c11 32.47 runs/mo = (21 scheduled + 11 dispatched runs in 30 days) × 30.44 ÷ 30 ; gh run list --workflow <nightly E2E workflow> --created ">=<date 30 days ago>" --json createdAt,event [A]`
 
 </details>
 
@@ -232,8 +233,8 @@ The block of the worked example. Give every field it shows.
   ],
   "results": [
     {"id": "R1", "target": "staging", "item": "Logs query", "amount": {"low": 0.064, "high": 0.064, "unit": "$/mo"}, "grade": "B", "factors": [{"value": 21.74, "unit": "runs/mo", "grade": "B", "cite": "c1"}, {"value": 0.5, "unit": "GB/run", "grade": "B", "cite": "c4"}, {"value": 0.0059, "unit": "$/GB", "grade": "A", "cite": "c6"}]},
-    {"id": "R2", "target": "CI provider", "item": "<log watch workflow>", "amount": {"low": 0.349, "high": 0.349, "unit": "$/30 days"}, "grade": "B", "factors": [{"value": 69.8, "unit": "billed min", "grade": "B", "cite": "c7"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]},
-    {"id": "R3", "target": "CI provider", "item": "<nightly E2E workflow>", "amount": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}, "grade": "C", "factors": [{"value": 768.5, "unit": "billed min", "grade": "C", "cite": "c8"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]},
+    {"id": "R2", "target": "CI provider", "item": "<log watch workflow>", "amount": {"low": 0.349, "high": 0.349, "unit": "$/30 days"}, "grade": "B", "factors": [{"value": 21.74, "unit": "runs/mo", "grade": "B", "cite": "c1"}, {"value": 3.21, "unit": "min/run", "grade": "B", "cite": "c7"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]},
+    {"id": "R3", "target": "CI provider", "item": "<nightly E2E workflow>", "amount": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}, "grade": "C", "factors": [{"value": 32.47, "unit": "runs/mo", "grade": "A", "cite": "c11"}, {"value": 23.67, "unit": "min/run", "grade": "C", "cite": "c8"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]},
     {"id": "R4", "target": "staging", "item": "AssumeRole", "amount": {"low": 0, "high": 0, "unit": "$/mo"}, "grade": "B", "factors": [{"value": 0, "unit": "$/request", "grade": "B", "cite": "c10"}]}
   ],
   "citations": {
@@ -242,10 +243,11 @@ The block of the worked example. Give every field it shows.
     "c3": {"value": 0.0139, "unit": "GB/h", "formula": "9.99 GB ÷ 30 ÷ 24", "source": "costs{sum_usage_amount; EUW3-DataProcessing-Bytes; asset_arn under the 3 prefixes of <script>.py:231@<sha>; 2026-10-20..2026-11-18}", "grade": "B"},
     "c4": {"value": 0.5, "unit": "GB/run", "formula": "c2 × c3", "source": "bill difference +11.75 GB/mo against 10.9 GB/mo predicted, within ±20 %; bill: confirmed", "grade": "B"},
     "c6": {"value": 0.0059, "unit": "$/GB", "formula": "/pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes", "source": "/pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes", "grade": "A"},
-    "c7": {"value": 69.8, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <log watch workflow>; 2026-10-20..2026-11-18}", "grade": "B"},
-    "c8": {"value": 768.5, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18}; analog per G2, because the job changed after the merge; bill: none, no after window yet", "grade": "C"},
+    "c7": {"value": 3.21, "unit": "min/run", "formula": "69.8 billed min ÷ 21.74 runs", "source": "github_workflow_costs{billable_minutes; workflow is <log watch workflow>; 2026-10-20..2026-11-18} ÷ c1", "grade": "B"},
+    "c8": {"value": 23.67, "unit": "min/run", "formula": "768.5 billed min ÷ 32.47 runs", "source": "github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18} ÷ c11; analog per G2, because the job changed after the merge; bill: none, no after window yet", "grade": "C"},
     "c9": {"value": 0.005, "unit": "$/min", "formula": "$0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min", "source": "github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18}; the marginal rate is the list rate, because the included minutes are used up", "grade": "B"},
-    "c10": {"value": 0, "unit": "$/request", "formula": "no price list, no bill row", "source": "/pricing/aws/list-price?service_code=AWSSecurityTokenService: no price list; costs{sum_current_net_unblended_cost; product_code contains Security; last 30 days}: 0 rows", "grade": "B"}
+    "c10": {"value": 0, "unit": "$/request", "formula": "no price list, no bill row", "source": "/pricing/aws/list-price?service_code=AWSSecurityTokenService: no price list; costs{sum_current_net_unblended_cost; product_code contains Security; last 30 days}: 0 rows", "grade": "B"},
+    "c11": {"value": 32.47, "unit": "runs/mo", "formula": "(21 scheduled + 11 dispatched runs in 30 days) × 30.44 ÷ 30", "source": "gh run list --workflow <nightly E2E workflow> --created \">=<date 30 days ago>\" --json createdAt,event", "grade": "A"}
   },
   "doubts": [
     {"text": "A window with 10,000 rows or more scans both halves again (<script>.py:176@<sha>)", "effect_low": 0, "effect_high": 0.064, "resolve": "count the \"hit the row limit\" warnings in the CI logs"},
