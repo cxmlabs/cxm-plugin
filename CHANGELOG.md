@@ -8,6 +8,7 @@ fixes, including security fixes.
 
 - `cxm price --datasource`: lists the datasources with a published rate, then the dimensions and units
   of one datasource, and prices a third-party metered service by dimension and unit.
+  When a dimension has two units, the skill takes the unit of the latest billing period and never mixes rates of two units.
 
 - Auto-update: the installer asks once whether to keep the plugin up to date. On yes, Claude Code's
   plugin auto-update is on for the CXM marketplace and Codex is refreshed at a session start, once a

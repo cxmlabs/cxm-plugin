@@ -244,7 +244,9 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
   It lists the `dimension`, `unit` and `billing_period` of each published rate. The dimension is the
   billed item of the datasource, for example a sku, a model or a plan. If `limit_reached` is true on
   the datasource listing or on the dimension listing, say that the list is cut. Pick the dimension and
-  the unit of the call from that list. Then run
+  the unit of the call from that list. If the listing shows the dimension in more than one unit, take
+  the unit of the latest `billing_period`. That unit is the billing mode of the account. Never add,
+  average or compare the rates of two units. Then run
   `cxm price --datasource <datasource> --dimension <dimension> --unit <unit> [--quantity <n>]`. Read
   `unit_rate_usd`, `unit`, `billing_period` and `rate_source` from the answer, and cite
   `rate_source`. The rate is the average billed rate of that billing period. Before you multiply,

@@ -70,4 +70,5 @@ test('the skill prices a third-party service from the published rate, not from a
   assert.match(rules, /`cxm price --datasource` with no\s+value/);
   assert.match(rules, /no listed datasource is the service of the call/);
   assert.ok(rules.includes('--unit <unit>') && !rules.includes('[--unit <unit>]'));
+  assert.match(rules, /more than one unit, take\s+the unit of the latest `billing_period`/);
 });
