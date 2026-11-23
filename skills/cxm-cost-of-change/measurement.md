@@ -35,7 +35,8 @@ Each unit of work needs the counts of its row. Attempt each count through its ro
 
 | Unit of work | Required counts |
 |---|---|
-| once per run, per request | Runs per month |
+| once per run | Runs per month |
+| per request | Requests per month |
 | per account, per account and region | Accounts, Runs per month |
 | per asset | Assets per account and region, Accounts, Runs per month |
 | per GitHub org | GitHub orgs, Runs per month |
@@ -66,6 +67,9 @@ doubts block. `<usage type>`, `<window>` and the filters are those of the lookup
 | Flag state | The connected flag service: not available yet. | none | Default value in the code. | Basis, low value, high value. |
 | GitHub orgs | Datasources of the organization: not available yet. | Distinct `github_costs.org` in the window. | none | none |
 | Units a job iterates over | Count in the logs or in the outputs of the job: not available yet. | Distinct accounts of the provider cost view: `costs` or `github_costs`. | Loop bound in the code. | Basis, low value, high value. |
+| Requests per month | `lambda_functions.sum_request_count` of the function, in the window. The load-balancer request metric: not available yet. | A usage type in `costs` that counts requests: `costs{sum_usage_amount}` of that usage type, in the window. | Request count or rate that the code sets, at `file:line@sha`. | Basis, low value, high value. |
+| CI runs per month | `gh run list --workflow <file> --created ">=<date 30 days ago>" --limit 1000 --json createdAt,event`, then count every row of the workflow, whatever its event. A count equal to the limit is a floor: raise the limit and run again. Count the rows of each `event` as one trigger: `schedule` is a schedule, `workflow_dispatch` is an operator action. This is a local read of the CI history that the user already holds. | Days with usage in `github_workflow_costs` (`usage_date`) for the workflow. It is the CxM-side source of the same count. A ceiling only for a workflow that runs at most once a day. For any other workflow this cell gives no value. | Cron at `file:line@sha`: it counts the schedule trigger only, never an operator action. | Basis, low value, high value. |
+| CI minutes per run | none | `github_workflow_costs.billable_minutes` ÷ the runs of the same window ("CI runs per month"), per workflow and SKU. | `timeout-minutes` at `file:line@sha`, as a ceiling. | Basis, low value, high value. |
 
 ## Billing dimensions
 

@@ -117,9 +117,9 @@ test('the skill prints unmeasured only from the stop rule', () => {
   for (const rule of ['S1', 'S2', 'S3', 'S4', 'S5']) assert.ok(measurement.includes(`**${rule}.**`), `stop rule ${rule}`);
   const map = measurement.slice(measurement.indexOf('## Source map'));
   const rows = ['Runs per month', 'Accounts', 'Assets per account and region', 'Regions', 'Pages', 'Bytes per query', 'Bytes scanned',
-    'Object sizes', 'Flag state', 'GitHub orgs', 'Units a job iterates over'];
+    'Object sizes', 'Flag state', 'GitHub orgs', 'Units a job iterates over', 'Requests per month', 'CI runs per month', 'CI minutes per run'];
   for (const row of rows) assert.ok(map.includes(`\n| ${row}`), `source map row ${row}`);
-  assert.equal(map.split('\n').filter((line) => line.startsWith('| ')).length, rows.length + 1, 'the source map holds the 11 rows and a header');
+  assert.equal(map.split('\n').filter((line) => line.startsWith('| ')).length, rows.length + 1, 'the source map holds the 14 rows and a header');
   assert.match(measurement, /error text of the attempted query/);
   assert.ok(measurement.includes('latest inventory, crawled at <date of the last crawl>'));
   const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name}`));
@@ -223,4 +223,19 @@ test('the code-change steps follow the seven sections of the method', () => {
     'mark it "not billed"']) assert.ok(bills.includes(text), text);
   assert.ok(output.includes('<item> (<datasource>, <kind>) ='));
   assert.ok(output.includes('`not billed: <reason> [<cite>]`'));
+});
+
+test('each unit of work names its trigger and counts it from its source-map row', () => {
+  const unit = skillOnly.slice(skillOnly.indexOf('### 2. Unit of work'), skillOnly.indexOf('#### Billed units'));
+  assert.match(unit, phrase('a schedule, a request, an event, a CI run or an operator action'));
+  assert.ok(unit.includes('`file:line@sha`'));
+  for (const name of ['Requests per month', 'CI runs per month', 'CI minutes per run']) assert.ok(unit.includes(`"${name}"`), `section 2 names ${name}`);
+  const map = measurement.slice(measurement.indexOf('## Source map'));
+  const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name} |`));
+  assert.ok(row('Requests per month').includes('`lambda_functions.sum_request_count`'));
+  assert.ok(row('CI runs per month').includes('gh run list') && row('CI runs per month').includes('whatever its event'));
+  assert.ok(row('CI runs per month').includes('github_workflow_costs') && row('CI runs per month').includes('operator action'));
+  assert.ok(row('CI minutes per run').includes('`github_workflow_costs.billable_minutes`'));
+  assert.ok(row('CI minutes per run').includes('`timeout-minutes`'));
+  assert.match(skillOnly, phrase('request count per route are not in a dataset. The exception is the "Requests per month" row'));
 });
