@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "organization": "the session organization",
+  "status": "failed",
+  "headlines": [],
+  "targets": [],
+  "results": [],
+  "citations": {
+    "c1": {
+      "value": 2,
+      "unit": "GB/run",
+      "formula": "a formula",
+      "source": "a source",
+      "grade": "B"
+    }
+  },
+  "doubts": [],
+  "failed": {
+    "count": "the runs of the job in 30 days",
+    "unit_of_work": "one run"
+  }
+}
