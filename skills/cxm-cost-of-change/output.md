@@ -46,6 +46,10 @@ Organization: <name>. <floor or ceiling label, when one applies>
 | Target | Runs here? | Δ list /mo | Δ effective /mo | Grade |
 |---|---|---|---|---|
 
+**Dimensions of <service>**
+| Dimension | Moved? | Reason | Driver | Grade |
+|---|---|---|---|---|
+
 **Result lines**
 <id> <target> <item> = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] …
 
@@ -59,6 +63,11 @@ Organization: <name>. <floor or ceiling label, when one applies>
 
 - Print one headline for each payer and each currency. Never add two currencies.
 - A decrease takes a minus sign.
+- After the target table, print one dimensions table for each service that the change touches, as
+  `measurement.md` sets in "Billing dimensions". `Moved?` is `moved` or `not moved`. Each moved dimension
+  also has its own result line. List every dimension that the bill and the catalog give for the service,
+  also each dimension that is not moved, with its reason. For object storage, this includes request tiers,
+  storage and data transfer.
 - The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
   `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
   organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes
@@ -129,6 +138,13 @@ Organization: the session organization.
 | another tenant account | no [C: both callers assume the staging reader role and pass the staging region] | $0 | $0 | C |
 | the CI provider, log watch workflow | yes [A: CI run history] | +$0.349 per 30 days | +$0.349 per 30 days | B |
 | the CI provider, nightly E2E workflow | yes [A: CI run history] | +$3.84 per 30 days | +$3.84 per 30 days | C |
+
+**Dimensions of the staging log service**
+| Dimension | Moved? | Reason | Driver | Grade |
+|---|---|---|---|---|
+| query scan | moved | the job scans 36 h of 3 log-group prefixes (`<script>.py:231@<sha>`) | GB scanned | B |
+| ingestion | not moved | the job only reads logs (`<script>.py:231@<sha>`) | GB ingested | C |
+| storage | not moved | the job only reads logs (`<script>.py:231@<sha>`) | GB-month | C |
 
 **Result lines**
 - `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6]`

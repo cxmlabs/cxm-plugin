@@ -48,10 +48,10 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
 });
 
 test('the skill stops only when nothing about the cost changes, and keeps its count and rate rules', () => {
-  assert.match(skill, /accounts, regions and asset type that the call\s+iterates over\. If one of them changes, continue/);
+  assert.match(skill, /accounts, regions and asset type that the call\s+iterates over\. If one of them changes, or the diff moves a billing dimension, continue/);
   assert.match(skill, /If a dataset returns no rows, print `unmeasured \(no rows in <dataset>\)`/);
   assert.match(skill, /AWS applies the tiers to the total of the\s+payer/);
-  assert.match(skill, /If the diff adds, removes and multiplies no paid call, go to "No billed unit change"/);
+  assert.match(skill, /If the diff adds, removes and multiplies no paid call and moves no billing dimension, go to "No billed unit change"/);
   assert.match(skill, /If the change does not run yet, say that the baseline excludes the change/);
   assert.match(skill, /With no row, or a null rate, skip this line/);
   assert.match(skill, /returns no row, or a null rate, use a discount of 0/);
@@ -182,9 +182,14 @@ test('the skill lists every billing dimension of a service before it prices one'
   assert.match(dims, phrase('(`file:line@sha`)'));
   assert.match(dims, phrase('D factor'));
   assert.match(dims, phrase('`costs.sum_usage_amount` by `costs.asset_arn`'));
+  assert.match(dims, phrase('Print the dimensions table as `output.md` says.'));
+  assert.ok(output.includes('| Dimension | Moved? | Reason | Driver | Grade |'), 'output.md holds the dimensions table');
+  assert.ok(output.includes('List every dimension that the bill and the catalog give'));
+  assert.ok(dims.includes('1. Bill noise.') && dims.indexOf('1. Bill noise.') < dims.indexOf('2. Bill cap.') && dims.indexOf('2. Bill cap.') < dims.indexOf('3. `confirmed within ±20 %`'));
+  assert.match(dims, phrase('the bill caps it. The headline takes the bill value [B] as a ceiling'));
   assert.match(dims, phrase('Compare each moved dimension that has a C result with the bill of its usage types, before and after the merge or deploy date (G3 of `output.md`).'));
   for (const outcome of ['`confirmed within ±20 %`', '`change below the bill noise of <usage type>`', 'A larger gap is a doubt.',
-    'An A value then applies.', 'A B value from the bill stays a ceiling.']) assert.ok(dims.includes(outcome), outcome);
+    'An A value then applies.', 'A B value from the bill stays a ceiling.']) assert.match(dims, phrase(outcome), outcome);
   assert.match(output, phrase('A larger gap is a doubt. An A value then applies. A B value from the bill stays a ceiling'));
   const paid = skillOnly.slice(skillOnly.indexOf('. **Paid calls.**'), skillOnly.indexOf('. **Deployment targets.**'));
   assert.ok(paid.includes('"Billing dimensions" of `measurement.md`'), 'step 2 points to the section');
