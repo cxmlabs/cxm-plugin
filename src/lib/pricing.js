@@ -133,7 +133,7 @@ export function buildRateDimensionsQuery(spec) {
     dimensions: DIMENSION_MEMBERS.map((m) => `${RATES}.${m}`),
     filters: [f('datasource', spec.datasource, RATES), RATED],
     order: [[`${RATES}.billing_period`, 'desc'], [`${RATES}.dimension`, 'asc']],
-    limit: RATE_DIMENSIONS_LIMIT,
+    limit: RATE_DIMENSIONS_LIMIT + 1,
   };
 }
 
@@ -142,7 +142,7 @@ export function buildRateDatasourcesQuery() {
     dimensions: [`${RATES}.datasource`],
     filters: [RATED],
     order: [[`${RATES}.datasource`, 'asc']],
-    limit: RATE_DIMENSIONS_LIMIT,
+    limit: RATE_DIMENSIONS_LIMIT + 1,
   };
 }
 

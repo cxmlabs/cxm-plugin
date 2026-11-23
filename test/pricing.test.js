@@ -127,6 +127,8 @@ test('prices a third-party datasource from the published rate', () => {
     order: [[`${R}.billing_period`, 'desc'], [`${R}.unit`, 'asc'], [`${R}.rate_source`, 'asc']],
     limit: 1,
   });
+  const noUnit = buildUnitRateQuery(unitRateSpec(['--datasource', 'ci', '--dimension', 'runner_linux']));
+  assert.ok(!noUnit.filters.some((x) => x.member === `${R}.unit`));
   for (const bad of [{ datasource: 'ci' }, { dimension: 'runner_linux' }]) assert.throws(() => buildUnitRateQuery(bad), (e) => classifyError(e) === 'bad_input');
   const row = { [`${R}.unit_rate_usd`]: '0.008', [`${R}.unit`]: 'minute', [`${R}.billing_period`]: '2026-10', [`${R}.rate_source`]: 'ci_costs' };
   const priced = unitRateResult(spec, [row], { organization: 'org', quantity: '120' });
@@ -143,44 +145,66 @@ test('prices a third-party datasource from the published rate', () => {
     dimensions: ['dimension', 'unit', 'billing_period'].map((m) => `${R}.${m}`),
     filters: [{ member: `${R}.datasource`, operator: 'equals', values: ['ci'] }, { member: `${R}.unit_rate_usd`, operator: 'set' }],
     order: [[`${R}.billing_period`, 'desc'], [`${R}.dimension`, 'asc']],
-    limit: 200,
+    limit: RATE_DIMENSIONS_LIMIT + 1,
   });
   const listed = rateDimensionsResult(listing, [{ [`${R}.dimension`]: 'runner_linux', [`${R}.unit`]: 'minute', [`${R}.billing_period`]: '2026-10' }], { organization: 'org' });
   assert.deepEqual(listed.dimensions, [{ dimension: 'runner_linux', unit: 'minute', billing_period: '2026-10' }]);
   assert.equal(listed.limit_reached, false);
   const full = Array.from({ length: RATE_DIMENSIONS_LIMIT }, () => ({}));
-  assert.equal(rateDimensionsResult(listing, full, { organization: 'org' }).limit_reached, true);
+  const over = Array.from({ length: RATE_DIMENSIONS_LIMIT + 1 }, () => ({}));
+  assert.equal(rateDimensionsResult(listing, full, { organization: 'org' }).limit_reached, false);
+  const cut = rateDimensionsResult(listing, over, { organization: 'org' });
+  assert.equal(cut.limit_reached, true);
+  assert.equal(cut.dimensions.length, RATE_DIMENSIONS_LIMIT);
   assert.equal(rateDimensionsResult(listing, [], { organization: 'org' }).result, 'no_rate_found');
   assert.deepEqual(buildRateDatasourcesQuery(), {
     dimensions: [`${R}.datasource`],
     filters: [{ member: `${R}.unit_rate_usd`, operator: 'set' }],
     order: [[`${R}.datasource`, 'asc']],
-    limit: 200,
+    limit: RATE_DIMENSIONS_LIMIT + 1,
   });
   assert.deepEqual(rateDatasourcesResult([{ [`${R}.datasource`]: 'ci' }], { organization: 'org' }).datasources, ['ci']);
   assert.equal(rateDatasourcesResult([], { organization: 'org' }).result, 'no_rate_found');
   assert.equal(rateDatasourcesResult([{ [`${R}.datasource`]: 'ci' }], { organization: 'org' }).limit_reached, false);
-  assert.equal(rateDatasourcesResult(full, { organization: 'org' }).limit_reached, true);
+  assert.equal(rateDatasourcesResult(full, { organization: 'org' }).limit_reached, false);
+  const cutNames = rateDatasourcesResult(over, { organization: 'org' });
+  assert.equal(cutNames.limit_reached, true);
+  assert.equal(cutNames.datasources.length, RATE_DIMENSIONS_LIMIT);
 });
 
 test('price dispatches on the datasource and dimension flags and checks the quantity', async () => {
+  const R = 'third_party_unit_rates';
   const real = globalThis.fetch;
   const config = { baseUrl: 'https://example.test', organizationId: 'org', accessToken: 't' };
-  const limits = [];
+  const queries = [];
   globalThis.fetch = async (url, init) => {
-    limits.push(JSON.parse(init.body).query.limit);
-    return new Response(JSON.stringify({ data: [] }), { status: 200 });
+    const query = JSON.parse(init.body).query;
+    queries.push(query);
+    const data = query.limit === 1 && query.filters.some((x) => x.values?.[0] === 'runner_linux')
+      ? [{ [`${R}.unit_rate_usd`]: '0.008', [`${R}.unit`]: 'minute', [`${R}.billing_period`]: '2026-10', [`${R}.rate_source`]: 'ci_costs' }]
+      : query.dimensions.length === 1 ? [{ [`${R}.datasource`]: 'ci' }]
+        : query.limit === 1 ? [] : [{ [`${R}.dimension`]: 'runner_linux', [`${R}.unit`]: 'minute', [`${R}.billing_period`]: '2026-10' }];
+    return new Response(JSON.stringify({ data }), { status: 200 });
   };
   const logs = console.log;
-  console.log = () => {};
+  const printed = [];
+  console.log = (text) => printed.push(JSON.parse(text));
   try {
     await unitRate(config, ['--datasource']);
     await unitRate(config, ['--datasource', 'ci']);
-    await unitRate(config, ['--datasource', 'ci', '--dimension', 'runner_linux']);
+    await unitRate(config, ['--datasource', 'ci', '--dimension', 'runner_linux', '--quantity', '120']);
+    await unitRate(config, ['--datasource', 'ci', '--dimension', 'missing']);
     await assert.rejects(unitRate(config, ['--datasource', 'ci', '--dimension', 'x', '--quantity', 'abc']), (e) => classifyError(e) === 'bad_input');
   } finally {
     globalThis.fetch = real;
     console.log = logs;
   }
-  assert.deepEqual(limits, [200, 200, 1]);
+  assert.deepEqual(queries.map((q) => q.limit), [201, 201, 1, 1]);
+  assert.deepEqual(queries.map((q) => q.dimensions.length), [1, 3, 6, 6]);
+  assert.deepEqual(printed[0].datasources, ['ci']);
+  assert.deepEqual(printed[1].dimensions, [{ dimension: 'runner_linux', unit: 'minute', billing_period: '2026-10' }]);
+  assert.equal(printed[2].unit_rate_usd, '0.008');
+  assert.equal(printed[2].quantity, 120);
+  assert.equal(printed[3].result, 'no_rate_found');
+  assert.equal(printed.length, 4);
 });

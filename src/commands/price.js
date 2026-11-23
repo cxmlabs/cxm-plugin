@@ -37,12 +37,12 @@ export function unitRateResult(spec, rows, { organization, quantity }) {
 
 export function rateDimensionsResult(spec, rows, { organization }) {
   if (!rows.length) return { source: 'CloudExMachina', spec, result: 'no_rate_found', datasource: spec.datasource, hint: 'Check --datasource.' };
-  return { source: 'CloudExMachina', organization, spec, dimensions: rateDimensionRows(rows), limit_reached: rows.length >= RATE_DIMENSIONS_LIMIT };
+  return { source: 'CloudExMachina', organization, spec, dimensions: rateDimensionRows(rows.slice(0, RATE_DIMENSIONS_LIMIT)), limit_reached: rows.length > RATE_DIMENSIONS_LIMIT };
 }
 
 export function rateDatasourcesResult(rows, { organization }) {
   if (!rows.length) return { source: 'CloudExMachina', result: 'no_rate_found', hint: 'No datasource has a published rate.' };
-  return { source: 'CloudExMachina', organization, datasources: rateDatasourceNames(rows), limit_reached: rows.length >= RATE_DIMENSIONS_LIMIT };
+  return { source: 'CloudExMachina', organization, datasources: rateDatasourceNames(rows.slice(0, RATE_DIMENSIONS_LIMIT)), limit_reached: rows.length > RATE_DIMENSIONS_LIMIT };
 }
 
 async function rateDimensions(config, spec) {
