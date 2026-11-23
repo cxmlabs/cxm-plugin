@@ -54,7 +54,7 @@ allowance, the tiers, the commitments and the negotiated discount. A datasource 
 | Datasource | Quantity measure | Usage dimension | List rate | Effective rate | Service terms and marginal-rate rule |
 |---|---|---|---|---|---|
 | AWS | `costs.sum_usage_amount` | `costs.usage_type` | The list-price route, for the usage type of the region of the API endpoint [A]. | `costs` net cost ÷ usage per usage type, with the `usage_charges_only` segment [B]. The discount-rate route when the usage type has no usage [B]. | The AWS rules below. |
-| GitHub | `github_costs.sum_quantity` | `github_costs.sku` | `github_costs.sum_gross_amount` ÷ `sum_quantity` per `sku` [B]. | `github_costs.sum_net_amount` ÷ `sum_quantity` per `sku` [B]. | Never `costs.sum_list_cost`: it equals the net amount for GitHub. When `sum_discount_quantity` < `sum_quantity` in the billing period, the included allowance is used up, and the marginal unit bills at the list rate. Otherwise the floor is 0 and the ceiling is the list rate. |
+| GitHub | `github_costs.sum_quantity` | `github_costs.sku` | `github_costs.sum_gross_amount` ÷ `sum_quantity` per `sku` [B]. | `github_costs.sum_net_amount` ÷ `sum_quantity` per `sku` [B]. | Never `costs.sum_list_cost`: it equals the net amount for GitHub. When `sum_discount_quantity` is below `sum_quantity` by more than 0.1 % in the billing period, the included allowance is used up, and the marginal unit bills at the list rate. Otherwise the floor is 0 and the ceiling is the list rate. The effective amount of "Monthly change" uses the marginal rate: the list rate when the allowance is used up, else 0 to the list rate. Cite net ÷ quantity as the average only. |
 
 **AWS rules**
 

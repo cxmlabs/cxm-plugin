@@ -252,6 +252,10 @@ test('each datasource prices at the marginal rate of its bill', () => {
     assert.match(map, phrase(text), text);
   }
   for (const text of ['sum_gross_amount', 'sum_net_amount', 'sum_discount_quantity', 'sum_quantity']) assert.ok(row('GitHub').includes(text), text);
+  for (const text of ['`sum_discount_quantity` is below `sum_quantity` by more than 0.1 %',
+    'The effective amount of "Monthly change" uses the marginal rate: the list rate when the allowance is used up, else 0 to the list rate. Cite net ÷ quantity as the average only.']) {
+    assert.match(row('GitHub'), phrase(text), text);
+  }
   assert.ok(map.includes('unmeasured (no rate rule: <datasource>)'));
   assert.doesNotMatch(skillOnly, /#### Rate rules|routes cover AWS only/);
   assert.doesNotMatch(skill, phrase('`github_workflow_costs` gives `net_amount` ÷ `quantity`'));
