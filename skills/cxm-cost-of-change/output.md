@@ -195,8 +195,10 @@ The block of the worked example. Give every field it shows.
   ],
   "targets": [
     {"target": "the staging account, one region", "runs_here": {"value": "yes", "grade": "A", "basis": "22 runs in 30 days, CI run history"}, "grade": "B", "amounts": {"list": {"low": 0.064, "high": 0.064, "unit": "$/mo"}, "effective": {"low": 0, "high": 0.064, "unit": "$/mo"}}},
-    {"target": "production and other tenants", "runs_here": {"value": "no", "grade": "C", "basis": "both callers assume the staging reader role and pass the staging region"}, "grade": "C", "amounts": {"list": {"low": 0, "high": 0, "unit": "$/mo"}, "effective": {"low": 0, "high": 0, "unit": "$/mo"}}},
-    {"target": "the CI provider, two workflows", "runs_here": {"value": "yes", "grade": "A", "basis": "CI run history"}, "grade": "C", "amounts": {"list": {"low": 4.19, "high": 4.19, "unit": "$/30 days"}, "effective": {"low": 4.19, "high": 4.19, "unit": "$/30 days"}}}
+    {"target": "the production account", "runs_here": {"value": "no", "grade": "C", "basis": "both callers assume the staging reader role and pass the staging region"}, "grade": "C", "amounts": {"list": {"low": 0, "high": 0, "unit": "$/mo"}, "effective": {"low": 0, "high": 0, "unit": "$/mo"}}},
+    {"target": "another tenant account", "runs_here": {"value": "no", "grade": "C", "basis": "both callers assume the staging reader role and pass the staging region"}, "grade": "C", "amounts": {"list": {"low": 0, "high": 0, "unit": "$/mo"}, "effective": {"low": 0, "high": 0, "unit": "$/mo"}}},
+    {"target": "the CI provider, log watch workflow", "runs_here": {"value": "yes", "grade": "A", "basis": "CI run history"}, "grade": "B", "amounts": {"list": {"low": 0.349, "high": 0.349, "unit": "$/30 days"}, "effective": {"low": 0.349, "high": 0.349, "unit": "$/30 days"}}},
+    {"target": "the CI provider, nightly E2E workflow", "runs_here": {"value": "yes", "grade": "A", "basis": "CI run history"}, "grade": "C", "amounts": {"list": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}, "effective": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}}}
   ],
   "results": [
     {"id": "R1", "target": "staging", "item": "Logs query", "amount": {"low": 0.064, "high": 0.064, "unit": "$/mo"}, "grade": "B", "factors": [{"value": 21.74, "unit": "runs/mo", "grade": "B", "cite": "c1"}, {"value": 0.5, "unit": "GB/run", "grade": "B", "cite": "c4"}, {"value": 0.0059, "unit": "$/GB", "grade": "A", "cite": "c6"}]},
