@@ -39,7 +39,7 @@ A diff that does both gets two subtotals. Add them only for one payer and one cu
      - **EDP/PRA:** read the negotiated discount of the usage account that will run the resource
        with the discount-rate route (see "Pricing routes"). Its net rate is
        `on_demand × (1 − rows[0].effective_discount_rate_pct ÷ 100)`. Label it and warn as the
-        discount rules of "Rate rules" say. With no row, or a null rate, skip this line.
+        discount rules of "Rate map" say. With no row, or a null rate, skip this line.
      - **Existing coverage:** the org's current ESR for this commitment_type (from
        `commitment_this_month_kpi`) indicates how much of similar usage is already discounted, i.e.
        whether spare Savings-Plan/RI capacity might already cover this new resource at the committed rate.
@@ -115,6 +115,7 @@ a task) in the result lines.
 - If the organization holds no datasource for an item, print `unmeasured (no datasource: <kind>)`.
 - If the datasource has no quantity measure, print `unmeasured (no quantity measure: <datasource>)`.
 - Give the query that proves each `unmeasured`.
+- Price only what the code of the diff makes. Name an indirect call in a doubt, as "Billing dimensions" of `measurement.md` says.
 
 Then list the billing dimensions that each call, resource or data write moves, as
 "Billing dimensions" of `measurement.md` says. For example, a diff that adds log writes moves log
@@ -248,8 +249,6 @@ row of the source map.
 - A token count per model call and a request count per route are not in a dataset. The exception is
   the "Requests per month" row of the source map. For a
   model call, give the rate and the per-call formula, or "cannot price" for a model outside the bill.
-- A third-party metered service is priced only from a dataset with a quantity measure:
-  `github_workflow_costs` gives `net_amount` ÷ `quantity`, grouped by `sku`.
 
 ### 4. Billing dimensions
 
@@ -267,9 +266,8 @@ date. The bill uses UTC days and the commit date uses local time. The extra day 
 difference. If the change does not run yet, say that the baseline excludes the change. If the change runs and its start date is
 unknown, say that the baseline includes the change.
 
-**Rates.** Read the effective rate from `costs` as net cost ÷ usage per usage type, with the
-`usage_charges_only` segment. Read the list rate with the list-price route, for the usage type
-of the region of the API endpoint. Follow "Rate rules".
+**Rates.** Read the list rate and the effective rate of each billed item from the row of its
+datasource in "Rate map" of `measurement.md`, and price it at the marginal rate of that row.
 
 A `costs` query that reads `sum_usage_amount` or `operation` scans the raw bill. Filter it on
 `costs.account_id`, `costs.product_code`, `costs.usage_type` and the dates, and pass
@@ -287,37 +285,6 @@ cxm analytics query '{"measures":["costs.sum_usage_amount","costs.sum_current_ne
 ```
 
 The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and measures as strings.
-
-#### Rate rules
-
-- Prefer the rate the account pays: net cost ÷ usage per usage type from `costs`. Otherwise use
-  the list-price route with `volume_amount`. Quote `total_cost_for_volume` for a tiered cost, never
-  `applicable_tier` × the whole volume. For a change on top of current usage, price the current
-  usage plus the change, and the current usage alone, and give the difference. Show the formula.
-- Copy the usage type verbatim from a `costs` row. Do not add or strip a region prefix. If the bill
-  has no row for it, find it with the `search` call.
-- Map an API operation to its usage type from a `costs` row that holds both. If no row of the
-  organization holds the pair, search the catalog. If the search finds nothing, print the rate as
-  `unmeasured`.
-- Take the unit from the `unit` that the route returns. Group usage by `costs.usage_type`. Do not
-  add the usage of two usage types.
-- Do not subtract a free tier. If the effective rate is lower than the list rate after the
-  discount, give 0 as the floor and the list rate as the ceiling.
-- Say that the effective rate excludes credits, refunds, reseller discounts and tax.
-- For a usage type with usage, the rate the account pays is already net of EDP/PRA. Apply no
-  discount on top of it.
-- For a usage type with no usage, read the negotiated discount with the discount-rate route for
-  the usage account. Apply `rows[0].effective_discount_rate_pct` ÷ 100 to the list rate. Label it
-  "blended over <product code>, latest billing month within 45 days". The route does not return
-  the month. Never carry the discount to another account or product code.
-- If the discount-rate route returns no row, or a null rate, use a discount of 0. Print the
-  warning "no discounted usage of <product code> in <account> in the last 45 days", and label the
-  result a ceiling.
-- Report each amount in its `costs.billing_currency`. Do not add two currencies. The list-price
-  route returns USD: compare a list rate with an effective rate, or set a floor and a ceiling from
-  them, only when `costs.billing_currency` is USD. Otherwise print the list rate in USD on its own
-  line. The routes cover AWS only. For another cloud, print the list rate as `unmeasured`.
-- Print each amount with 2 significant digits at least, and the billed units beside it.
 
 ### 6. Monthly change
 
