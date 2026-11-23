@@ -144,13 +144,20 @@ test('the skill lists every deployment target before it names a payer', () => {
   assert.ok(targets > 0 && targets < code.indexOf('. **Payer.**'), 'Deployment targets comes before Payer');
   const step = code.slice(targets, code.indexOf('. **Payer.**'));
   assert.ok(step.includes('Runs here? unknown — no access: <error>'));
-  for (const source of ['`deploys` edge', "git tag --list 'deploy/*' --contains <sha>", '`gh run list`', '`costs` and `assets`']) assert.ok(step.includes(source), source);
+  for (const source of ['`deploys` edge', "git tag --list 'deploy/*' --contains <file-sha>", '`gh run list`', '`costs` and `assets`']) assert.ok(step.includes(source), source);
   assert.match(step, phrase('A target that is not attempted fails the run'));
   assert.match(step, phrase('names the missing datasource'));
   assert.ok(output.includes('| Target | Runs here? |') && output.includes('`runs_here.value`'));
   assert.doesNotMatch(code, phrase('Print the cost for each other organization'));
   assert.match(code, phrase('A schedule and a run count never come from it.'));
-  assert.match(step, phrase('A target row takes only the units of work inside that target: its accounts, regions and assets. The total is the sum of the rows.'));
+  for (const sentence of ['`<file-sha>` is `git log -1 --format=%H <base> -- <file>`.',
+    'For a file that the diff adds, run the same command on the file of its deployable unit.',
+    'A job, image or schedule with no run yet, such as one that the diff adds before merge, takes its Runs here? from code or configuration (C).',
+    'An empty release history never gives no.',
+    'A target row counts only the units of work that the code deployed on that target reaches: its accounts of step 8, its regions and assets of step 9. Never count the units of another target. The total is the sum of the rows.',
+    'Keep a row for each candidate target, also when its answer is no: it prints $0, with the grade of its evidence. Never drop a candidate target from the table.',
+    'Answer from the run history of the window: count the runs that reached the call. Never answer from one run.']) assert.match(step, phrase(sentence), sentence);
+  assert.match(code, phrase('Do not take a schedule, a run count or an account list from a node that only matches by name.'));
   assert.doesNotMatch(output, phrase('production and other tenants'));
   assert.doesNotMatch(output, phrase('Until the skill reads more than one deployment target'));
   assert.doesNotMatch(output, phrase('wait for the deployment-target step'));

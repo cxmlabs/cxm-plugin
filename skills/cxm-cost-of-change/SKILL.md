@@ -111,17 +111,22 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
    - Expand the unit into targets. For infrastructure, follow the `deploys` edges of the
      `cxm-repo-graph` skill from each Terraform workspace that uses the module or image to its
      accounts. A target is a workspace × account × region. For CI, a target is a job × role × region
-     × matrix entry. For release state, read `git tag --list 'deploy/*' --contains <sha>` and
-     `gh run list`. `<sha>` is the base commit that holds the changed file. For the accounts of the tenants, read the account names in `costs` and `assets`
-     of the organization.
+     × matrix entry. For release state, read `git tag --list 'deploy/*' --contains <file-sha>` and
+     `gh run list`. `<file-sha>` is `git log -1 --format=%H <base> -- <file>`. For a file that the
+     diff adds, run the same command on the file of its deployable unit. For the accounts of the
+     tenants, read the account names in `costs` and `assets` of the organization.
    - Answer "Runs here?" for each target, with its grade: A for a run history count, a metric or an
      audit log count. B for bill usage after the deploy date. C for code, configuration or a deploy
-     marker. D for an assumption. A job, image or schedule that the diff adds has no run history
-     yet. Answer its Runs here? from code or configuration (C). An empty release history never gives
-     no.
+     marker. D for an assumption. Answer from the run history of the window: count the runs that
+     reached the call. Never answer from one run. A job, image or schedule with no run yet, such as
+     one that the diff adds before merge, takes its Runs here? from code or configuration (C). An
+     empty release history never gives no.
    - Give each target one row of the target table, and price each target on its own. Never copy a
-     measurement to another target without G2 of `output.md`. A target row takes only the units of work
-     inside that target: its accounts, regions and assets. The total is the sum of the rows.
+     measurement to another target without G2 of `output.md`. A target row counts only the units of
+     work that the code deployed on that target reaches: its accounts of step 8, its regions and
+     assets of step 9. Never count the units of another target. The total is the sum of the rows.
+   - Keep a row for each candidate target, also when its answer is no: it prints $0, with the grade
+     of its evidence. Never drop a candidate target from the table.
    - If the organization cannot reach a target, keep its row as
      `Runs here? unknown — no access: <error>`, with grade D. The total becomes a floor (G6). Add a
      doubt that names the missing datasource.

@@ -114,7 +114,7 @@ Print the section with these parts:
 ## Worked example
 
 A change adds one scheduled CI job. The job runs a log query on the staging account. The example
-shows two payers, so it has two headlines. It also shows two targets of the cloud payer.
+shows two payers, so it has two headlines. It also shows three targets of the cloud payer and two targets of the CI payer.
 Step 3 of `SKILL.md` lists the targets. Each target has one row.
 
 **Staging AWS account: +$0.064/mo list, $0–0.064/mo effective, grade B**
