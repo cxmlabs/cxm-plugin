@@ -238,7 +238,8 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
   are `lambda_functions.sum_request_count` and a usage type in `costs` that counts requests. For a
   model call, give the rate and the per-call formula, or "cannot price" for a model outside the bill.
 - Price a third-party metered service in three steps. First run `cxm price --datasource` with no
-  value. It lists the `datasources` that have a published rate. Pick the one of the service of the
+  value. It lists the `datasources` that have a published rate. If that listing returns `no_rate_found`,
+  print `unmeasured (no published rate: <datasource>)`. Pick the one of the service of the
   call. Then run `cxm price --datasource <datasource>`. It lists the `dimension`, `unit` and
   `billing_period` of each published rate. The dimension is the billed item of the datasource, for example a sku, a model or a plan. If `limit_reached` is
   true, say that the list is cut. Pick the dimension and the unit of the call from that list. Then run

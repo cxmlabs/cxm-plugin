@@ -61,7 +61,7 @@ Everything else
                                                 On-demand and committed rates for one resource
   price --datasource                            List the datasources with a published rate
   price --datasource <d>                        List the priced dimensions of a third-party service
-  price --datasource <d> --dimension <x> [--unit <u>] [--billing-period YYYY-MM] [--quantity n]
+  price --datasource <d> --dimension <x> [--unit <u>] [--quantity n]
                                                 Published billed unit rate of a third-party service
   context '<query>' [--limit n] [--category c]  Search the cloud map
   context --pages | --page <path>               List the pages, or read one

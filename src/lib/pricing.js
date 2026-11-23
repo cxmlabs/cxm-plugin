@@ -118,7 +118,6 @@ export function buildUnitRateQuery(spec) {
       f('dimension', spec.dimension, RATES),
       RATED,
       ...(spec.unit ? [f('unit', spec.unit, RATES)] : []),
-      ...(spec.billingPeriod ? [f('billing_period', spec.billingPeriod, RATES)] : []),
     ],
     order: [[`${RATES}.billing_period`, 'desc'], [`${RATES}.unit`, 'asc'], [`${RATES}.rate_source`, 'asc']],
     limit: 1,

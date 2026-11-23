@@ -6,6 +6,9 @@ fixes, including security fixes.
 
 ## Unreleased
 
+- `cxm price --datasource`: lists the datasources with a published rate, then the dimensions and units
+  of one datasource, and prices a third-party metered service by dimension and unit.
+
 - Auto-update: the installer asks once whether to keep the plugin up to date. On yes, Claude Code's
   plugin auto-update is on for the CXM marketplace and Codex is refreshed at a session start, once a
   day. A `cxm` command says, at most once a day, when a newer version is out.

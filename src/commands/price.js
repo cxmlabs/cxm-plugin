@@ -24,14 +24,13 @@ export function unitRateSpec(argv) {
     datasource: getFlag(argv, '--datasource'),
     dimension: getFlag(argv, '--dimension'),
     unit: getFlag(argv, '--unit'),
-    billingPeriod: getFlag(argv, '--billing-period'),
   };
 }
 
 export function unitRateResult(spec, rows, { organization, quantity }) {
   const rate = unitRateRow(rows);
   if (!rate) {
-    return { source: 'CloudExMachina', spec, result: 'no_rate_found', datasource: spec.datasource, hint: 'Check --datasource/--dimension/--unit/--billing-period.' };
+    return { source: 'CloudExMachina', spec, result: 'no_rate_found', datasource: spec.datasource, hint: 'Check --datasource/--dimension/--unit.' };
   }
   return { source: 'CloudExMachina', organization, spec, ...rate, ...(quantity === undefined ? {} : { quantity: Number(quantity) }) };
 }
