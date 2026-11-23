@@ -94,6 +94,7 @@ test('the skill ends its answer with one cxm-cost-result block', () => {
   assert.ok(output.includes('`cost-result.schema.json`'));
   assert.ok(output.includes('Read `cost-result.schema.json` before you write the block.'));
   assert.ok(output.includes('"low"'));
+  assert.ok(output.includes('"effect_low": <number>'));
   assert.ok(output.includes('print only this line, then the structured block:'));
   assert.equal(JSON.parse(read('cost-result.schema.json')).properties.status.enum.length, 3);
 });

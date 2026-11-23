@@ -165,6 +165,8 @@ Read `cost-result.schema.json` before you write the block.
   `results[].amount` may be the text `unmeasured` in place of this object.
 - Each `citations` value is `{"value": <number>, "unit": "<unit>", "formula": "<text>", "source": "<text>", "grade": "<A to D>"}`.
 - A factor `value` is a number or `unmeasured`.
+- A doubt is `{"text": "<text>", "effect_low": <number>, "effect_high": <number or "unmeasured">, "resolve": "<text>"}`.
+  It has two fields for the effect and no amount object.
 - `status` is `priced`, `no_billed_unit_change` or `failed`.
 - Make one `headlines` entry for each headline, one `targets` entry for each row of the table, one
   `results` entry for each result line with its `factors`, one `citations` key for each cite, and one
