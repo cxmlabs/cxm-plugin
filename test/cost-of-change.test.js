@@ -113,6 +113,10 @@ test('the skill prints unmeasured only from the stop rule', () => {
   assert.equal(map.split('\n').filter((line) => line.startsWith('| ')).length, rows.length + 1, 'the source map holds the 11 rows and a header');
   assert.match(measurement, /error text of the attempted query/);
   assert.ok(measurement.includes('latest inventory, crawled at <date of the last crawl>'));
+  const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name}`));
+  assert.ok(row('Pages').includes('of that account and region'));
+  assert.ok(!measurement.includes('Σ over account and region'));
+  assert.ok(row('Runs per month').includes('--created') && row('Runs per month').includes('A count equal to the limit is a floor'));
   for (const order of ['print the runs per month as `unmeasured`', 'print the account count as `unmeasured`',
     'If the code cannot bound the page count, print it as `unmeasured`',
     'Print the bytes per query as `unmeasured`, and give the floor runs × 10 MB × rate', 'print the region count as `unmeasured`']) {
