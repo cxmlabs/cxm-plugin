@@ -112,6 +112,7 @@ test('the skill prints unmeasured only from the stop rule', () => {
   for (const row of rows) assert.ok(map.includes(`\n| ${row}`), `source map row ${row}`);
   assert.equal(map.split('\n').filter((line) => line.startsWith('| ')).length, rows.length + 1, 'the source map holds the 11 rows and a header');
   assert.match(measurement, /error text of the attempted query/);
+  assert.ok(measurement.includes('latest inventory, crawled at <date of the last crawl>'));
   for (const order of ['print the runs per month as `unmeasured`', 'print the account count as `unmeasured`',
     'If the code cannot bound the page count, print it as `unmeasured`',
     'Print the bytes per query as `unmeasured`, and give the floor runs × 10 MB × rate', 'print the region count as `unmeasured`']) {
@@ -125,5 +126,7 @@ test('a required count that was not attempted fails the run', () => {
   const counts = measurement.slice(measurement.indexOf('## Required counts'), measurement.indexOf('## Source map'));
   for (const count of ['Accounts', 'Assets per account and region', 'GitHub orgs', 'Runs per month']) assert.ok(counts.includes(count), count);
   assert.ok(measurement.includes('A required count not attempted fails the run.'));
+  assert.match(measurement, phrase('prints only the FAILED line of `output.md`, then the structured block.'));
+  assert.match(skillOnly, phrase('per account and region, per asset, per GitHub org, or per request'));
   assert.doesNotMatch(skill, phrase('print the per-line amounts and no monthly total'));
 });

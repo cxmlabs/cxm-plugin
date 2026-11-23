@@ -26,7 +26,7 @@ Try the rungs in this order. Each rung gives the grade of `output.md` on the sam
 - **S3.** Skip a source whose own measurement costs more than 10 % of the current estimate. Name the
   skip in the doubts block.
 - **S4.** A required count not attempted fails the run. Such a run prints only the FAILED line of
-  `output.md`.
+  `output.md`, then the structured block.
 - **S5.** Stop when every input is A, B or C, or D with a basis and a range.
 
 ## Required counts
@@ -45,20 +45,24 @@ rung, as S2 says.
 
 ## Source map
 
+Cite each value that the inventory gives as "latest inventory, crawled at <date of the last crawl>". Read
+the date from `inventory_crawl_manifest` (`sync_time`, latest, for the table of the asset type). An
+inventory value that you cite this way is a source, not a doubt.
+
 One row for each input. A rung that shows "none" has no source: go to the next rung. A source that shows
 "not available yet" needs a measurement route that does not exist today: skip it, and say so in the
 doubts block. `<usage type>`, `<window>` and the filters are those of the lookup in `SKILL.md`.
 
 | Input | A | B | C | D |
 |---|---|---|---|---|
-| Runs per month | `gh run list` of the workflow that runs the job, over 30 days. Scheduler and task metrics, audit log and job log lines: not available yet. | Days with usage in `costs` (`billing_day`). A ceiling, never the run count: the bill names no caller. | Cron at `file:line@sha`. | Basis, low value, high value. |
+| Runs per month | `gh run list --limit <count>` of the workflow that runs the job, over 30 days. Set the limit above the expected run count: the command returns 20 runs by default. Scheduler and task metrics, audit log and job log lines: not available yet. | Days with usage in `costs` (`billing_day`). A ceiling only for a job that runs at most once a day, never the run count: the bill names no caller. For any other job this cell gives no value. | Cron at `file:line@sha`. | Basis, low value, high value. |
 | Accounts | `costs` with segment `scoped_accounts_only`, for the accounts with rows in the window. | Distinct `costs.account_id` of the usage type. | List in the code or in its configuration, at `file:line@sha`. | none |
 | Assets per account and region | `assets{count; asset_type; inventory_status is live; account_id; region}`, with the date of the count. | Distinct `costs.asset_id` that have cost rows in the window. | none | none |
 | Regions | Distinct `assets.region` of the asset type. Listing or manifest of the outputs: not available yet. | Distinct `costs.region` of the usage type. | Region list in the code. Local run of the planner over public inputs. | none |
-| Pages | `assets{count}` of the asset type ÷ the page size. The page size is a C factor. | none | Page size × count, both from the code. | Basis, low value, high value. |
+| Pages | Σ over account and region of ⌈`assets{count}` ÷ page size⌉, for the asset type. The page size is a C factor. | none | ⌈item count ÷ page size⌉, both from the code. | Basis, low value, high value. |
 | Bytes per query | `ProcessedBytes` ÷ `SampleCount` per workgroup: not available yet. | `costs{sum_usage_amount}` of the query service, by workgroup ÷ runs. | Table sizes from inventory: not available yet. | The 10 MB minimum of one query, as a floor. |
 | Bytes scanned | `IncomingBytes` per log group: not available yet. | `costs{sum_usage_amount}` on the usage types that end in `DataProcessing-Bytes`, by `asset_arn`. | none | Basis, low value, high value. |
-| Object sizes | Percentiles of an S3 prefix: not available yet. | Storage bytes ÷ object count: not available yet, because no dataset holds the object count. | `TransferConfig` in the code. | Pinned default of the library. |
+| Object sizes | Percentiles of an S3 prefix: not available yet. | Storage bytes ÷ object count: not available yet, because no dataset holds the object count. | `TransferConfig` in the code, else the pinned default of the library. | Basis, low value, high value. |
 | Flag state | The connected flag service: not available yet. | none | Default value in the code. | Basis, low value, high value. |
 | GitHub orgs | Datasources of the organization: not available yet. | Distinct `github_costs.org` in the window. | none | none |
 | Units a job iterates over | Count in the logs or in the outputs of the job: not available yet. | Distinct accounts of the provider cost view: `costs` or `github_costs`. | Loop bound in the code. | Basis, low value, high value. |

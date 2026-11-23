@@ -102,7 +102,7 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
 2. **Paid calls.** Read the diff (`git diff <base>...HEAD`). Find each paid call that the diff
    adds, removes or multiplies. A call to a third-party service is a paid call. For each paid call,
    name the API operation, the payer, the unit of work and the asset type that the call iterates
-   over. The unit of work is once per run, per account, per account and region, per asset, or per
+   over. The unit of work is once per run, per account, per account and region, per asset, per GitHub org, or per
    request. If the diff adds, removes and multiplies no paid call, go to "No billed unit change".
 3. **Payer.** A call with a role in another account bills that account. A call with the platform
    credentials bills the platform account. If the session organization does not hold the bill of
