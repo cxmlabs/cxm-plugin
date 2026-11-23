@@ -195,6 +195,8 @@ test('the skill lists every billing dimension of a service before it prices one'
   assert.match(output, phrase('A result line with no dimensions table for its service is not finished.'));
   assert.match(output, phrase('For example, a log query moves ingestion, storage and query scan; object storage moves request tiers, storage and data transfer.'));
   assert.match(dims, phrase('Use the volume that the storage usage type bills.'));
+  assert.match(dims, phrase('Price only the calls, resources and compute that the code of the diff makes. A call that the running system makes in response to the change\'s traffic'));
+  assert.match(dims, phrase('is indirect: name it in a doubt with its driver, never in a result line.'));
   assert.match(dims, phrase('read the ratio of stored to ingested bytes from the bill of the same resource (`costs.asset_arn`). When the bill of that resource gives no ratio, use a D factor with a low value and a high value.'));
   assert.match(dims, phrase('Compare the sizes, without their signs. When the bill change is zero or has the opposite sign of the code value, apply no cap: keep C and print `bill: gap`.'));
   assert.match(dims, phrase('the bill caps the result line. The line takes the bill change × its rate [B] as a ceiling, and the headline adds up the lines as usual.'));

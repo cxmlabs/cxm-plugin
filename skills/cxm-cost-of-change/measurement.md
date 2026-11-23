@@ -132,7 +132,7 @@ For each service that the change touches (a call, a resource it creates, or data
    not show yet. Write no dimension from memory.
 2. **Mark.** Mark each dimension `moved` or `not moved`, with a one-line reason and a citation. A change
    moves a dimension directly (the call or the resource itself) or through what it produces (data that it
-   writes is ingested, then stored, then read). Price no read that a caller outside the diff makes.
+   writes is ingested, then stored, then read). Price only the calls, resources and compute that the code of the diff makes. A call that the running system makes in response to the change's traffic (the app's own calls, its database reads, the logs it writes, the load balancer in front of it) is indirect: name it in a doubt with its driver, never in a result line.
 3. **Drive.** Name the driver of each moved dimension and its unit (bytes, hours, requests, GB-month).
    Measure the driver with the source map.
 4. **Store.** For a stored dimension, price the steady state: daily volume × the retention days. Read the

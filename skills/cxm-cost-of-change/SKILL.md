@@ -115,6 +115,7 @@ a task) in the result lines.
 - If the organization holds no datasource for an item, print `unmeasured (no datasource: <kind>)`.
 - If the datasource has no quantity measure, print `unmeasured (no quantity measure: <datasource>)`.
 - Give the query that proves each `unmeasured`.
+- Price only what the code of the diff makes. Name an indirect call in a doubt, as "Billing dimensions" of `measurement.md` says.
 
 Then list the billing dimensions that each call, resource or data write moves, as
 "Billing dimensions" of `measurement.md` says. For example, a diff that adds log writes moves log
