@@ -1,6 +1,6 @@
 import { requireSession } from '../lib/config.js';
 import { cubeLoad } from '../lib/http.js';
-import { buildPricingQuery, summarizePricing } from '../lib/pricing.js';
+import { buildPricingQuery, buildUnitRateQuery, summarizePricing, unitRateRow } from '../lib/pricing.js';
 
 function getFlag(argv, name) {
   const i = argv.indexOf(name);
@@ -19,8 +19,35 @@ export function priceSpec(argv) {
   };
 }
 
+export function unitRateSpec(argv) {
+  return {
+    datasource: getFlag(argv, '--datasource'),
+    dimension: getFlag(argv, '--dimension'),
+    unit: getFlag(argv, '--unit'),
+    billingPeriod: getFlag(argv, '--billing-period'),
+  };
+}
+
+export function unitRateResult(spec, rows, { organization, quantity }) {
+  const rate = unitRateRow(rows);
+  if (!rate) {
+    return { source: 'CloudExMachina', spec, result: 'no_rate_found', datasource: spec.datasource, hint: 'Check --datasource/--dimension/--unit/--billing-period.' };
+  }
+  return { source: 'CloudExMachina', organization, spec, ...rate, ...(quantity === undefined ? {} : { quantity: Number(quantity) }) };
+}
+
+async function unitRate(config, argv) {
+  const spec = unitRateSpec(argv);
+  const quantity = getFlag(argv, '--quantity');
+  if (quantity !== undefined && !Number.isFinite(Number(quantity))) throw new Error('price requires --quantity to be a number');
+  const rows = await cubeLoad(config, buildUnitRateQuery(spec), { maxWaitMs: 60000 });
+  const result = unitRateResult(spec, rows, { organization: config.organizationId, quantity });
+  console.log(JSON.stringify(result, null, 2));
+}
+
 export async function price(argv) {
   const config = await requireSession();
+  if (argv.includes('--datasource')) return unitRate(config, argv);
   const spec = priceSpec(argv);
   const count = Number(getFlag(argv, '--count') ?? 1);
   const hours = Number(getFlag(argv, '--hours') ?? 730);

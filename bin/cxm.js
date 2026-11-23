@@ -59,6 +59,8 @@ Everything else
   price --service <ec2|rds|elasticache> --instance-type <t> --region <r>
         [--os/--engine/--deployment/--count/--hours]
                                                 On-demand and committed rates for one resource
+  price --datasource <d> --dimension <x> [--unit <u>] [--billing-period YYYY-MM] [--quantity n]
+                                                Published billed unit rate of a third-party service
   context '<query>' [--limit n] [--category c]  Search the cloud map
   context --pages | --page <path>               List the pages, or read one
   resolve --arn <a> | --address <tf> [--repo r] Identity, cost, owner repository and opportunities

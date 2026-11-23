@@ -103,3 +103,28 @@ export function summarizePricing(rows, { hours = 730, count = 1 } = {}) {
     count,
   };
 }
+
+const RATES = 'third_party_unit_rates';
+const RATE_MEMBERS = ['datasource', 'dimension', 'unit', 'billing_period', 'unit_rate_usd', 'rate_source'];
+
+// The analytics layer publishes the rate; the newest billing period comes first, and the CLI reads that one row.
+export function buildUnitRateQuery(spec) {
+  if (!spec.datasource || !spec.dimension) throw new Error('price requires --datasource and --dimension');
+  const eq = (member, value) => ({ member: `${RATES}.${member}`, operator: 'equals', values: [value] });
+  return {
+    dimensions: RATE_MEMBERS.map((m) => `${RATES}.${m}`),
+    filters: [
+      eq('datasource', spec.datasource),
+      eq('dimension', spec.dimension),
+      ...(spec.unit ? [eq('unit', spec.unit)] : []),
+      ...(spec.billingPeriod ? [eq('billing_period', spec.billingPeriod)] : []),
+    ],
+    order: { [`${RATES}.billing_period`]: 'desc' },
+    limit: 1,
+  };
+}
+
+export function unitRateRow(rows) {
+  if (!rows.length) return null;
+  return Object.fromEntries(RATE_MEMBERS.map((m) => [m, rows[0][`${RATES}.${m}`]]));
+}

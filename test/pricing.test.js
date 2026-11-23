@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { priceSpec } from '../src/commands/price.js';
+import { priceSpec, unitRateResult, unitRateSpec } from '../src/commands/price.js';
 import { classifyError } from '../src/lib/telemetry.js';
-import { buildPricingQuery, summarizePricing } from '../src/lib/pricing.js';
+import { buildPricingQuery, buildUnitRateQuery, summarizePricing } from '../src/lib/pricing.js';
 
 const C = 'pricing_rates';
 const row = (model, term, rate, unit = 'Hrs') => ({
@@ -111,4 +111,29 @@ test('null committed layers when no reserved rows; null overall when no on-deman
 test('an RDS engine slug maps to the catalog label', () => {
   const q = buildPricingQuery({ service: 'rds', instanceType: 'db.r6g.xlarge', region: 'eu-west-1', engine: 'aurora-postgresql' });
   assert.ok(q.filters.some((f) => f.member === 'pricing_rates.database_engine' && f.values[0] === 'Aurora PostgreSQL'));
+});
+
+test('prices a third-party datasource from the published rate', () => {
+  const R = 'third_party_unit_rates';
+  const spec = unitRateSpec(['--datasource', 'ci', '--dimension', 'runner_linux', '--unit', 'minute']);
+  assert.deepEqual(buildUnitRateQuery(spec), {
+    dimensions: ['datasource', 'dimension', 'unit', 'billing_period', 'unit_rate_usd', 'rate_source'].map((m) => `${R}.${m}`),
+    filters: [
+      { member: `${R}.datasource`, operator: 'equals', values: ['ci'] },
+      { member: `${R}.dimension`, operator: 'equals', values: ['runner_linux'] },
+      { member: `${R}.unit`, operator: 'equals', values: ['minute'] },
+    ],
+    order: { [`${R}.billing_period`]: 'desc' },
+    limit: 1,
+  });
+  for (const bad of [{ datasource: 'ci' }, { dimension: 'runner_linux' }]) assert.throws(() => buildUnitRateQuery(bad), (e) => classifyError(e) === 'bad_input');
+  const row = { [`${R}.unit_rate_usd`]: '0.008', [`${R}.unit`]: 'minute', [`${R}.billing_period`]: '2026-10', [`${R}.rate_source`]: 'ci_costs' };
+  const priced = unitRateResult(spec, [row], { organization: 'org', quantity: '120' });
+  assert.equal(priced.unit_rate_usd, '0.008');
+  assert.equal(priced.billing_period, '2026-10');
+  assert.equal(priced.quantity, 120);
+  const empty = unitRateResult(spec, [], { organization: 'org' });
+  assert.equal(empty.result, 'no_rate_found');
+  assert.equal(empty.datasource, 'ci');
+  assert.ok(!('unit_rate_usd' in empty));
 });
