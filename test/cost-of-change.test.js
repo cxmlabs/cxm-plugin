@@ -230,6 +230,9 @@ test('each unit of work names its trigger and counts it from its source-map row'
   assert.match(unit, phrase('a schedule, a request, an event, a CI run or an operator action'));
   assert.ok(unit.includes('`file:line@sha`'));
   for (const name of ['Requests per month', 'CI runs per month', 'CI minutes per run']) assert.ok(unit.includes(`"${name}"`), `section 2 names ${name}`);
+  assert.match(unit, phrase('Send every trigger of a CI workflow (`schedule`, `workflow_dispatch`, `push` and any other event) to "CI runs per month"'));
+  assert.match(unit, phrase('Price a CI job as CI runs per month [cite] × CI minutes per run [cite] × the rate. Show both factors on the result line.'));
+  assert.match(measurement.slice(measurement.indexOf('## Required counts')), phrase('| per CI run | CI runs per month, CI minutes per run |'));
   const map = measurement.slice(measurement.indexOf('## Source map'));
   const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name} |`));
   assert.ok(row('Requests per month').includes('`lambda_functions.sum_request_count`'));

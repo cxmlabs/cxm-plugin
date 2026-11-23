@@ -37,6 +37,7 @@ Each unit of work needs the counts of its row. Attempt each count through its ro
 |---|---|
 | once per run | Runs per month |
 | per request | Requests per month |
+| per CI run | CI runs per month, CI minutes per run |
 | per account, per account and region | Accounts, Runs per month |
 | per asset | Assets per account and region, Accounts, Runs per month |
 | per GitHub org | GitHub orgs, Runs per month |

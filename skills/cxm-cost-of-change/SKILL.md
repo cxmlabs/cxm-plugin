@@ -129,9 +129,14 @@ request.
 **Trigger.** Name the trigger of each unit of work: a schedule, a request, an event, a CI run or an
 operator action. Cite the code or configuration that sets it, as `file:line@sha`. A workflow can
 have several triggers: its cron is a schedule and its manual dispatch is an operator action. Name
-each one. Count the units of each trigger from its row of the source map: "Requests per month" for
-a request, "CI runs per month" for a CI run and "CI minutes per run" for the minutes of one run,
-and "Runs per month" for any other schedule, event or operator action.
+each one. Count the units of each trigger from its row of the source map. Send every trigger of a
+CI workflow (`schedule`, `workflow_dispatch`, `push` and any other event) to "CI runs per month".
+That row counts every run of the workflow and splits the count by event. Use "Requests per month"
+for a request. Use "Runs per month" for a schedule, an event or an operator action outside CI.
+
+The unit of work of a CI job is once per CI run. Price a CI job as CI runs per month [cite] × CI
+minutes per run [cite] × the rate. Show both factors on the result line. "CI minutes per run" is
+`github_workflow_costs.billable_minutes` ÷ the runs in the same window, per workflow and SKU [B].
 
 If the diff adds, removes and multiplies no paid call and moves no billing dimension, go to "No billed unit change".
 
@@ -214,7 +219,7 @@ the payer, print each input that needs that bill as `unmeasured`.
 only matches by name. A `deploys` edge names a candidate target of "Deployment targets". A schedule
 and a run count never come from it.
 
-**Runs per month.** For a CI run or a request, take the count from its row (section 2). Else take them from the schedule that the code declares, and cite its
+**Runs per month.** For each trigger of a CI workflow, take the count from "CI runs per month". For a request, take it from "Requests per month". Else take them from the schedule that the code declares, and cite its
 `file:line@sha`. Show the run count as a factor: `21.74 runs/mo [C:c1]`, with the citation
 `c1 21.74 = 5 × 365.25 ÷ 7 ÷ 12 ; cron "0 4 * * 1-5" at <file>:<line>@<sha> [C]`. A weekday
 cron gives 21.74 runs per month; a daily cron gives 30.44. Use the bill only as a ceiling: the
