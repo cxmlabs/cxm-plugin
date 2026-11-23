@@ -77,9 +77,9 @@ test('every result line carries grades and citations, and the doubts block alway
 });
 
 test('the runs-per-month step gives the runs-per-month factor with its grade and cron citation', () => {
-  const step6 = skillOnly.slice(skillOnly.indexOf('. **Runs per month.**'), skillOnly.indexOf('. **Accounts.**'));
-  assert.ok(step6.includes('21.74 runs/mo [C:c1]'));
-  assert.ok(step6.includes('@<sha>'));
+  const step7 = skillOnly.slice(skillOnly.indexOf('. **Runs per month.**'), skillOnly.indexOf('. **Accounts.**'));
+  assert.ok(step7.includes('21.74 runs/mo [C:c1]'));
+  assert.ok(step7.includes('@<sha>'));
 });
 
 test('the skill returns its result and never reads or writes a pull request', () => {
@@ -150,6 +150,8 @@ test('the skill lists every deployment target before it names a payer', () => {
   assert.ok(output.includes('| Target | Runs here? |') && output.includes('`runs_here.value`'));
   assert.doesNotMatch(code, phrase('Print the cost for each other organization'));
   assert.match(code, phrase('A schedule and a run count never come from it.'));
+  assert.match(step, phrase('A target row takes only the units of work inside that target: its accounts, regions and assets. The total is the sum of the rows.'));
+  assert.doesNotMatch(output, phrase('production and other tenants'));
   assert.doesNotMatch(output, phrase('Until the skill reads more than one deployment target'));
   assert.doesNotMatch(output, phrase('wait for the deployment-target step'));
 });

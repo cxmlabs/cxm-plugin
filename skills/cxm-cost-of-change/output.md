@@ -124,8 +124,10 @@ Organization: the session organization.
 | Target | Runs here? | Δ list /mo | Δ effective /mo | Grade |
 |---|---|---|---|---|
 | the staging account, one region | yes [A: 22 runs in 30 days, CI run history] | +$0.064 | $0–0.064 | B |
-| production and other tenants | no [C: both callers assume the staging reader role and pass the staging region] | $0 | $0 | C |
-| the CI provider, two workflows | yes [A: CI run history] | +$4.19 per 30 days | +$4.19 per 30 days | C |
+| the production account | no [C: both callers assume the staging reader role and pass the staging region] | $0 | $0 | C |
+| another tenant account | no [C: both callers assume the staging reader role and pass the staging region] | $0 | $0 | C |
+| the CI provider, log watch workflow | yes [A: CI run history] | +$0.349 per 30 days | +$0.349 per 30 days | B |
+| the CI provider, nightly E2E workflow | yes [A: CI run history] | +$3.84 per 30 days | +$3.84 per 30 days | C |
 
 **Result lines**
 - `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6]`

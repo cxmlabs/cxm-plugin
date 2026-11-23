@@ -112,13 +112,16 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
      `cxm-repo-graph` skill from each Terraform workspace that uses the module or image to its
      accounts. A target is a workspace × account × region. For CI, a target is a job × role × region
      × matrix entry. For release state, read `git tag --list 'deploy/*' --contains <sha>` and
-     `gh run list`. For the accounts of the tenants, read the account names in `costs` and `assets`
+     `gh run list`. `<sha>` is the base commit that holds the changed file. For the accounts of the tenants, read the account names in `costs` and `assets`
      of the organization.
    - Answer "Runs here?" for each target, with its grade: A for a run history count, a metric or an
      audit log count. B for bill usage after the deploy date. C for code, configuration or a deploy
-     marker. D for an assumption.
+     marker. D for an assumption. A job, image or schedule that the diff adds has no run history
+     yet. Answer its Runs here? from code or configuration (C). An empty release history never gives
+     no.
    - Give each target one row of the target table, and price each target on its own. Never copy a
-     measurement to another target without G2 of `output.md`.
+     measurement to another target without G2 of `output.md`. A target row takes only the units of work
+     inside that target: its accounts, regions and assets. The total is the sum of the rows.
    - If the organization cannot reach a target, keep its row as
      `Runs here? unknown — no access: <error>`, with grade D. The total becomes a floor (G6). Add a
      doubt that names the missing datasource.
@@ -136,9 +139,9 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
    unit change". For example, a diff removes 2 of 4 statistics of a metric, or changes the batch
    size and keeps one page.
 6. **Runtime node.** Find the runtime node and the image of the changed code with the
-   `cxm-repo-graph` skill. Do not take a schedule or a run count from a node that only matches
-   by name, or from a `deploys` edge. A `deploys` edge names a candidate target for step 3. A
-   schedule and a run count never come from it.
+   `cxm-repo-graph` skill. Do not take a schedule, a run count or an account list from a node that
+   only matches by name. A `deploys` edge names a candidate target of step 3. A schedule and a run
+   count never come from it.
 7. **Runs per month.** Take them from the schedule that the code declares, and cite its
    `file:line@sha`. Show the run count as a factor: `21.74 runs/mo [C:c1]`, with the citation
    `c1 21.74 = 5 × 365.25 ÷ 7 ÷ 12 ; cron "0 4 * * 1-5" at <file>:<line>@<sha> [C]`. A weekday
