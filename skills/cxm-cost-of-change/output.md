@@ -24,7 +24,7 @@ Give each number one grade. The grade says how the number was obtained.
 - **G2.** A value that was measured on one target and is used for another drops one grade. Cite it
   as "analog of `<target>`".
 - **G3.** A C value that an independent A or B source confirms within ±20 % becomes B. A larger
-  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as steps 4 and 6
+  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as steps 5 and 7
   of `SKILL.md` say.
 - **G4.** Print a floor or a ceiling as a bound. If ceiling ÷ floor is more than 3, the result is
   C at best. A floor of 0 that a free allowance sets is exempt from this ratio.
@@ -59,8 +59,10 @@ Organization: <name>. <floor or ceiling label, when one applies>
 
 - Print one headline for each payer and each currency. Never add two currencies.
 - A decrease takes a minus sign.
-- Until the skill reads more than one deployment target, the target table has one row: the session
-  organization.
+- The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
+  `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
+  organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes
+  grade A, B or C.
 - Print each result line with its whole formula. Each factor carries `[<grade>:<cite>]`.
 - A citation holds its own formula, and the cites and sources of that formula. Follow the chain
   down to a leaf source.
@@ -91,8 +93,8 @@ line in place of the list:
 
 - Print an input that you cannot read as `unmeasured`, never as a number. Print `unmeasured` only as
   the stop rule of `measurement.md` allows. Attempt each required count of `measurement.md`: a required
-  count not attempted fails the run. The `unmeasured` row of the other organizations does not block
-  the total of the session organization.
+  count not attempted fails the run. The row of a target that the organization cannot reach does not
+  block the total. It makes the total a floor, as G6 says.
 
 ### A failed run
 
@@ -113,9 +115,8 @@ Print the section with these parts:
 ## Worked example
 
 A change adds one scheduled CI job. The job runs a log query on the staging account. The example
-shows two payers, so it has two headlines. It also shows two targets of the cloud payer.
-The rows for other targets wait for the deployment-target step. Until then, the skill prints only the
-row of the session organization.
+shows two payers, so it has two headlines. It also shows three targets of the cloud payer and two targets of the CI payer.
+Step 3 of `SKILL.md` lists the targets. Each target has one row.
 
 **Staging AWS account: +$0.064/mo list, $0–0.064/mo effective, grade B**
 **CI provider organization: +$4.19 per 30 days list, grade C**
@@ -124,8 +125,10 @@ Organization: the session organization.
 | Target | Runs here? | Δ list /mo | Δ effective /mo | Grade |
 |---|---|---|---|---|
 | the staging account, one region | yes [A: 22 runs in 30 days, CI run history] | +$0.064 | $0–0.064 | B |
-| production and other tenants | no [C: both callers assume the staging reader role and pass the staging region] | $0 | $0 | C |
-| the CI provider, two workflows | yes [A: CI run history] | +$4.19 per 30 days | +$4.19 per 30 days | C |
+| the production account | no [C: both callers assume the staging reader role and pass the staging region] | $0 | $0 | C |
+| another tenant account | no [C: both callers assume the staging reader role and pass the staging region] | $0 | $0 | C |
+| the CI provider, log watch workflow | yes [A: CI run history] | +$0.349 per 30 days | +$0.349 per 30 days | B |
+| the CI provider, nightly E2E workflow | yes [A: CI run history] | +$3.84 per 30 days | +$3.84 per 30 days | C |
 
 **Result lines**
 - `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6]`
@@ -174,7 +177,7 @@ Read `cost-result.schema.json` before you write the block.
 - A factor that the section prints as `unmeasured` has the value `unmeasured` and a `reason`. It has
   no grade and no cite.
 - A target row that the table prints as `unmeasured` has the value `unmeasured` in `amounts.list` and
-  `amounts.effective`.
+  `amounts.effective`. A target with `Runs here? unknown` has `runs_here.value` `unknown`.
 - For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets`,
   `results`, `doubts` and `citations` empty.
 - For no billed unit change, leave `headlines` and `targets` empty. `results` holds the count before
@@ -193,8 +196,10 @@ The block of the worked example. Give every field it shows.
   ],
   "targets": [
     {"target": "the staging account, one region", "runs_here": {"value": "yes", "grade": "A", "basis": "22 runs in 30 days, CI run history"}, "grade": "B", "amounts": {"list": {"low": 0.064, "high": 0.064, "unit": "$/mo"}, "effective": {"low": 0, "high": 0.064, "unit": "$/mo"}}},
-    {"target": "production and other tenants", "runs_here": {"value": "no", "grade": "C", "basis": "both callers assume the staging reader role and pass the staging region"}, "grade": "C", "amounts": {"list": {"low": 0, "high": 0, "unit": "$/mo"}, "effective": {"low": 0, "high": 0, "unit": "$/mo"}}},
-    {"target": "the CI provider, two workflows", "runs_here": {"value": "yes", "grade": "A", "basis": "CI run history"}, "grade": "C", "amounts": {"list": {"low": 4.19, "high": 4.19, "unit": "$/30 days"}, "effective": {"low": 4.19, "high": 4.19, "unit": "$/30 days"}}}
+    {"target": "the production account", "runs_here": {"value": "no", "grade": "C", "basis": "both callers assume the staging reader role and pass the staging region"}, "grade": "C", "amounts": {"list": {"low": 0, "high": 0, "unit": "$/mo"}, "effective": {"low": 0, "high": 0, "unit": "$/mo"}}},
+    {"target": "another tenant account", "runs_here": {"value": "no", "grade": "C", "basis": "both callers assume the staging reader role and pass the staging region"}, "grade": "C", "amounts": {"list": {"low": 0, "high": 0, "unit": "$/mo"}, "effective": {"low": 0, "high": 0, "unit": "$/mo"}}},
+    {"target": "the CI provider, log watch workflow", "runs_here": {"value": "yes", "grade": "A", "basis": "CI run history"}, "grade": "B", "amounts": {"list": {"low": 0.349, "high": 0.349, "unit": "$/30 days"}, "effective": {"low": 0.349, "high": 0.349, "unit": "$/30 days"}}},
+    {"target": "the CI provider, nightly E2E workflow", "runs_here": {"value": "yes", "grade": "A", "basis": "CI run history"}, "grade": "C", "amounts": {"list": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}, "effective": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}}}
   ],
   "results": [
     {"id": "R1", "target": "staging", "item": "Logs query", "amount": {"low": 0.064, "high": 0.064, "unit": "$/mo"}, "grade": "B", "factors": [{"value": 21.74, "unit": "runs/mo", "grade": "B", "cite": "c1"}, {"value": 0.5, "unit": "GB/run", "grade": "B", "cite": "c4"}, {"value": 0.0059, "unit": "$/GB", "grade": "A", "cite": "c6"}]},

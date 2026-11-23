@@ -77,10 +77,10 @@ test('every result line carries grades and citations, and the doubts block alway
   assert.ok(none.includes('The doubts block. In this case, give the effect of each doubt in billed units per run, not in $/mo.'));
 });
 
-test('step 6 gives the runs-per-month factor with its grade and cron citation', () => {
-  const step6 = skillOnly.slice(skillOnly.indexOf('6. **Runs per month.**'), skillOnly.indexOf('7. **Accounts.**'));
-  assert.ok(step6.includes('21.74 runs/mo [C:c1]'));
-  assert.ok(step6.includes('@<sha>'));
+test('the runs-per-month step gives the runs-per-month factor with its grade and cron citation', () => {
+  const step7 = skillOnly.slice(skillOnly.indexOf('. **Runs per month.**'), skillOnly.indexOf('. **Accounts.**'));
+  assert.ok(step7.includes('21.74 runs/mo [C:c1]'));
+  assert.ok(step7.includes('@<sha>'));
 });
 
 test('the skill returns its result and never reads or writes a pull request', () => {
@@ -141,4 +141,32 @@ test('a required count that was not attempted fails the run', () => {
   assert.match(measurement, phrase('prints only the FAILED line of `output.md`, then the structured block.'));
   assert.match(skillOnly, phrase('per account and region, per asset, per GitHub org, or per request'));
   assert.doesNotMatch(skill, phrase('print the per-line amounts and no monthly total'));
+});
+
+test('the skill lists every deployment target before it names a payer', () => {
+  const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
+  const targets = code.indexOf('. **Deployment targets.**');
+  assert.ok(targets > 0 && targets < code.indexOf('. **Payer.**'), 'Deployment targets comes before Payer');
+  const step = code.slice(targets, code.indexOf('. **Payer.**'));
+  assert.ok(step.includes('Runs here? unknown — no access: <error>'));
+  for (const source of ['`deploys` edge', "git tag --list 'deploy/*' --contains <file-sha>", '`gh run list`', '`costs` and `assets`']) assert.ok(step.includes(source), source);
+  assert.match(step, phrase('A target that is not attempted fails the run'));
+  assert.match(step, phrase('names the missing datasource'));
+  assert.ok(output.includes('| Target | Runs here? |') && output.includes('`runs_here.value`'));
+  assert.doesNotMatch(code, phrase('Print the cost for each other organization'));
+  assert.match(code, phrase('A schedule and a run count never come from it.'));
+  for (const sentence of ['`<file-sha>` is `git log -1 --format=%H <base> -- <file>`.',
+    'For a file that the diff adds, run the same command on the file of its deployable unit.',
+    'A job, image or schedule with no run yet, such as one that the diff adds before merge, takes its Runs here? from code or configuration (C).',
+    'An empty release history never gives no.',
+    'A target row counts only the units of work that the code deployed on that target reaches: its accounts of step 8, its regions and assets of step 9. Never count the units of another target. The total is the sum of the rows.',
+    'Keep a row for each candidate target, also when its answer is no: it prints $0, with the grade of its evidence. Never drop a candidate target from the table.',
+    'Answer from the run history of the window: count the runs that reached the call. Never answer from one run.',
+    'A count of 0 gives no only when the schedule of the code fires inside the window. If the schedule fires less often, or the job runs on an event, answer from code or configuration (C).',
+    'A no needs grade C or better. A no that rests on an assumption (D) is `unknown`: print it as `unknown [D: <basis>]`, and the total becomes a floor (G6).']) assert.match(step, phrase(sentence), sentence);
+  assert.match(output, phrase('`no` takes grade A, B or C.'));
+  assert.match(code, phrase('Do not take a schedule, a run count or an account list from a node that only matches by name.'));
+  assert.doesNotMatch(output, phrase('production and other tenants'));
+  assert.doesNotMatch(output, phrase('Until the skill reads more than one deployment target'));
+  assert.doesNotMatch(output, phrase('wait for the deployment-target step'));
 });
