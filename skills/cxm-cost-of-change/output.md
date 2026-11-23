@@ -24,8 +24,8 @@ Give each number one grade. The grade says how the number was obtained.
 - **G2.** A value that was measured on one target and is used for another drops one grade. Cite it
   as "analog of `<target>`".
 - **G3.** A C value that an independent A or B source confirms within ±20 % becomes B. A larger
-  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as steps 5 and 7
-  of `SKILL.md` say.
+  gap is a doubt. An A value then applies. A B value from the bill stays a ceiling, as "Runs per month"
+  of `SKILL.md` says.
 - **G4.** Print a floor or a ceiling as a bound. If ceiling ÷ floor is more than 3, the result is
   C at best. A floor of 0 that a free allowance sets is exempt from this ratio.
 - **G5.** A D factor makes the result D. An assumption is a D factor: it cites its basis and gives
@@ -51,7 +51,7 @@ Organization: <name>. <floor or ceiling label, when one applies>
 |---|---|---|---|---|
 
 **Result lines**
-<id> <target> <item> = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] … ; bill: <confirmed | cap | noise | gap | none> [<cite>]
+<id> <target> <item> (<datasource>, <kind>) = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] … ; bill: <confirmed | cap | noise | gap | none> [<cite>]
 
 **Doubts**
 1. <assumption or unknown> — effect: <low>–<high or unmeasured> $/mo — resolve: <dataset, route, tool or owner>.
@@ -69,11 +69,12 @@ Organization: <name>. <floor or ceiling label, when one applies>
   List every dimension that the bill and the catalog give for the service, also each dimension that is
   not moved, with its reason. For example, a log query moves ingestion, storage and query scan; object
   storage moves request tiers, storage and data transfer.
-- The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
+- The target table has one row for each deployment target that "Deployment targets" of `SKILL.md` lists. The
   `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
   organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes
   grade A, B or C.
 - Print each result line with its whole formula. Each factor carries `[<grade>:<cite>]`.
+- A call that its datasource does not bill prints as a result line with $0 and `not billed: <reason> [<cite>]`.
 - Each result line whose value is C before the bill comparison ends with its bill outcome:
   `bill: confirmed | cap | noise | gap`, then the cite of the comparison. Step 6 of "Billing dimensions"
   in `measurement.md` says how to get the outcome. When no after window exists, the outcome is
@@ -130,7 +131,7 @@ Print the section with these parts:
 
 A change adds one scheduled CI job. The job runs a log query on the staging account. The example
 shows two payers, so it has two headlines. It also shows three targets of the cloud payer and two targets of the CI payer.
-Step 3 of `SKILL.md` lists the targets. Each target has one row.
+"Deployment targets" of `SKILL.md` lists the targets. Each target has one row.
 
 **Staging AWS account: +$0.064/mo list, $0–0.064/mo effective, grade B**
 **CI provider organization: +$4.19 per 30 days list, grade C**
@@ -157,9 +158,10 @@ Organization: the session organization.
 | billed minutes | moved | each run of the two workflows bills its minutes (`<workflow>.yml:15@<sha>`) | billed min | C |
 
 **Result lines**
-- `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6] ; bill: confirmed [c4]`
-- `R2 CI provider <log watch workflow> = $0.349 per 30 days [B] = 69.8 billed min [B:c7] × $0.005/min [B:c9]`
-- `R3 CI provider <nightly E2E workflow> = $3.84 per 30 days [C] = 768.5 billed min [C:c8] × $0.005/min [B:c9] ; bill: none [c8]`
+- `R1 staging Logs query (aws, call) = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6] ; bill: confirmed [c4]`
+- `R2 CI provider <log watch workflow> (github, compute) = $0.349 per 30 days [B] = 69.8 billed min [B:c7] × $0.005/min [B:c9]`
+- `R3 CI provider <nightly E2E workflow> (github, compute) = $3.84 per 30 days [C] = 768.5 billed min [C:c8] × $0.005/min [B:c9] ; bill: none [c8]`
+- `R4 staging AssumeRole (aws, call) = $0 [B] = 0 $/request [B:c10] ; not billed: the token service has no price list and no bill row [c10]`
 
 **Doubts**
 1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: 0–0.064 $/mo, at most one more scan of both halves — resolve: count the "hit the row limit" warnings in the CI logs.
@@ -202,6 +204,7 @@ Read `cost-result.schema.json` before you write the block.
   `doubts` entry for each doubt. When the section prints "No doubt", `doubts` is an empty list.
 - A factor that the section prints as `unmeasured` has the value `unmeasured` and a `reason`. It has
   no grade and no cite. It keeps its unit.
+- A not-billed line is a `results` entry with amount `{low: 0, high: 0, unit}`, one factor of value 0 with its unit, grade and cite, and the grade of that cite.
 - A target row that the table prints as `unmeasured` has the value `unmeasured` in `amounts.list` and
   `amounts.effective`. A target with `Runs here? unknown` has `runs_here.value` `unknown`.
 - For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets`,
@@ -230,7 +233,8 @@ The block of the worked example. Give every field it shows.
   "results": [
     {"id": "R1", "target": "staging", "item": "Logs query", "amount": {"low": 0.064, "high": 0.064, "unit": "$/mo"}, "grade": "B", "factors": [{"value": 21.74, "unit": "runs/mo", "grade": "B", "cite": "c1"}, {"value": 0.5, "unit": "GB/run", "grade": "B", "cite": "c4"}, {"value": 0.0059, "unit": "$/GB", "grade": "A", "cite": "c6"}]},
     {"id": "R2", "target": "CI provider", "item": "<log watch workflow>", "amount": {"low": 0.349, "high": 0.349, "unit": "$/30 days"}, "grade": "B", "factors": [{"value": 69.8, "unit": "billed min", "grade": "B", "cite": "c7"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]},
-    {"id": "R3", "target": "CI provider", "item": "<nightly E2E workflow>", "amount": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}, "grade": "C", "factors": [{"value": 768.5, "unit": "billed min", "grade": "C", "cite": "c8"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]}
+    {"id": "R3", "target": "CI provider", "item": "<nightly E2E workflow>", "amount": {"low": 3.84, "high": 3.84, "unit": "$/30 days"}, "grade": "C", "factors": [{"value": 768.5, "unit": "billed min", "grade": "C", "cite": "c8"}, {"value": 0.005, "unit": "$/min", "grade": "B", "cite": "c9"}]},
+    {"id": "R4", "target": "staging", "item": "AssumeRole", "amount": {"low": 0, "high": 0, "unit": "$/mo"}, "grade": "B", "factors": [{"value": 0, "unit": "$/request", "grade": "B", "cite": "c10"}]}
   ],
   "citations": {
     "c1": {"value": 21.74, "unit": "runs/mo", "formula": "5 × 365.25 ÷ 7 ÷ 12", "source": "cron \"30 5 * * 1-5\" at <workflow>.yml:15@<sha> [C]; confirmed by 22 runs in 30 days [A]", "grade": "B"},
@@ -240,7 +244,8 @@ The block of the worked example. Give every field it shows.
     "c6": {"value": 0.0059, "unit": "$/GB", "formula": "/pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes", "source": "/pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes", "grade": "A"},
     "c7": {"value": 69.8, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <log watch workflow>; 2026-10-20..2026-11-18}", "grade": "B"},
     "c8": {"value": 768.5, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18}; analog per G2, because the job changed after the merge; bill: none, no after window yet", "grade": "C"},
-    "c9": {"value": 0.005, "unit": "$/min", "formula": "$0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min", "source": "github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18}; the marginal rate is the list rate, because the included minutes are used up", "grade": "B"}
+    "c9": {"value": 0.005, "unit": "$/min", "formula": "$0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min", "source": "github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18}; the marginal rate is the list rate, because the included minutes are used up", "grade": "B"},
+    "c10": {"value": 0, "unit": "$/request", "formula": "no price list, no bill row", "source": "/pricing/aws/list-price?service_code=AWSSecurityTokenService: no price list; costs{sum_current_net_unblended_cost; product_code contains Security; last 30 days}: 0 rows", "grade": "B"}
   },
   "doubts": [
     {"text": "A window with 10,000 rows or more scans both halves again (<script>.py:176@<sha>)", "effect_low": 0, "effect_high": 0.064, "resolve": "count the \"hit the row limit\" warnings in the CI logs"},
