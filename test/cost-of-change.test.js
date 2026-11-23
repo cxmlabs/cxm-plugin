@@ -183,7 +183,8 @@ test('the skill lists every billing dimension of a service before it prices one'
   assert.match(dims, phrase('D factor'));
   assert.match(dims, phrase('`costs.sum_usage_amount` by `costs.asset_arn`'));
   assert.match(dims, phrase('Print the dimensions table as `output.md` says.'));
-  assert.ok(output.includes('| Dimension | Moved? | Reason | Driver | Grade |'), 'output.md holds the dimensions table');
+  const template = output.slice(output.indexOf('| Target | Runs here? |'), output.indexOf('**Result lines**'));
+  assert.ok(template.includes('| Dimension | Moved? | Reason | Driver | Grade |'), 'the result template holds the dimensions table');
   assert.ok(output.includes('List every dimension that the bill and the catalog give'));
   assert.ok(output.includes('A C result line with no bill outcome is not finished.'));
   assert.ok(output.includes('It keeps its unit.'));
@@ -191,11 +192,13 @@ test('the skill lists every billing dimension of a service before it prices one'
   assert.match(dims, phrase(finished));
   assert.match(output, phrase('print one dimensions table for each service that a result line names'));
   assert.match(output, phrase('A result line with no dimensions table for its service is not finished.'));
-  assert.match(output, phrase('For a log query, the service is the log service: list ingestion, storage and query scan.'));
-  assert.match(output, phrase('For object storage, this includes request tiers, storage and data transfer, in the table of that service.'));
+  assert.match(output, phrase('For example, a log query moves ingestion, storage and query scan; object storage moves request tiers, storage and data transfer.'));
+  assert.match(dims, phrase('Use the volume that the storage usage type bills.'));
+  assert.match(dims, phrase('read the ratio of stored to ingested bytes from the bill of the same resource (`costs.asset_arn`). When the bill of that resource gives no ratio, use a D factor with a low value and a high value.'));
+  assert.match(dims, phrase('Compare the sizes, without their signs. When the bill change is zero or has the opposite sign of the code value, apply no cap: keep C and print `bill: gap`.'));
+  assert.match(dims, phrase('the bill caps the result line. The line takes the bill change × its rate [B] as a ceiling, and the headline adds up the lines as usual.'));
   assert.ok(dims.includes('1. Bill noise.') && dims.indexOf('1. Bill noise.') < dims.indexOf('2. Bill cap.') && dims.indexOf('2. Bill cap.') < dims.indexOf('3. `confirmed within ±20 %`'));
   assert.match(dims, phrase('The bill noise is the spread of the daily usage in the baseline window without its single highest day, scaled to 30 days. A single spike day is not noise: name it in a doubt.'));
-  assert.match(dims, phrase('the bill caps it. The headline takes the bill value [B] as a ceiling'));
   assert.match(dims, phrase('Compare each moved dimension that has a C result with the bill of its usage types, before and after the merge or deploy date (G3 of `output.md`).'));
   for (const outcome of ['`confirmed within ±20 %`', '`change below the bill noise of <usage type>`', 'A larger gap is a doubt.',
     'An A value then applies.', 'A B value from the bill stays a ceiling.']) assert.match(dims, phrase(outcome), outcome);

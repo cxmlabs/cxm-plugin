@@ -88,7 +88,8 @@ For each service that the change touches (a call, a resource it creates, or data
    D factor with a low value and a high value.
    Use the volume that the storage usage type bills. When a service stores a different volume than it
    ingests (for example, compressed log storage), read the ratio of stored to ingested bytes from the bill
-   of the same resource (`costs.asset_arn`). Otherwise use a D factor with a low value and a high value.
+   of the same resource (`costs.asset_arn`). When the bill of that resource gives no ratio, use a D factor
+   with a low value and a high value.
 5. **Read.** For a dimension billed by the volume that a call reads, take the bytes per run as the sum of
    the bytes that the resources it reads ingested in the read window. For log groups, read
    `costs.sum_usage_amount` by `costs.asset_arn` on the ingestion usage type.
@@ -96,14 +97,16 @@ For each service that the change touches (a call, a resource it creates, or data
    and after the merge or deploy date (G3 of `output.md`). The before window is the baseline window of
    the baseline step of `SKILL.md`. The after window starts at the deploy date, or at the commit date when
    the deploy date is unknown. It ends at the latest bill day, and the volume is scaled to 30 days. Both
-   windows use the same accounts, regions and usage types. Print the comparison as a citation with the
-   first outcome that holds:
+   windows use the same accounts, regions and usage types. Compare the sizes, without their signs. When the
+   bill change is zero or has the opposite sign of the code value, apply no cap: keep C and print
+   `bill: gap`. Print the comparison as a citation with the first outcome that holds:
    1. Bill noise. The bill noise is the spread of the daily usage in the baseline window without its
       single highest day, scaled to 30 days. A single spike day is not noise: name it in a doubt. When the
-      predicted change is below that noise, print `change below the bill noise of <usage type>`. The bill gives no confirmation, and the result
-      keeps C.
-   2. Bill cap. When the code value is more than 20 % above the bill change, the bill caps it. The
-      headline takes the bill value [B] as a ceiling, and the code value goes into a doubt.
+      predicted change is below that noise, print `change below the bill noise of <usage type>`. The bill
+      gives no confirmation, and the result keeps C.
+   2. Bill cap. When the code value is more than 20 % above the bill change, the bill caps the result
+      line. The line takes the bill change × its rate [B] as a ceiling, and the headline adds up the lines
+      as usual. The code value goes into a doubt.
    3. `confirmed within ±20 %`: C becomes B.
    4. When the code value is more than 20 % below the bill change, the result keeps C, and the gap is a
       doubt.

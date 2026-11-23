@@ -67,9 +67,8 @@ Organization: <name>. <floor or ceiling label, when one applies>
   `measurement.md` sets in "Billing dimensions". A result line with no dimensions table for its service is
   not finished. `Moved?` is `moved` or `not moved`. Each moved dimension also has its own result line.
   List every dimension that the bill and the catalog give for the service, also each dimension that is
-  not moved, with its reason. For a log query, the service is the log service: list ingestion, storage and
-  query scan. For object storage, this includes request tiers, storage and data transfer, in the table of
-  that service.
+  not moved, with its reason. For example, a log query moves ingestion, storage and query scan; object
+  storage moves request tiers, storage and data transfer.
 - The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
   `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
   organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes
@@ -152,6 +151,11 @@ Organization: the session organization.
 | ingestion | not moved | the job only reads logs (`<script>.py:231@<sha>`) | GB ingested | C |
 | storage | not moved | the job only reads logs (`<script>.py:231@<sha>`) | GB-month | C |
 
+**Dimensions of the CI provider**
+| Dimension | Moved? | Reason | Driver | Grade |
+|---|---|---|---|---|
+| billed minutes | moved | each run of the two workflows bills its minutes (`<workflow>.yml:15@<sha>`) | billed min | C |
+
 **Result lines**
 - `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6] ; bill: confirmed [c4]`
 - `R2 CI provider <log watch workflow> = $0.349 per 30 days [B] = 69.8 billed min [B:c7] × $0.005/min [B:c9]`
@@ -161,7 +165,7 @@ Organization: the session organization.
 1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: 0–0.064 $/mo, at most one more scan of both halves — resolve: count the "hit the row limit" warnings in the CI logs.
 2. The free tier is account-wide, so the effective cost is $0 to $0.064 — effect: 0–0.064 $/mo — resolve: read the free-tier usage of the payer account.
 3. The production row is C until a CloudTrail count of the job exists — effect: 0–0.064 $/mo — resolve: count the job calls in the audit log of the production account.
-4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`). The analog overstates the minutes of the merged job by one third at most. That is 768.5 × 1/3 = 256 min, at $0.005/min [B:c9] — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
+4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`). The analog overstates the minutes of the merged job by one third at most. That is 768.5 × 1/3 = 256 min, at $0.005/min [B:c9]. No after window exists yet, so the bill outcome of R3 is `bill: none` — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
 
 <details><summary>Citations</summary>
 
@@ -242,7 +246,7 @@ The block of the worked example. Give every field it shows.
     {"text": "A window with 10,000 rows or more scans both halves again (<script>.py:176@<sha>)", "effect_low": 0, "effect_high": 0.064, "resolve": "count the \"hit the row limit\" warnings in the CI logs"},
     {"text": "The free tier is account-wide, so the effective cost is $0 to $0.064", "effect_low": 0, "effect_high": 0.064, "resolve": "read the free-tier usage of the payer account"},
     {"text": "The production row is C until a CloudTrail count of the job exists", "effect_low": 0, "effect_high": 0.064, "resolve": "count the job calls in the audit log of the production account"},
-    {"text": "The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min to 60 min. The analog overstates the minutes by one third at most", "effect_low": -1.28, "effect_high": 0, "resolve": "read github_workflow_costs again 30 days after the change"}
+    {"text": "The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min to 60 min. The analog overstates the minutes by one third at most. No after window exists yet, so the bill outcome of R3 is none", "effect_low": -1.28, "effect_high": 0, "resolve": "read github_workflow_costs again 30 days after the change"}
   ]
 }
 ```
