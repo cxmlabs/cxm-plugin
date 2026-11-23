@@ -65,5 +65,6 @@ test('the skill prices a third-party service from the published rate, not from a
   assert.ok(rules.includes('unmeasured (unit: <unit>)'));
   assert.doesNotMatch(rules, /github_workflow_costs|net_amount`?\s*(÷|\/|divided by)/);
   assert.match(rules, /`cxm price --datasource` with no\s+value/);
+  assert.match(rules, /no listed datasource is the service of the call/);
   assert.ok(rules.includes('--unit <unit>') && !rules.includes('[--unit <unit>]'));
 });
