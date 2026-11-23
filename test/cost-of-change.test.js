@@ -192,6 +192,7 @@ test('the skill lists every billing dimension of a service before it prices one'
   assert.match(output, phrase('For a log query, the service is the log service: list ingestion, storage and query scan.'));
   assert.match(output, phrase('For object storage, this includes request tiers, storage and data transfer, in the table of that service.'));
   assert.ok(dims.includes('1. Bill noise.') && dims.indexOf('1. Bill noise.') < dims.indexOf('2. Bill cap.') && dims.indexOf('2. Bill cap.') < dims.indexOf('3. `confirmed within ±20 %`'));
+  assert.match(dims, phrase('The bill noise is the spread of the daily usage in the baseline window without its single highest day, scaled to 30 days. A single spike day is not noise: name it in a doubt.'));
   assert.match(dims, phrase('the bill caps it. The headline takes the bill value [B] as a ceiling'));
   assert.match(dims, phrase('Compare each moved dimension that has a C result with the bill of its usage types, before and after the merge or deploy date (G3 of `output.md`).'));
   for (const outcome of ['`confirmed within ±20 %`', '`change below the bill noise of <usage type>`', 'A larger gap is a doubt.',

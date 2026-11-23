@@ -98,9 +98,9 @@ For each service that the change touches (a call, a resource it creates, or data
    the deploy date is unknown. It ends at the latest bill day, and the volume is scaled to 30 days. Both
    windows use the same accounts, regions and usage types. Print the comparison as a citation with the
    first outcome that holds:
-   1. Bill noise. The bill noise of a usage type is the spread of its daily usage in the baseline window
-      (highest day minus lowest day), scaled to 30 days. When the predicted change is below that noise,
-      print `change below the bill noise of <usage type>`. The bill gives no confirmation, and the result
+   1. Bill noise. The bill noise is the spread of the daily usage in the baseline window without its
+      single highest day, scaled to 30 days. A single spike day is not noise: name it in a doubt. When the
+      predicted change is below that noise, print `change below the bill noise of <usage type>`. The bill gives no confirmation, and the result
       keeps C.
    2. Bill cap. When the code value is more than 20 % above the bill change, the bill caps it. The
       headline takes the bill value [B] as a ceiling, and the code value goes into a doubt.
