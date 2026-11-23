@@ -46,8 +46,12 @@ Organization: <name>. <floor or ceiling label, when one applies>
 | Target | Runs here? | Δ list /mo | Δ effective /mo | Grade |
 |---|---|---|---|---|
 
+**Dimensions of <service>**
+| Dimension | Moved? | Reason | Driver | Grade |
+|---|---|---|---|---|
+
 **Result lines**
-<id> <target> <item> = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] …
+<id> <target> <item> = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] … ; bill: <confirmed | cap | noise | gap | none> [<cite>]
 
 **Doubts**
 1. <assumption or unknown> — effect: <low>–<high or unmeasured> $/mo — resolve: <dataset, route, tool or owner>.
@@ -59,11 +63,21 @@ Organization: <name>. <floor or ceiling label, when one applies>
 
 - Print one headline for each payer and each currency. Never add two currencies.
 - A decrease takes a minus sign.
+- After the target table, print one dimensions table for each service that a result line names, as
+  `measurement.md` sets in "Billing dimensions". A result line with no dimensions table for its service is
+  not finished. `Moved?` is `moved` or `not moved`. Each moved dimension also has its own result line.
+  List every dimension that the bill and the catalog give for the service, also each dimension that is
+  not moved, with its reason. For example, a log query moves ingestion, storage and query scan; object
+  storage moves request tiers, storage and data transfer.
 - The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
   `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
   organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes
   grade A, B or C.
 - Print each result line with its whole formula. Each factor carries `[<grade>:<cite>]`.
+- Each result line whose value is C before the bill comparison ends with its bill outcome:
+  `bill: confirmed | cap | noise | gap`, then the cite of the comparison. Step 6 of "Billing dimensions"
+  in `measurement.md` says how to get the outcome. When no after window exists, the outcome is
+  `bill: none`, with a doubt. A C result line with no bill outcome is not finished.
 - A citation holds its own formula, and the cites and sources of that formula. Follow the chain
   down to a leaf source.
 - Label each floor and each ceiling.
@@ -130,26 +144,38 @@ Organization: the session organization.
 | the CI provider, log watch workflow | yes [A: CI run history] | +$0.349 per 30 days | +$0.349 per 30 days | B |
 | the CI provider, nightly E2E workflow | yes [A: CI run history] | +$3.84 per 30 days | +$3.84 per 30 days | C |
 
+**Dimensions of the staging log service**
+| Dimension | Moved? | Reason | Driver | Grade |
+|---|---|---|---|---|
+| query scan | moved | the job scans 36 h of 3 log-group prefixes (`<script>.py:231@<sha>`) | GB scanned | B |
+| ingestion | not moved | the job only reads logs (`<script>.py:231@<sha>`) | GB ingested | C |
+| storage | not moved | the job only reads logs (`<script>.py:231@<sha>`) | GB-month | C |
+
+**Dimensions of the CI provider**
+| Dimension | Moved? | Reason | Driver | Grade |
+|---|---|---|---|---|
+| billed minutes | moved | each run of the two workflows bills its minutes (`<workflow>.yml:15@<sha>`) | billed min | C |
+
 **Result lines**
-- `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6]`
+- `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6] ; bill: confirmed [c4]`
 - `R2 CI provider <log watch workflow> = $0.349 per 30 days [B] = 69.8 billed min [B:c7] × $0.005/min [B:c9]`
-- `R3 CI provider <nightly E2E workflow> = $3.84 per 30 days [C] = 768.5 billed min [C:c8] × $0.005/min [B:c9]`
+- `R3 CI provider <nightly E2E workflow> = $3.84 per 30 days [C] = 768.5 billed min [C:c8] × $0.005/min [B:c9] ; bill: none [c8]`
 
 **Doubts**
 1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: 0–0.064 $/mo, at most one more scan of both halves — resolve: count the "hit the row limit" warnings in the CI logs.
 2. The free tier is account-wide, so the effective cost is $0 to $0.064 — effect: 0–0.064 $/mo — resolve: read the free-tier usage of the payer account.
 3. The production row is C until a CloudTrail count of the job exists — effect: 0–0.064 $/mo — resolve: count the job calls in the audit log of the production account.
-4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`). The analog overstates the minutes of the merged job by one third at most. That is 768.5 × 1/3 = 256 min, at $0.005/min [B:c9] — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
+4. The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min (`<workflow>.yml:<line>@<sha>`) to 60 min (`<workflow>.yml:<line>@<sha>`). The analog overstates the minutes of the merged job by one third at most. That is 768.5 × 1/3 = 256 min, at $0.005/min [B:c9]. No after window exists yet, so the bill outcome of R3 is `bill: none` — effect: –1.28 to 0 $/mo — resolve: read `github_workflow_costs` again 30 days after the change.
 
 <details><summary>Citations</summary>
 
 - `c1 21.74 = 5 × 365.25 ÷ 7 ÷ 12 ; cron "30 5 * * 1-5" at <workflow>.yml:15@<sha> [C] ; confirmed by 22 runs in 30 days [A] → B`
 - `c2 36 h = 12 h window (<workflow>.yml:54@<sha>) + 24 h baseline (<script>.py:216@<sha>) [C]`
 - `c3 0.0139 GB/h = 9.99 GB ÷ 30 ÷ 24 ; costs{sum_usage_amount; EUW3-DataProcessing-Bytes; asset_arn under the 3 prefixes of <script>.py:231@<sha>; 2026-10-20..2026-11-18} [B]`
-- `c4 0.50 GB/run = c2 × c3 [C] ; bill difference +11.75 GB/mo against 10.9 GB/mo predicted, within ±20 % → B`
+- `c4 0.50 GB/run = c2 × c3 [C] ; bill difference +11.75 GB/mo against 10.9 GB/mo predicted, within ±20 % ; bill: confirmed → B`
 - `c6 $0.0059/GB = /pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes [A]`
 - `c7 69.8 min = CI minutes per run × CI runs per month ; github_workflow_costs{billable_minutes; workflow is <log watch workflow>; 2026-10-20..2026-11-18} [B]`
-- `c8 768.5 min = CI minutes per run × CI runs per month ; github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18} [B] ; analog per G2, because the job changed after the merge → C`
+- `c8 768.5 min = CI minutes per run × CI runs per month ; github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18} [B] ; analog per G2, because the job changed after the merge ; bill: none, no after window yet → C`
 - `c9 $0.005/min = $0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min ; github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18} [B] ; the marginal rate is the list rate, because the included minutes are used up`
 
 </details>
@@ -175,7 +201,7 @@ Read `cost-result.schema.json` before you write the block.
   `results` entry for each result line with its `factors`, one `citations` key for each cite, and one
   `doubts` entry for each doubt. When the section prints "No doubt", `doubts` is an empty list.
 - A factor that the section prints as `unmeasured` has the value `unmeasured` and a `reason`. It has
-  no grade and no cite.
+  no grade and no cite. It keeps its unit.
 - A target row that the table prints as `unmeasured` has the value `unmeasured` in `amounts.list` and
   `amounts.effective`. A target with `Runs here? unknown` has `runs_here.value` `unknown`.
 - For a failed run, set `status` to `failed` and fill `failed`. Leave `headlines`, `targets`,
@@ -210,17 +236,17 @@ The block of the worked example. Give every field it shows.
     "c1": {"value": 21.74, "unit": "runs/mo", "formula": "5 × 365.25 ÷ 7 ÷ 12", "source": "cron \"30 5 * * 1-5\" at <workflow>.yml:15@<sha> [C]; confirmed by 22 runs in 30 days [A]", "grade": "B"},
     "c2": {"value": 36, "unit": "h", "formula": "12 h window (<workflow>.yml:54@<sha>) + 24 h baseline (<script>.py:216@<sha>)", "source": "<workflow>.yml:54@<sha>", "grade": "C"},
     "c3": {"value": 0.0139, "unit": "GB/h", "formula": "9.99 GB ÷ 30 ÷ 24", "source": "costs{sum_usage_amount; EUW3-DataProcessing-Bytes; asset_arn under the 3 prefixes of <script>.py:231@<sha>; 2026-10-20..2026-11-18}", "grade": "B"},
-    "c4": {"value": 0.5, "unit": "GB/run", "formula": "c2 × c3", "source": "bill difference +11.75 GB/mo against 10.9 GB/mo predicted, within ±20 %", "grade": "B"},
+    "c4": {"value": 0.5, "unit": "GB/run", "formula": "c2 × c3", "source": "bill difference +11.75 GB/mo against 10.9 GB/mo predicted, within ±20 %; bill: confirmed", "grade": "B"},
     "c6": {"value": 0.0059, "unit": "$/GB", "formula": "/pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes", "source": "/pricing/aws/list-price?service_code=AmazonCloudWatch&usage_type=EUW3-DataScanned-Bytes", "grade": "A"},
     "c7": {"value": 69.8, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <log watch workflow>; 2026-10-20..2026-11-18}", "grade": "B"},
-    "c8": {"value": 768.5, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18}; analog per G2, because the job changed after the merge", "grade": "C"},
+    "c8": {"value": 768.5, "unit": "min", "formula": "CI minutes per run × CI runs per month", "source": "github_workflow_costs{billable_minutes; workflow is <nightly E2E workflow>; 2026-10-20..2026-11-18}; analog per G2, because the job changed after the merge; bill: none, no after window yet", "grade": "C"},
     "c9": {"value": 0.005, "unit": "$/min", "formula": "$0.349 ÷ 69.8 min = $3.84 ÷ 768.5 min", "source": "github_workflow_costs{gross_amount, billable_minutes; both workflows; 2026-10-20..2026-11-18}; the marginal rate is the list rate, because the included minutes are used up", "grade": "B"}
   },
   "doubts": [
     {"text": "A window with 10,000 rows or more scans both halves again (<script>.py:176@<sha>)", "effect_low": 0, "effect_high": 0.064, "resolve": "count the \"hit the row limit\" warnings in the CI logs"},
     {"text": "The free tier is account-wide, so the effective cost is $0 to $0.064", "effect_low": 0, "effect_high": 0.064, "resolve": "read the free-tier usage of the payer account"},
     {"text": "The production row is C until a CloudTrail count of the job exists", "effect_low": 0, "effect_high": 0.064, "resolve": "count the job calls in the audit log of the production account"},
-    {"text": "The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min to 60 min. The analog overstates the minutes by one third at most", "effect_low": -1.28, "effect_high": 0, "resolve": "read github_workflow_costs again 30 days after the change"}
+    {"text": "The nightly job changed after the merge, so its minutes are an analog. Its timeout went from 40 min to 60 min. The analog overstates the minutes by one third at most. No after window exists yet, so the bill outcome of R3 is none", "effect_low": -1.28, "effect_high": 0, "resolve": "read github_workflow_costs again 30 days after the change"}
   ]
 }
 ```

@@ -103,7 +103,10 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
    adds, removes or multiplies. A call to a third-party service is a paid call. For each paid call,
    name the API operation, the payer, the unit of work and the asset type that the call iterates
    over. The unit of work is once per run, per account, per account and region, per asset, per GitHub org, or per
-   request. If the diff adds, removes and multiplies no paid call, go to "No billed unit change".
+   request. Then list the billing dimensions that each call, resource or data write moves, as
+   "Billing dimensions" of `measurement.md` says.
+   If the diff adds, removes and multiplies no paid call and moves no billing dimension, go to "No billed unit change".
+   For example, a diff that adds log writes moves log ingestion.
 3. **Deployment targets.** List every target that runs the changed code, before you name a payer.
    Do this for each changed file:
    - Find its deployable unit: a CI workflow (jobs, schedule, role variables, `--region`, matrix,
@@ -143,9 +146,9 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
    stored data. Follow "Billed units". Then compare these inputs before and after the diff: the
    payer and the usage type of every call, the billed units of every call, the unit of work, the
    runs per month, the row filters, and the accounts, regions and asset type that the call
-   iterates over. If one of them changes, continue to step 6. A change of payer is a removal on
-   the old payer and an addition on the new payer: give each one a subtotal. If all of them stay the same, show the count before and after, and go to "No billed
-   unit change". For example, a diff removes 2 of 4 statistics of a metric, or changes the batch
+   iterates over. If one of them changes, or the diff moves a billing dimension, continue to step 6. A change of payer is a removal on
+   the old payer and an addition on the new payer: give each one a subtotal. If all of them stay the same and the diff moves no billing
+   dimension, show the count before and after, and go to "No billed unit change". For example, a diff removes 2 of 4 statistics of a metric, or changes the batch
    size and keeps one page.
 6. **Runtime node.** Find the runtime node and the image of the changed code with the
    `cxm-repo-graph` skill. Do not take a schedule, a run count or an account list from a node that
@@ -261,7 +264,8 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 - The query service (product code `AmazonAthena`) bills each query's scan rounded up to the next
   MB, with a 10 MB minimum. Take the bytes per query from the "Bytes per query" row of the source map.
 - List each call that the diff causes indirectly, such as a KMS `Decrypt` for each S3 `GetObject`
-  on a key-encrypted bucket without a bucket key. Price it, or print it as `unmeasured`.
+  on a key-encrypted bucket without a bucket key. Price it, or print it as `unmeasured`. Follow
+  "Billing dimensions" of `measurement.md` for the dimensions that it moves.
 
 ### Count rules
 

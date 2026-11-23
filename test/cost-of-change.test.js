@@ -48,10 +48,10 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
 });
 
 test('the skill stops only when nothing about the cost changes, and keeps its count and rate rules', () => {
-  assert.match(skill, /accounts, regions and asset type that the call\s+iterates over\. If one of them changes, continue/);
+  assert.match(skill, /accounts, regions and asset type that the call\s+iterates over\. If one of them changes, or the diff moves a billing dimension, continue/);
   assert.match(skill, /If a dataset returns no rows, print `unmeasured \(no rows in <dataset>\)`/);
   assert.match(skill, /AWS applies the tiers to the total of the\s+payer/);
-  assert.match(skill, /If the diff adds, removes and multiplies no paid call, go to "No billed unit change"/);
+  assert.match(skill, /If the diff adds, removes and multiplies no paid call and moves no billing dimension, go to "No billed unit change"/);
   assert.match(skill, /If the change does not run yet, say that the baseline excludes the change/);
   assert.match(skill, /With no row, or a null rate, skip this line/);
   assert.match(skill, /returns no row, or a null rate, use a discount of 0/);
@@ -169,4 +169,42 @@ test('the skill lists every deployment target before it names a payer', () => {
   assert.doesNotMatch(output, phrase('production and other tenants'));
   assert.doesNotMatch(output, phrase('Until the skill reads more than one deployment target'));
   assert.doesNotMatch(output, phrase('wait for the deployment-target step'));
+});
+
+test('the skill lists every billing dimension of a service before it prices one', () => {
+  const start = measurement.indexOf('## Billing dimensions');
+  assert.ok(start > 0, 'measurement.md has no section "## Billing dimensions"');
+  const dims = measurement.slice(start).split(/\n## /)[0];
+  assert.ok(dims.includes('`costs.usage_type`'), 'the bill lists the dimensions');
+  assert.match(dims, phrase('list-price `search` call'));
+  assert.ok(dims.includes('`moved`') && dims.includes('`not moved`'));
+  assert.match(dims, phrase('daily volume × the retention days'));
+  assert.match(dims, phrase('(`file:line@sha`)'));
+  assert.match(dims, phrase('D factor'));
+  assert.match(dims, phrase('`costs.sum_usage_amount` by `costs.asset_arn`'));
+  assert.match(dims, phrase('Print the dimensions table as `output.md` says.'));
+  const template = output.slice(output.indexOf('| Target | Runs here? |'), output.indexOf('**Result lines**'));
+  assert.ok(template.includes('| Dimension | Moved? | Reason | Driver | Grade |'), 'the result template holds the dimensions table');
+  assert.ok(output.includes('List every dimension that the bill and the catalog give'));
+  assert.ok(output.includes('A C result line with no bill outcome is not finished.'));
+  assert.ok(output.includes('It keeps its unit.'));
+  const finished = 'Print one dimensions table for each service that a result line names. A result line with no dimensions table for its service is not finished.';
+  assert.match(dims, phrase(finished));
+  assert.match(output, phrase('print one dimensions table for each service that a result line names'));
+  assert.match(output, phrase('A result line with no dimensions table for its service is not finished.'));
+  assert.match(output, phrase('For example, a log query moves ingestion, storage and query scan; object storage moves request tiers, storage and data transfer.'));
+  assert.match(dims, phrase('Use the volume that the storage usage type bills.'));
+  assert.match(dims, phrase('read the ratio of stored to ingested bytes from the bill of the same resource (`costs.asset_arn`). When the bill of that resource gives no ratio, use a D factor with a low value and a high value.'));
+  assert.match(dims, phrase('Compare the sizes, without their signs. When the bill change is zero or has the opposite sign of the code value, apply no cap: keep C and print `bill: gap`.'));
+  assert.match(dims, phrase('the bill caps the result line. The line takes the bill change × its rate [B] as a ceiling, and the headline adds up the lines as usual.'));
+  assert.ok(dims.includes('1. Bill noise.') && dims.indexOf('1. Bill noise.') < dims.indexOf('2. Bill cap.') && dims.indexOf('2. Bill cap.') < dims.indexOf('3. `confirmed within ±20 %`'));
+  assert.match(dims, phrase('The bill noise is the spread of the daily usage in the baseline window without its single highest day, scaled to 30 days. A single spike day is not noise: name it in a doubt.'));
+  assert.match(dims, phrase('Compare each moved dimension that has a C result with the bill of its usage types, before and after the merge or deploy date (G3 of `output.md`).'));
+  for (const outcome of ['`confirmed within ±20 %`', '`change below the bill noise of <usage type>`', 'A larger gap is a doubt.',
+    'An A value then applies.', 'A B value from the bill stays a ceiling.']) assert.match(dims, phrase(outcome), outcome);
+  assert.match(output, phrase('A larger gap is a doubt. An A value then applies. A B value from the bill stays a ceiling'));
+  const paid = skillOnly.slice(skillOnly.indexOf('. **Paid calls.**'), skillOnly.indexOf('. **Deployment targets.**'));
+  assert.ok(paid.includes('"Billing dimensions" of `measurement.md`'), 'step 2 points to the section');
+  const indirect = skillOnly.match(/- List each call that the diff causes indirectly[^]*?(?=\n- |\n\n)/)[0];
+  assert.ok(indirect.includes('Billing dimensions'), 'the indirect-calls line points to the section');
 });
