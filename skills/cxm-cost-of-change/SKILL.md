@@ -104,9 +104,10 @@ target that another organization holds.
 
 Read the datasources that the organization holds: the distinct `costs.cloud_provider_id` over the
 last 30 days, and the datasets that `cxm analytics schema` lists. Read the diff
-(`git diff <base>...HEAD`). Find each paid call that the diff adds, removes or multiplies. List each
-billed item with its datasource and its kind: a call, a resource, or the compute that runs the code
-(a CI job, a function, a task).
+(`git diff <base>...HEAD`). Find each paid call that the diff adds, removes or multiplies.
+A call to a third-party service is a paid call. List each billed item. Print each with its
+datasource and its kind (call, resource, or the compute that runs the code: a CI job, a function,
+a task) in the result lines.
 
 - Name the API operation of a call. If its datasource does not bill it, mark it "not billed", with
   its reason and a citation.
@@ -116,7 +117,8 @@ billed item with its datasource and its kind: a call, a resource, or the compute
 - Give the query that proves each `unmeasured`.
 
 Then list the billing dimensions that each call, resource or data write moves, as
-"Billing dimensions" of `measurement.md` says.
+"Billing dimensions" of `measurement.md` says. For example, a diff that adds log writes moves log
+ingestion.
 
 ### 2. Unit of work
 

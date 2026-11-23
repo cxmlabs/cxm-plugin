@@ -218,4 +218,8 @@ test('the code-change steps follow the seven sections of the method', () => {
   const bills = code.slice(at[0], at[1]);
   assert.ok(bills.includes('unmeasured (no datasource: <kind>)'));
   assert.ok(bills.includes('unmeasured (no quantity measure: <datasource>)'));
+  for (const text of ['costs.cloud_provider_id', 'A call to a third-party service is a paid call.', '(call, resource, or the compute that runs the code',
+    'mark it "not billed"']) assert.ok(bills.includes(text), text);
+  assert.ok(output.includes('<item> (<datasource>, <kind>) ='));
+  assert.ok(output.includes('`not billed: <reason> [<cite>]`'));
 });

@@ -51,7 +51,7 @@ Organization: <name>. <floor or ceiling label, when one applies>
 |---|---|---|---|---|
 
 **Result lines**
-<id> <target> <item> = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] … ; bill: <confirmed | cap | noise | gap | none> [<cite>]
+<id> <target> <item> (<datasource>, <kind>) = <amount> [<grade>] = <factor> <unit> [<grade>:<cite>] × <factor> <unit> [<grade>:<cite>] … ; bill: <confirmed | cap | noise | gap | none> [<cite>]
 
 **Doubts**
 1. <assumption or unknown> — effect: <low>–<high or unmeasured> $/mo — resolve: <dataset, route, tool or owner>.
@@ -74,6 +74,7 @@ Organization: <name>. <floor or ceiling label, when one applies>
   organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes
   grade A, B or C.
 - Print each result line with its whole formula. Each factor carries `[<grade>:<cite>]`.
+- A call that its datasource does not bill prints as a result line with $0 and `not billed: <reason> [<cite>]`.
 - Each result line whose value is C before the bill comparison ends with its bill outcome:
   `bill: confirmed | cap | noise | gap`, then the cite of the comparison. Step 6 of "Billing dimensions"
   in `measurement.md` says how to get the outcome. When no after window exists, the outcome is
@@ -157,9 +158,9 @@ Organization: the session organization.
 | billed minutes | moved | each run of the two workflows bills its minutes (`<workflow>.yml:15@<sha>`) | billed min | C |
 
 **Result lines**
-- `R1 staging Logs query = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6] ; bill: confirmed [c4]`
-- `R2 CI provider <log watch workflow> = $0.349 per 30 days [B] = 69.8 billed min [B:c7] × $0.005/min [B:c9]`
-- `R3 CI provider <nightly E2E workflow> = $3.84 per 30 days [C] = 768.5 billed min [C:c8] × $0.005/min [B:c9] ; bill: none [c8]`
+- `R1 staging Logs query (aws, call) = $0.064/mo [B] = 21.74 runs/mo [B:c1] × 0.50 GB/run [B:c4] × $0.0059/GB [A:c6] ; bill: confirmed [c4]`
+- `R2 CI provider <log watch workflow> (github, compute) = $0.349 per 30 days [B] = 69.8 billed min [B:c7] × $0.005/min [B:c9]`
+- `R3 CI provider <nightly E2E workflow> (github, compute) = $3.84 per 30 days [C] = 768.5 billed min [C:c8] × $0.005/min [B:c9] ; bill: none [c8]`
 
 **Doubts**
 1. A window with 10,000 rows or more scans both halves again (`<script>.py:176@<sha>`) — effect: 0–0.064 $/mo, at most one more scan of both halves — resolve: count the "hit the row limit" warnings in the CI logs.
