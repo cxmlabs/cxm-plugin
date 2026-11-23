@@ -124,7 +124,25 @@ export function buildUnitRateQuery(spec) {
   };
 }
 
+const DIMENSION_MEMBERS = ['dimension', 'unit', 'billing_period'];
+export const RATE_DIMENSIONS_LIMIT = 200;
+
+export function buildRateDimensionsQuery(spec) {
+  if (!spec.datasource) throw new Error('price requires --datasource');
+  return {
+    dimensions: DIMENSION_MEMBERS.map((m) => `${RATES}.${m}`),
+    filters: [{ member: `${RATES}.datasource`, operator: 'equals', values: [spec.datasource] }],
+    order: [[`${RATES}.billing_period`, 'desc'], [`${RATES}.dimension`, 'asc']],
+    limit: RATE_DIMENSIONS_LIMIT,
+  };
+}
+
+const unprefixed = (row, members) => Object.fromEntries(members.map((m) => [m, row[`${RATES}.${m}`]]));
+
 export function unitRateRow(rows) {
-  if (!rows.length) return null;
-  return Object.fromEntries(RATE_MEMBERS.map((m) => [m, rows[0][`${RATES}.${m}`]]));
+  return rows.length ? unprefixed(rows[0], RATE_MEMBERS) : null;
+}
+
+export function rateDimensionRows(rows) {
+  return rows.map((r) => unprefixed(r, DIMENSION_MEMBERS));
 }

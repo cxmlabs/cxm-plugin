@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { priceSpec, unitRateResult, unitRateSpec } from '../src/commands/price.js';
+import { priceSpec, rateDimensionsResult, unitRateResult, unitRateSpec } from '../src/commands/price.js';
 import { classifyError } from '../src/lib/telemetry.js';
-import { buildPricingQuery, buildUnitRateQuery, summarizePricing } from '../src/lib/pricing.js';
+import { buildPricingQuery, buildRateDimensionsQuery, buildUnitRateQuery, summarizePricing } from '../src/lib/pricing.js';
 
 const C = 'pricing_rates';
 const row = (model, term, rate, unit = 'Hrs') => ({
@@ -136,4 +136,14 @@ test('prices a third-party datasource from the published rate', () => {
   assert.equal(empty.result, 'no_rate_found');
   assert.equal(empty.datasource, 'ci');
   assert.ok(!('unit_rate_usd' in empty));
+  const listing = unitRateSpec(['--datasource', 'ci']);
+  assert.deepEqual(buildRateDimensionsQuery(listing), {
+    dimensions: ['dimension', 'unit', 'billing_period'].map((m) => `${R}.${m}`),
+    filters: [{ member: `${R}.datasource`, operator: 'equals', values: ['ci'] }],
+    order: [[`${R}.billing_period`, 'desc'], [`${R}.dimension`, 'asc']],
+    limit: 200,
+  });
+  const listed = rateDimensionsResult(listing, [{ [`${R}.dimension`]: 'runner_linux', [`${R}.unit`]: 'minute', [`${R}.billing_period`]: '2026-10' }], { organization: 'org' });
+  assert.deepEqual(listed.dimensions, [{ dimension: 'runner_linux', unit: 'minute', billing_period: '2026-10' }]);
+  assert.equal(rateDimensionsResult(listing, [], { organization: 'org' }).result, 'no_rate_found');
 });

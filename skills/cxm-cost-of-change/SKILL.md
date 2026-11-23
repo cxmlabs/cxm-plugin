@@ -237,12 +237,14 @@ The query returns keys with the dataset prefix (`costs.sum_usage_amount`) and me
 - A token count per model call and a request count per route are not in a dataset. The exceptions
   are `lambda_functions.sum_request_count` and a usage type in `costs` that counts requests. For a
   model call, give the rate and the per-call formula, or "cannot price" for a model outside the bill.
-- Price a third-party metered service with
-  `cxm price --datasource <datasource> --dimension <dimension> [--unit <unit>] [--quantity <n>]`.
-  The dimension is the billed item of the datasource, for example a sku, a model or a plan. Read
+- Price a third-party metered service in two steps. First run `cxm price --datasource <datasource>`.
+  It lists the `dimension`, `unit` and `billing_period` of each published rate. The dimension is
+  the billed item of the datasource, for example a sku, a model or a plan. If `limit_reached` is
+  true, say that the list is cut. Pick the dimension of the call from that list. Then run
+  `cxm price --datasource <datasource> --dimension <dimension> [--unit <unit>] [--quantity <n>]`. Read
   `unit_rate_usd`, `unit`, `billing_period` and `rate_source` from the answer, and cite
   `rate_source`. The rate is the average billed rate of that billing period. Multiply the quantity
-  by the rate in your formula. If the answer is `no_rate_found`, print
+  by the rate in your formula. If either answer is `no_rate_found`, print
   `unmeasured (no published rate: <datasource>)`.
 
 ### No billed unit change
