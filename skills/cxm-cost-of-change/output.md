@@ -61,7 +61,8 @@ Organization: <name>. <floor or ceiling label, when one applies>
 - A decrease takes a minus sign.
 - The target table has one row for each deployment target that step 3 of `SKILL.md` lists. The
   `Runs here?` cell is `yes`, `no` or `unknown`, then `[<grade>: <basis>]`. For a target that the
-  organization cannot reach, the cell is `unknown — no access: <error>`, with grade D.
+  organization cannot reach, the cell is `unknown — no access: <error>`, with grade D. `no` takes
+  grade A, B or C.
 - Print each result line with its whole formula. Each factor carries `[<grade>:<cite>]`.
 - A citation holds its own formula, and the cites and sources of that formula. Follow the chain
   down to a leaf source.

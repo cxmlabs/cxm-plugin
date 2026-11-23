@@ -118,7 +118,9 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
    - Answer "Runs here?" for each target, with its grade: A for a run history count, a metric or an
      audit log count. B for bill usage after the deploy date. C for code, configuration or a deploy
      marker. D for an assumption. Answer from the run history of the window: count the runs that
-     reached the call. Never answer from one run. A job, image or schedule with no run yet, such as
+     reached the call. Never answer from one run. A count of 0 gives no only when the schedule of the code fires inside
+     the window. If the schedule fires less often, or the job runs on an event, answer from code or
+     configuration (C). A job, image or schedule with no run yet, such as
      one that the diff adds before merge, takes its Runs here? from code or configuration (C). An
      empty release history never gives no.
    - Give each target one row of the target table, and price each target on its own. Never copy a
@@ -126,7 +128,9 @@ and the required counts. Print `unmeasured` only as its stop rule allows.
      work that the code deployed on that target reaches: its accounts of step 8, its regions and
      assets of step 9. Never count the units of another target. The total is the sum of the rows.
    - Keep a row for each candidate target, also when its answer is no: it prints $0, with the grade
-     of its evidence. Never drop a candidate target from the table.
+     of its evidence. Never drop a candidate target from the table. A no needs grade C or better. A
+     no that rests on an assumption (D) is `unknown`: print it as `unknown [D: <basis>]`, and the
+     total becomes a floor (G6).
    - If the organization cannot reach a target, keep its row as
      `Runs here? unknown — no access: <error>`, with grade D. The total becomes a floor (G6). Add a
      doubt that names the missing datasource.
