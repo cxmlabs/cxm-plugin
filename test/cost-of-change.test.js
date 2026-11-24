@@ -113,13 +113,28 @@ test('the shared rules name a structured result, not a pull request body', () =>
 
 const phrase = (text) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
 
+test('the source map names the object count, the load-balancer requests and the task time', () => {
+  const map = measurement.slice(measurement.indexOf('## Source map'));
+  const row = (name) => {
+    const line = map.split('\n').find((text) => text.startsWith(`| ${name} |`));
+    assert.ok(line, `source map row ${name}`);
+    return line;
+  };
+  for (const text of ['metrics_aws_s3_buckets', 'NumberOfObjects']) assert.ok(row('Object sizes').includes(text), text);
+  assert.ok(!row('Object sizes').includes('no dataset holds the object count'));
+  for (const text of ['metrics_aws_elbv2_load_balancers', 'RequestCount']) assert.ok(row('Requests per month').includes(text), text);
+  assert.ok(!row('Requests per month').includes('not available yet'));
+  assert.ok(row('Task time').includes('`costs.asset_id`'));
+});
+
 test('the skill prints unmeasured only from the stop rule', () => {
   for (const rule of ['S1', 'S2', 'S3', 'S4', 'S5']) assert.ok(measurement.includes(`**${rule}.**`), `stop rule ${rule}`);
   const map = measurement.slice(measurement.indexOf('## Source map'));
   const rows = ['Runs per month', 'Accounts', 'Assets per account and region', 'Regions', 'Pages', 'Bytes per query', 'Bytes scanned',
-    'Object sizes', 'Flag state', 'GitHub orgs', 'Units a job iterates over', 'Requests per month', 'CI runs per month', 'CI minutes per run'];
+    'Object sizes', 'Flag state', 'GitHub orgs', 'Units a job iterates over', 'Requests per month', 'CI runs per month', 'CI minutes per run',
+    'Task time'];
   for (const row of rows) assert.ok(map.includes(`\n| ${row}`), `source map row ${row}`);
-  assert.equal(map.split('\n').filter((line) => line.startsWith('| ')).length, rows.length + 1, 'the source map holds the 14 rows and a header');
+  assert.equal(map.split('\n').filter((line) => line.startsWith('| ')).length, rows.length + 1, 'the source map holds the 15 rows and a header');
   assert.match(measurement, /error text of the attempted query/);
   assert.ok(measurement.includes('latest inventory, crawled at <date of the last crawl>'));
   const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name}`));
