@@ -1,16 +1,39 @@
-// The skill text keeps the branches, routes and stop rules that its pricing steps rely on.
+// The skill text and the calculator agree on one contract, and the maps and routes keep what the method relies on.
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { validateCostResult } from '../src/lib/cost-result.js';
+import { computeCostResult } from '../src/lib/cost-lines.js';
 import { orgApi } from '../src/lib/http.js';
 
 const skillDir = new URL('../skills/cxm-cost-of-change/', import.meta.url);
 const read = (name) => readFileSync(new URL(name, skillDir), 'utf8');
 const skillOnly = read('SKILL.md');
-const output = read('output.md');
 const measurement = read('measurement.md');
-const skill = `${skillOnly}\n${output}\n${measurement}`;
+const skill = `${skillOnly}\n${measurement}`;
+const phrase = (text) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
+const ticks = (text) => [...text.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
+// The text under one heading, down to the next heading of the same level or above.
+function section(text, heading) {
+  const out = [];
+  let level = 0;
+  let fenced = false;
+  for (const line of text.split('\n')) {
+    if (line.startsWith('```')) fenced = !fenced;
+    const depth = fenced ? 0 : (/^#+(?= )/.exec(line)?.[0].length ?? 0);
+    if (level && depth && depth <= level) break;
+    if (level) out.push(line);
+    else if (line === heading) level = depth;
+  }
+  assert.ok(out.some((line) => line.trim()), `no section "${heading}"`);
+  return out.join('\n');
+}
+const STEPS = ['Capabilities', 'Scope', 'Bound', 'Measure', 'Compute', 'Answer'].map((name, i) => `### ${i + 1}. ${name}`);
+const step = (name) => section(skillOnly, STEPS.find((heading) => heading.endsWith(` ${name}`)));
+function example() {
+  const body = /^cxm cost-result <<'EOF'\n([\s\S]*?)\nEOF$/m.exec(step('Compute'));
+  assert.ok(body, 'the Compute step holds no quoted heredoc to cxm cost-result');
+  return JSON.parse(body[1]);
+}
 const config = { baseUrl: 'https://example.test', organizationId: 'org', accessToken: 't' };
 
 async function failWith(status, body) {
@@ -47,71 +70,11 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
   assert.ok(!skill.includes('commitment_edp_monthly'), 'commitment_edp_monthly covers commitment fees only');
 });
 
-test('the skill stops only when nothing about the cost changes, and keeps its count and rate rules', () => {
-  assert.match(skill, /accounts, regions and asset type that the call\s+iterates over\. If one of them changes, or the diff moves a billing dimension, continue/);
-  assert.match(skill, /If a dataset returns no rows, print `unmeasured \(no rows in <dataset>\)`/);
-  assert.match(skill, /AWS applies the tiers to the total of the\s+payer/);
-  assert.match(skill, /If the diff adds, removes and multiplies no paid call and moves no billing dimension, go to "No billed unit change"/);
-  assert.match(skill, /If the change does not run yet, say that the baseline excludes the change/);
-  assert.match(skill, /With no row, or a null rate, skip this line/);
-  assert.match(skill, /returns no row, or a null rate, use a discount of 0/);
-  assert.match(skill, /the\s+payer and the usage type of every call/);
-  assert.match(skill, /after the\s+diff − the same product before the diff/);
-  assert.match(skill, /### No billed unit change\n\nSay "no billed unit changes"[^#]*Print the section of\n"Output"/);
-  assert.match(skill, /`costs\.sum_current_net_unblended_cost` ÷ `costs\.sum_list_cost`/);
-  assert.ok(skill.includes('"member":"costs.account_id"'), 'raw-bill example filters the account');
-});
-
-test('every result line carries grades and citations, and the doubts block always prints', () => {
-  const names = { A: 'Measured in the target', B: 'Measured from the bill', C: 'Derived from code', D: 'Assumed' };
-  for (const [grade, name] of Object.entries(names)) assert.ok(output.includes(`| ${grade} | ${name} |`), `grade ${grade}`);
-  for (const rule of ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7']) assert.ok(output.includes(`**${rule}.**`), `rule ${rule}`);
-  assert.ok(output.includes('[<grade>:<cite>]'));
-  assert.ok(output.includes('The doubts block always prints.'));
-  assert.ok(output.includes('No doubt: every factor is A or B.'));
-  assert.ok(output.includes('<details><summary>Citations</summary>'));
-  assert.ok(output.includes('**FAILED: required count not run: <count> (unit of work: <unit>).**'));
-  const none = output.slice(output.indexOf('### No billed unit change'), output.indexOf('## Worked example'));
-  assert.ok(none.includes('"no billed unit changes"'));
-  assert.match(none, /count before and after the diff, each with its grade and its citation/);
-  assert.ok(none.includes('The doubts block. In this case, give the effect of each doubt in billed units per run, not in $/mo.'));
-});
-
-test('the runs-per-month step gives the runs-per-month factor with its grade and cron citation', () => {
-  const step7 = skillOnly.slice(skillOnly.indexOf('**Runs per month.**'), skillOnly.indexOf('**Accounts.**'));
-  assert.ok(step7.includes('21.74 runs/mo [C:c1]'));
-  assert.ok(step7.includes('@<sha>'));
-});
-
-test('the skill returns its result and never reads or writes a pull request', () => {
-  for (const name of readdirSync(skillDir)) assert.doesNotMatch(read(name), /\bgh (pr|api)\b|--body-file/, `${name} names a pull request command`);
-  assert.ok(skill.includes('The caller decides where the result goes.'));
-  const pointer = skillOnly.slice(skillOnly.indexOf('### Output'));
-  assert.ok(pointer.includes('Print the result as `output.md` says.'));
-});
-
-test('the skill ends its answer with one cxm-cost-result block', () => {
-  assert.ok(output.includes('exactly one fenced block whose info string is `cxm-cost-result`'));
-  assert.ok(output.includes('`cost-result.schema.json`'));
-  assert.ok(output.includes('Read `cost-result.schema.json` before you write the block.'));
-  assert.ok(output.includes('"low"'));
-  assert.ok(output.includes('"effect_low": <number>'));
-  assert.ok(output.includes('The block of the worked example. Give every field it shows.'));
-  assert.ok(output.includes('A not-billed line is a `results` entry with amount `{low: 0, high: 0, unit}`, one factor of value 0 with its unit, grade and cite, and the grade of that cite.'));
-  const example = output.match(/```json\n([\s\S]*?)\n```/);
-  assert.ok(example, 'output.md holds no json example of the block');
-  assert.deepEqual(validateCostResult(JSON.parse(example[1])), []);
-  assert.ok(output.includes('print only this line, then the structured block:'));
-  assert.equal(JSON.parse(read('cost-result.schema.json')).properties.status.enum.length, 3);
-});
-
 test('the shared rules name a structured result, not a pull request body', () => {
   const shared = readFileSync(new URL('../skills/cxm-shared-rules.md', import.meta.url), 'utf8');
   assert.ok(shared.includes('Exception for a structured result or a document that a caller publishes'));
   assert.ok(!shared.includes('pull request body'));
 });
-
-const phrase = (text) => new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'));
 
 test('the source map names the object count, the load-balancer requests and the task time', () => {
   const map = measurement.slice(measurement.indexOf('## Source map'));
@@ -127,154 +90,114 @@ test('the source map names the object count, the load-balancer requests and the 
   assert.ok(row('Task time').includes('`costs.asset_id`'));
 });
 
-test('the skill prints unmeasured only from the stop rule', () => {
-  for (const rule of ['S1', 'S2', 'S3', 'S4', 'S5']) assert.ok(measurement.includes(`**${rule}.**`), `stop rule ${rule}`);
-  const map = measurement.slice(measurement.indexOf('## Source map'));
+test('the source map keeps its rows and its units of one account and region', () => {
+  const map = section(measurement, '## Source map');
   const rows = ['Runs per month', 'Accounts', 'Assets per account and region', 'Regions', 'Pages', 'Bytes per query', 'Bytes scanned',
     'Object sizes', 'Flag state', 'GitHub orgs', 'Units a job iterates over', 'Requests per month', 'CI runs per month', 'CI minutes per run',
     'Task time'];
-  for (const row of rows) assert.ok(map.includes(`\n| ${row}`), `source map row ${row}`);
-  assert.equal(map.split('\n').filter((line) => line.startsWith('| ')).length, rows.length + 1, 'the source map holds the 15 rows and a header');
-  assert.match(measurement, /error text of the attempted query/);
-  assert.ok(measurement.includes('latest inventory, crawled at <date of the last crawl>'));
-  const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name}`));
+  const row = (name) => map.split('\n').find((l) => l.startsWith(`| ${name} |`)) ?? assert.fail(`source map row ${name}`);
+  rows.forEach(row);
+  assert.equal(map.split('\n').filter((l) => l.startsWith('| ')).length, rows.length + 1, 'the source map holds the 15 rows and a header');
   assert.ok(row('Pages').includes('of that account and region'));
-  assert.ok(!measurement.includes('Σ over account and region'));
   assert.ok(row('Runs per month').includes('--created') && row('Runs per month').includes('A count equal to the limit is a floor'));
-  for (const order of ['print the runs per month as `unmeasured`', 'print the account count as `unmeasured`',
-    'If the code cannot bound the page count, print it as `unmeasured`',
-    'Print the bytes per query as `unmeasured`, and give the floor runs × 10 MB × rate', 'print the region count as `unmeasured`']) {
-    assert.doesNotMatch(skill, phrase(order), order);
-  }
-  const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
-  assert.ok(code.indexOf('measurement.md') > 0 && code.indexOf('measurement.md') < code.indexOf('### 1. What the change bills'));
-});
-
-test('a required count that was not attempted fails the run', () => {
-  const counts = measurement.slice(measurement.indexOf('## Required counts'), measurement.indexOf('## Source map'));
-  for (const count of ['Accounts', 'Assets per account and region', 'GitHub orgs', 'Runs per month']) assert.ok(counts.includes(count), count);
-  assert.ok(measurement.includes('A required count not attempted fails the run.'));
-  assert.match(measurement, phrase('prints only the FAILED line of `output.md`, then the structured block.'));
-  assert.match(skillOnly, phrase('per account and region, per asset, per GitHub org, or per request'));
-  assert.doesNotMatch(skill, phrase('print the per-line amounts and no monthly total'));
-});
-
-test('the skill lists every deployment target before it names a payer', () => {
-  const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
-  const targets = code.indexOf('**Deployment targets.**');
-  assert.ok(targets > 0 && targets < code.indexOf('**Payer.**'), 'Deployment targets comes before Payer');
-  const step = code.slice(targets, code.indexOf('**Payer.**'));
-  assert.ok(step.includes('Runs here? unknown — no access: <error>'));
-  for (const source of ['`deploys` edge', "git tag --list 'deploy/*' --contains <file-sha>", '`gh run list`', '`costs` and `assets`']) assert.ok(step.includes(source), source);
-  assert.match(step, phrase('A target that is not attempted fails the run'));
-  assert.match(step, phrase('names the missing datasource'));
-  assert.ok(output.includes('| Target | Runs here? |') && output.includes('`runs_here.value`'));
-  assert.doesNotMatch(code, phrase('Print the cost for each other organization'));
-  assert.match(code, phrase('A schedule and a run count never come from it.'));
-  for (const sentence of ['`<file-sha>` is `git log -1 --format=%H <base> -- <file>`.',
-    'For a file that the diff adds, run the same command on the file of its deployable unit.',
-    'A job, image or schedule with no run yet, such as one that the diff adds before merge, takes its Runs here? from code or configuration (C).',
-    'An empty release history never gives no.',
-    'A target row counts only the units of work that the code deployed on that target reaches: its accounts of "Accounts", its regions and assets of "Assets". Never count the units of another target. The total is the sum of the rows.',
-    'Keep a row for each candidate target, also when its answer is no: it prints $0, with the grade of its evidence. Never drop a candidate target from the table.',
-    'Answer from the run history of the window: count the runs that reached the call. Never answer from one run.',
-    'A count of 0 gives no only when the schedule of the code fires inside the window. If the schedule fires less often, or the job runs on an event, answer from code or configuration (C).',
-    'A no needs grade C or better. A no that rests on an assumption (D) is `unknown`: print it as `unknown [D: <basis>]`, and the total becomes a floor (G6).']) assert.match(step, phrase(sentence), sentence);
-  assert.match(output, phrase('`no` takes grade A, B or C.'));
-  assert.match(code, phrase('Do not take a schedule, a run count or an account list from a node that only matches by name.'));
-  assert.doesNotMatch(output, phrase('production and other tenants'));
-  assert.doesNotMatch(output, phrase('Until the skill reads more than one deployment target'));
-  assert.doesNotMatch(output, phrase('wait for the deployment-target step'));
-});
-
-test('the skill lists every billing dimension of a service before it prices one', () => {
-  const start = measurement.indexOf('## Billing dimensions');
-  assert.ok(start > 0, 'measurement.md has no section "## Billing dimensions"');
-  const dims = measurement.slice(start).split(/\n## /)[0];
-  assert.ok(dims.includes('`costs.usage_type`'), 'the bill lists the dimensions');
-  assert.match(dims, phrase('list-price `search` call'));
-  assert.ok(dims.includes('`moved`') && dims.includes('`not moved`'));
-  assert.match(dims, phrase('daily volume × the retention days'));
-  assert.match(dims, phrase('(`file:line@sha`)'));
-  assert.match(dims, phrase('D factor'));
-  assert.match(dims, phrase('`costs.sum_usage_amount` by `costs.asset_arn`'));
-  assert.match(dims, phrase('Print the dimensions table as `output.md` says.'));
-  const template = output.slice(output.indexOf('| Target | Runs here? |'), output.indexOf('**Result lines**'));
-  assert.ok(template.includes('| Dimension | Moved? | Reason | Driver | Grade |'), 'the result template holds the dimensions table');
-  assert.ok(output.includes('List every dimension that the bill and the catalog give'));
-  assert.ok(output.includes('A C result line with no bill outcome is not finished.'));
-  assert.ok(output.includes('It keeps its unit.'));
-  const finished = 'Print one dimensions table for each service that a result line names. A result line with no dimensions table for its service is not finished.';
-  assert.match(dims, phrase(finished));
-  assert.match(output, phrase('print one dimensions table for each service that a result line names'));
-  assert.match(output, phrase('A result line with no dimensions table for its service is not finished.'));
-  assert.match(output, phrase('For example, a log query moves ingestion, storage and query scan; object storage moves request tiers, storage and data transfer.'));
-  assert.match(dims, phrase('Use the volume that the storage usage type bills.'));
-  assert.match(dims, phrase('Price only the calls, resources and compute that the code of the diff makes. A call that the running system makes in response to the change\'s traffic'));
-  assert.match(dims, phrase('is indirect: name it in a doubt with its driver, never in a result line.'));
-  assert.match(dims, phrase('read the ratio of stored to ingested bytes from the bill of the same resource (`costs.asset_arn`). When the bill of that resource gives no ratio, use a D factor with a low value and a high value.'));
-  assert.match(dims, phrase('Compare the sizes, without their signs. When the bill change is zero or has the opposite sign of the code value, apply no cap: keep C and print `bill: gap`.'));
-  assert.match(dims, phrase('the bill caps the result line. The line takes the bill change × its rate [B] as a ceiling, and the headline adds up the lines as usual.'));
-  assert.ok(dims.includes('1. Bill noise.') && dims.indexOf('1. Bill noise.') < dims.indexOf('2. Bill cap.') && dims.indexOf('2. Bill cap.') < dims.indexOf('3. `confirmed within ±20 %`'));
-  assert.match(dims, phrase('The bill noise is the spread of the daily usage in the baseline window without its single highest day, scaled to 30 days. A single spike day is not noise: name it in a doubt.'));
-  assert.match(dims, phrase('Compare each moved dimension that has a C result with the bill of its usage types, before and after the merge or deploy date (G3 of `output.md`).'));
-  for (const outcome of ['`confirmed within ±20 %`', '`change below the bill noise of <usage type>`', 'A larger gap is a doubt.',
-    'An A value then applies.', 'A B value from the bill stays a ceiling.']) assert.match(dims, phrase(outcome), outcome);
-  assert.match(output, phrase('A larger gap is a doubt. An A value then applies. A B value from the bill stays a ceiling'));
-  const paid = skillOnly.slice(skillOnly.indexOf('### 1. What the change bills'), skillOnly.indexOf('### 2. Unit of work'));
-  assert.ok(paid.includes('"Billing dimensions" of `measurement.md`'), 'section 1 points to the section');
-  const indirect = skillOnly.match(/- List each call that the diff causes indirectly[^]*?(?=\n- |\n\n)/)[0];
-  assert.ok(indirect.includes('Billing dimensions'), 'the indirect-calls line points to the section');
-});
-
-test('the code-change steps follow the seven sections of the method', () => {
-  const code = skillOnly.slice(skillOnly.indexOf('## Price a code change'));
-  const headings = ['### 1. What the change bills', '### 2. Unit of work', '### 3. Units on each target', '### 4. Billing dimensions',
-    '### 5. Rates', '### 6. Monthly change', '### Output', '### No billed unit change'];
-  const at = headings.map((heading) => code.indexOf(`\n${heading}\n`));
-  assert.ok(at.every((index, n) => index > 0 && (n === 0 || index > at[n - 1])), `the eight headings in order: ${at}`);
-  const bills = code.slice(at[0], at[1]);
-  assert.ok(bills.includes('unmeasured (no datasource: <kind>)'));
-  assert.ok(bills.includes('unmeasured (no quantity measure: <datasource>)'));
-  for (const text of ['costs.cloud_provider_id', 'A call to a third-party service is a paid call.', '(call, resource, or the compute that runs the code',
-    'mark it "not billed"']) assert.ok(bills.includes(text), text);
-  assert.ok(output.includes('<item> (<datasource>, <kind>) ='));
-  assert.ok(output.includes('`not billed: <reason> [<cite>]`'));
-});
-
-test('each unit of work names its trigger and counts it from its source-map row', () => {
-  const unit = skillOnly.slice(skillOnly.indexOf('### 2. Unit of work'), skillOnly.indexOf('#### Billed units'));
-  assert.match(unit, phrase('a schedule, a request, an event, a CI run or an operator action'));
-  assert.ok(unit.includes('`file:line@sha`'));
-  for (const name of ['Requests per month', 'CI runs per month', 'CI minutes per run']) assert.ok(unit.includes(`"${name}"`), `section 2 names ${name}`);
-  assert.match(unit, phrase('Send every trigger of a CI workflow (`schedule`, `workflow_dispatch`, `push` and any other event) to "CI runs per month"'));
-  assert.match(unit, phrase('Price a CI job as CI runs per month [cite] × CI minutes per run [cite] × the rate. Show both factors on the result line.'));
-  assert.match(measurement.slice(measurement.indexOf('## Required counts')), phrase('| per CI run | CI runs per month, CI minutes per run |'));
-  const map = measurement.slice(measurement.indexOf('## Source map'));
-  const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name} |`));
+  for (const text of ['gh run list', 'whatever its event', 'github_workflow_costs', 'operator action']) assert.ok(row('CI runs per month').includes(text), text);
+  for (const text of ['`github_workflow_costs.billable_minutes`', '`timeout-minutes`']) assert.ok(row('CI minutes per run').includes(text), text);
   assert.ok(row('Requests per month').includes('`lambda_functions.sum_request_count`'));
-  assert.ok(row('CI runs per month').includes('gh run list') && row('CI runs per month').includes('whatever its event'));
-  assert.ok(row('CI runs per month').includes('github_workflow_costs') && row('CI runs per month').includes('operator action'));
-  assert.ok(row('CI minutes per run').includes('`github_workflow_costs.billable_minutes`'));
-  assert.ok(row('CI minutes per run').includes('`timeout-minutes`'));
-  assert.match(skillOnly, phrase('request count per route are not in a dataset. The exception is the "Requests per month" row'));
+  assert.ok(map.includes('latest inventory, crawled at <date of the last crawl>'));
 });
 
-test('each datasource prices at the marginal rate of its bill', () => {
-  const map = measurement.slice(measurement.indexOf('## Rate map')).split(/\n## /)[0];
-  assert.ok(map.startsWith('## Rate map'), 'measurement.md has no section "## Rate map"');
-  const row = (name) => map.split('\n').find((line) => line.startsWith(`| ${name} |`));
-  assert.ok(row('AWS') && row('GitHub'), 'one row for AWS and one for GitHub');
-  for (const text of ['"Monthly change" of `SKILL.md`', 'returns no row, or a null rate, use a discount of 0', '`costs.pricing_term` = `OnDemand`', '`Reserved`']) {
-    assert.match(map, phrase(text), text);
+test('the skill folder holds the method and the maps, and nothing of version 1', () => {
+  assert.deepEqual(readdirSync(skillDir).sort(), ['SKILL.md', 'measurement.md']);
+  const lines = (text) => text.trim().split('\n').length;
+  assert.ok(lines(skillOnly) <= 170, 'SKILL.md has more than 170 lines');
+  assert.ok(Buffer.byteLength(skillOnly) + Buffer.byteLength(measurement) <= 40960, 'the two files have more than 40,960 bytes');
+  assert.ok(lines(section(skillOnly, '## Price a resource')) <= 30, 'Price a resource has more than 30 lines');
+  assert.ok(lines(section(measurement, '## Money rules')) <= 30, 'Money rules has more than 30 lines');
+  for (const gone of ['../src/lib/cost-result.js', './cost-result.test.js', './fixtures/cost-result']) {
+    assert.ok(!existsSync(new URL(gone, import.meta.url)), `${gone} is still here`);
   }
-  for (const text of ['sum_gross_amount', 'sum_net_amount', 'sum_discount_quantity', 'sum_quantity']) assert.ok(row('GitHub').includes(text), text);
-  for (const text of ['`sum_discount_quantity` is below `sum_quantity` by more than 0.1 %',
-    'The effective amount of "Monthly change" uses the marginal rate: the list rate when the allowance is used up, else 0 to the list rate. Cite net ÷ quantity as the average only.']) {
-    assert.match(row('GitHub'), phrase(text), text);
+  assert.doesNotMatch(skill, /output\.md|schema\.json|\((?:G|S)\d\)|Monthly change|Stop rule|Required counts/i, 'a pointer to deleted text');
+});
+
+test('each tag, direction, grade, constant, source kind and coverage kind of the skill is one that the calculator knows, and the reverse', () => {
+  const { faults } = computeCostResult({
+    schema_version: 2,
+    organization: 'x',
+    lines: [{ tag: 'x', direction: 'x', factors: [{ low: 1, high: 1, unit: 'u', grade: 'x', source: { kind: 'x', ref: 'x' } }, { constant: 'x' }] }],
+    coverage: [{ kind: 'x', what: 'x', why: 'x', source: { kind: 'code', ref: 'x' } }],
+  });
+  const known = (name) => {
+    const fault = faults.find((text) => text.includes(`unknown ${name} "x". Known: `));
+    assert.ok(fault, `no fault for ${name}`);
+    return fault.split('Known: ')[1].split(', ').sort();
+  };
+  const line = (text, start) => text.split('\n').find((l) => l.startsWith(start)) ?? assert.fail(`no line "${start}"`);
+  const rows = section(measurement, '## Grades').split('\n').filter((l) => /^\| [A-Z] \|/.test(l)).map((l) => l.split('|').map((cell) => cell.trim()));
+  const said = {
+    tag: [...section(step('Scope'), '#### Tag').matchAll(/^\d\. `([^`]+)`/gm)].map((m) => m[1]),
+    direction: ticks(line(step('Scope'), 'Directions: ')),
+    grade: rows.map((cells) => cells[1]),
+    'source kind': [...new Set(rows.flatMap((cells) => ticks(cells[3])))],
+    constant: [...section(measurement, '## Units').matchAll(/^- `(\w+)`: /gm)].map((m) => m[1]),
+    'coverage kind': ticks(line(step('Compute'), 'Coverage kinds: ')),
+  };
+  for (const [name, values] of Object.entries(said)) assert.deepEqual([...values].sort(), known(name), name);
+});
+
+test('the example input of the skill computes with no fault', () => {
+  const input = example();
+  assert.equal(input.lines.length, 2);
+  const out = computeCostResult(input);
+  assert.equal(out.faults, undefined, out.faults?.join('\n'));
+  assert.ok(out.result.headline.high > out.result.headline.low, 'the example gives a range');
+});
+
+test('the method lists its lines before it bounds and measures, and computes with the command', () => {
+  assert.deepEqual(section(skillOnly, '## Price a code change').split('\n').filter((l) => l.startsWith('### ')), STEPS);
+  assert.match(step('Scope'), phrase('Print the list before any read of a quantity, a count or a rate'));
+  const named = (text) => text.split('cxm cost-result').length - 1;
+  assert.ok(named(step('Compute')) > 0, 'the Compute step names the command');
+  assert.equal(named(skill), named(step('Compute')), 'only the Compute step names the command');
+});
+
+test('the step that reads the change forbids a pull-request read', () => {
+  assert.match(step('Scope'), phrase('Describe the change from `git diff` and the files at the commit. Never read the pull request of the change, its title, body, comments or reviews, because its text is a claim and not a measure.'));
+  for (const name of readdirSync(skillDir)) assert.doesNotMatch(read(name), /\bgh (pr|api)\b|--body-file|src\/lib/, name);
+});
+
+test('the method names no provider, no benchmark question and no rule of one crawler', () => {
+  const method = skillOnly.replace(/^---\n[\s\S]*?\n---\n/, '').replace(section(skillOnly, '## Price a resource'), '').replace(/^```[\s\S]*?^```/gm, '');
+  for (const word of ['aws_services_metrics.yml', 'source_filter', 'min_stored_bytes', 'max_dimension_values']) assert.ok(!skill.includes(word), word);
+  assert.equal(/\b(aws|amazon|azure|microsoft|gcp|google|github|gitlab|oracle)/i.exec(method)?.[0], undefined, 'the method names a provider');
+  for (const heading of STEPS) assert.ok(method.includes(`\n${heading}\n`), heading);
+  for (const { at } of example().lines) assert.match(at, /^src\/example\//, 'the example is synthetic');
+});
+
+test('each key of the skill uses a dimension and a service of the map', () => {
+  const keys = section(measurement, '## Keys');
+  const dimensions = [...section(keys, '### Dimensions').matchAll(/^- `([^`]+)`: /gm)].map((m) => m[1]);
+  assert.deepEqual([...dimensions].sort(), ['api-requests', 'ci-minutes', 'commitment-fee', 'compute-time', 'data-processed', 'data-scanned',
+    'data-transfer', 'events', 'ingestion', 'read-requests', 'storage', 'tokens', 'write-requests']);
+  const services = new Map([...section(keys, '### Services').matchAll(/^- `([^`]+)`: (.+)$/gm)].map((m) => [m[1], ticks(m[2])]));
+  for (const { key } of example().lines) {
+    const [provider, service, dimension, more] = key.split('/');
+    assert.equal(more, undefined, key);
+    assert.ok(services.get(provider)?.includes(service), `${key}: service`);
+    assert.ok(dimensions.includes(dimension), `${key}: dimension`);
   }
-  assert.ok(map.includes('unmeasured (no rate rule: <datasource>)'));
-  assert.doesNotMatch(skillOnly, /#### Rate rules|routes cover AWS only/);
-  assert.doesNotMatch(skill, phrase('`github_workflow_costs` gives `net_amount` ÷ `quantity`'));
-  assert.ok(output.includes('github_costs.sum_gross_amount ÷ sum_quantity') && !output.includes('github_workflow_costs{gross_amount'));
+});
+
+test('the rate map and the money rules stay', () => {
+  const map = section(measurement, '## Rate map');
+  const row = (name) => map.split('\n').find((l) => l.startsWith(`| ${name} |`)) ?? assert.fail(`rate map row ${name}`);
+  assert.ok(row('AWS').includes('`costs.sum_usage_amount`') && row('AWS').includes('`usage_charges_only`'));
+  for (const text of ['sum_gross_amount', 'sum_net_amount', 'sum_discount_quantity', '0.1 %']) assert.ok(row('GitHub').includes(text), text);
+  assert.match(map, phrase('The rate is the marginal rate'));
+  assert.match(map, phrase('`costs.pricing_term` = `OnDemand`'));
+  assert.match(map, phrase('returns no row, or a null rate, use a discount of 0'));
+  const money = section(measurement, '## Money rules');
+  for (const text of ['total of the payer', '`total_cost_for_volume`', '`costs.sum_current_net_unblended_cost` ÷ `costs.sum_list_cost`']) {
+    assert.match(money, phrase(text), text);
+  }
+  for (const text of ['--timeout 300', '`costs.account_id`', '`costs.product_code`', '`costs.usage_type`', '`usage_charges_only`']) assert.ok(money.includes(text), text);
 });
