@@ -151,12 +151,29 @@ function dollars(v) {
   const [int, dec = ''] = text.split('.');
   return `${v < 0 && Number(text) !== 0 ? '-' : ''}$${int.replace(/\B(?=(\d{3})+$)/g, ',')}.${dec.padEnd(2, '0')}`;
 }
-function amount({ low, high, unit }) {
+function span({ low, high }) {
   const [from, to] = [dollars(low), dollars(high)];
-  return `${from === to ? from : `${from} to ${to}`} ${unit === '$' ? 'once' : 'per month'}`;
+  return from === to ? from : `${from} to ${to}`;
 }
+const amount = (range) => `${span(range)} ${range.unit === '$' ? 'once' : 'per month'}`;
 // A one-line code span that its text cannot close, so a field renders as text only.
 const code = (s) => `\`${clean(s).replace(/`/g, "'")}\``;
+
+// Each group holds the values of one printed prefix, in input order.
+function groups(values, prefix) {
+  const found = new Map();
+  values.forEach((value, i) => found.set(prefix(value), [...(found.get(prefix(value)) ?? []), [value, i]]));
+  return found;
+}
+function lineRows(lines, computed, shared) {
+  const prefix = (l) => `- ${l.tag}, ${l.direction}: ${code(l.item)}, ${code(l.key)}, at ${code(shared ? l.at.slice(0, -shared.length - 1) : l.at)}`;
+  const own = ([l, i]) => `${code(l.id)} ${code(l.target)}: ${span(computed[i])}, grade ${computed[i].grade}`;
+  return [...groups(lines, prefix)].map(([text, held]) => (held.length === 1 ? `${text}. ${own(held[0])}` : [text, ...held.map((h) => `  - ${own(h)}`)].join('\n')));
+}
+function coverageRows(entries) {
+  const reason = (c) => `Why: ${code(c.why)}. Source: ${c.source.kind}, ${code(c.source.ref)}.`;
+  return [...groups(entries, (c) => `${c.kind} ${reason(c)}`).values()].map((held) => `- ${held[0][0].kind}: ${held.map(([c]) => code(c.what)).join(', ')}. ${reason(held[0][0])}`);
+}
 
 function sectionOf(input, result) {
   const { lines, totals, headline } = result;
@@ -169,10 +186,12 @@ function sectionOf(input, result) {
     out.push(`**${amount(headline)}**, grade ${headline.grade ?? 'none'}. ${uncovered}`, '');
     if (held.includes('commitment')) out.push(`Commitment fee inside the headline: ${amount(totals.commitment)}.`, '');
     if (shares.length) out.push(`Share of the weight by grade: ${shares.join(', ')}.`, '');
-    out.push('Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`), '', 'Lines:', '');
-    out.push(...input.lines.map((l, i) => `- ${code(l.id)} ${l.tag}, ${l.direction}: ${amount(lines[i])}, grade ${lines[i].grade}. ${code(l.target)}, ${code(l.item)}, ${code(l.key)}, at ${code(l.at)}`));
+    out.push('Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`), '');
+    const commits = new Set(input.lines.map((l) => l.at.slice(l.at.lastIndexOf('@') + 1)));
+    const shared = commits.size === 1 ? [...commits][0] : '';
+    out.push(`Lines,${shared && ` at commit ${code(shared)},`} in dollars per month (a one-off line: in dollars, once):`, '', ...lineRows(input.lines, lines, shared));
   }
-  if (input.coverage.length) out.push('', 'Coverage:', '', ...input.coverage.map((c) => `- ${c.kind}: ${code(c.what)}. Why: ${code(c.why)}. Source: ${c.source.kind}, ${code(c.source.ref)}.`));
+  if (input.coverage.length) out.push('', 'Coverage:', '', ...coverageRows(input.coverage));
   return `${out.join('\n')}\n`;
 }
 
@@ -228,11 +247,4 @@ export function computeCostResult(input) {
     },
   };
   return { result, section: sectionOf(input, result) };
-}
-
-// The input with its result. An escaped backtick or control in a text field cannot close the fence.
-export function costResultBlock(input, result) {
-  const escape = (c) => c.split('').map((u) => `\\u${u.charCodeAt(0).toString(16).padStart(4, '0')}`).join('');
-  const json = JSON.stringify({ ...input, result }).replace(/`/g, escape).replace(UNSAFE, escape);
-  return `\`\`\`cxm-cost-result\n${json}\n\`\`\``;
 }
