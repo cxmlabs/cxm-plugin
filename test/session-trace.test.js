@@ -52,6 +52,14 @@ test('a CXM session becomes one metadata-only trace with no content, arguments o
   }
 });
 
+test('the mcp command is named, and its tool and arguments are not', () => {
+  for (const command of ['cxm mcp', 'cxm mcp secret-tool', "cxm mcp secret_tool '{\"secret\":1}'"]) assert.equal(cxmCommand(command), 'mcp', command);
+  const calls = [assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: `cxm mcp secret-tool '{"secret-argument":1}'` } }]), result('t1', 2, 'secret-result')];
+  const events = buildSessionTrace(calls, { sessionId: 's' });
+  assert.deepEqual(events[0].properties.cxm_commands, { mcp: 1 });
+  assert.ok(!JSON.stringify(events).includes('secret'));
+});
+
 test('a session that never used CXM sends nothing', () => {
   const other = [assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'ls' } }]), result('t1', 2, 'x')];
   assert.deepEqual(buildSessionTrace(other, { sessionId: 's' }), []);

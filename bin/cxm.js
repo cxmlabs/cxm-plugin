@@ -35,6 +35,7 @@ const { context } = await import('../src/commands/wiki.js');
 const { scan } = await import('../src/commands/scan.js');
 const { resolve } = await import('../src/commands/resolve.js');
 const { viz } = await import('../src/commands/viz.js');
+const { mcp } = await import('../src/commands/mcp.js');
 const { updateNotice } = await import('../src/lib/update.js');
 
 // Written for an agent. A person runs `setup` and `login`. A skill runs the rest, so this names
@@ -69,6 +70,8 @@ Everything else
   api <METHOD> <path> [--body '<json>']         Call a REST endpoint the datasets do not cover
   viz <chart|cube-chart|row|mermaid> '<body>' | <file> | - [--width n] [--color] [--csv <file>] [--svg <file>]
                                                 Draw one chart or diagram block as text
+  mcp                                           List the tools of the hosted CxM MCP
+  mcp <tool> '<json>'                           Call one tool, for a question that needs thinking
   --version, -v                                 Print the CLI version
 
 The datasets and the REST API are the interface. This command only carries your session.`;
@@ -97,6 +100,7 @@ const tree = {
   'report-opportunity': (a) => reportOpportunity(a),
   api: (a) => api(a),
   viz: (a) => viz(a),
+  mcp: (a) => mcp(a),
 };
 
 // Pre-rename names. Each one routes to the handler it always used, so old call sites still work.
@@ -180,10 +184,11 @@ Promise.resolve()
       duration_ms: Date.now() - started,
       error_class: classifyError(err),
       // Sanitized: ARNs, account ids, ids, emails, URLs, local paths and secrets are masked.
-      error_message: sanitizeMessage(err.message),
+      // An mcp error can hold a tool name, an argument or a text of the service, so it sends no message.
+      ...(name === 'mcp' ? {} : { error_message: sanitizeMessage(err.message) }),
     });
     // An unclassified failure is most likely our bug: also send a sanitized crash report.
-    if (classifyError(err) === 'other') await reportCrash(err, { source: 'command', command: name });
+    if (name !== 'mcp' && classifyError(err) === 'other') await reportCrash(err, { source: 'command', command: name });
     console.error(`Error: ${err.message}`);
     process.exit(1);
   });

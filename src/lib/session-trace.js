@@ -8,7 +8,7 @@ import { draw, needsRows, splitReply } from './viz.js';
 // `cxm` sub-commands we may name. Anything else is reported as `other`, so an argument can never leak.
 const CXM_COMMANDS = new Set([
   'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'api',
-  'analytics query', 'analytics schema', 'cube', 'wiki', 'viz', 'viz chart', 'viz cube-chart', 'viz row', 'viz mermaid',
+  'analytics query', 'analytics schema', 'cube', 'wiki', 'viz', 'viz chart', 'viz cube-chart', 'viz row', 'viz mermaid', 'mcp',
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;

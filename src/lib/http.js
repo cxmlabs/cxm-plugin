@@ -1,7 +1,7 @@
 import { clientHeaders } from './client.js';
 import { deriveHosts } from './urls.js';
 
-const RELOGIN = 'Session expired or unauthorized. Run: cxm login';
+export const RELOGIN = 'Session expired or unauthorized. Run: cxm login';
 
 // The session APIs read the token from the sAccessToken cookie (they are configured
 // cookie-transfer), so send it there. Bearer is kept for anything header-based.
@@ -120,4 +120,80 @@ export async function orgApi(config, method, path, body) {
     throw new Error(`Org API ${method} ${path} failed: ${res.status}. ${detail.slice(0, 300)}`);
   }
   return res.status === 204 ? {} : res.json();
+}
+
+const MCP_WAIT_MS = 90_000; // the service itself waits 50 seconds for its data
+const MCP_MAX_MB = 10;
+const MCP_ID = 1;
+export const mcpShapeError = (status) => new Error(`The CxM MCP gave an answer that is not JSON-RPC (HTTP ${status}).`);
+
+const eventData = (event) => event.split(/\r?\n/).filter((l) => l.startsWith('data:')).map((l) => l.slice(5).replace(/^ /, '')).join('\n');
+
+// The JSON-RPC answer in a text, or undefined.
+function mcpAnswer(text) {
+  let message;
+  try {
+    message = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (message?.jsonrpc !== '2.0') return undefined;
+  if (message.error && typeof message.error === 'object') return message;
+  return message.id === MCP_ID && message.result && typeof message.result === 'object' ? message : undefined;
+}
+
+// Reads no more than the answer: an event stream can stay open after it.
+async function readMcpAnswer(res) {
+  const stream = (res.headers.get('content-type') ?? '').startsWith('text/event-stream');
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  for await (const chunk of res.body ?? []) {
+    bytes += chunk.length;
+    if (bytes > MCP_MAX_MB * 1024 * 1024) throw new Error(`The answer of the CxM MCP is larger than ${MCP_MAX_MB} MB.`);
+    text += decoder.decode(chunk, { stream: true });
+    if (!stream) continue;
+    const events = text.split(/\r?\n\r?\n/);
+    text = events.pop();
+    for (const event of events) {
+      const answer = mcpAnswer(eventData(event));
+      if (answer) return answer;
+    }
+  }
+  return mcpAnswer(stream ? eventData(text) : text);
+}
+
+// One JSON-RPC request to the hosted MCP. A list is a read. A tool call is sent once. No redirect, so the token stays on one host.
+export async function mcpRequest(config, method, params = {}) {
+  const { mcp } = deriveHosts(config);
+  const send = method === 'tools/list' ? gatewayRetry(Date.now() + MCP_WAIT_MS) : fetch;
+  try {
+    const res = await send(mcp, {
+      method: 'POST',
+      headers: {
+        ...clientHeaders(),
+        'Content-Type': 'application/json',
+        Accept: 'application/json, text/event-stream',
+        Authorization: `Bearer ${config.accessToken}`,
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: MCP_ID, method, params }),
+      redirect: 'manual',
+      signal: AbortSignal.timeout(MCP_WAIT_MS),
+    });
+    if (res.status === 401) throw new Error(RELOGIN);
+    if (res.status === 404) throw new Error('No CxM MCP on this deployment (HTTP 404).');
+    if (res.status === 403 && !res.headers.get('content-type')?.includes('json')) {
+      throw new Error('The request was refused before it reached the CxM MCP (HTTP 403).');
+    }
+    const answer = await readMcpAnswer(res);
+    if (answer?.error) throw new Error(`The CxM MCP refused the request: ${answer.error.message ?? 'no reason'}`);
+    if (!answer || !res.ok) throw mcpShapeError(res.status);
+    return answer.result;
+  } catch (err) {
+    if (err?.name === 'TimeoutError') throw new Error(`The CxM MCP did not answer in ${MCP_WAIT_MS / 1000} seconds.`);
+    // Only a network fault of `fetch` has a cause.
+    if (!err?.cause) throw err;
+    if (err.cause.code === 'ENOTFOUND') throw new Error('No CxM MCP on this deployment (no host).');
+    throw new Error(`The CxM MCP did not answer: network fault (${err.cause.code ?? 'no code'}).`);
+  }
 }

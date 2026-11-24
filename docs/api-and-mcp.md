@@ -32,9 +32,15 @@ query from the output of `cxm analytics schema`, and send it through the API.
 - **The CLI holds the login.** It stores the session, and each API call uses it.
 - **It works in each harness.** Claude Code, Codex, a shell and CI can all run a command.
 
-## When the MCP is not available
+## How a session calls the MCP
 
-How a session signs in to the central CxM MCP is not decided yet (MONETA-UV2-DECISION-001). Do not add
-an MCP configuration file or a login step before that decision.
+Decided on 2026-11-24 (MONETA-UV2-DECISION-001). The `cxm` command forwards the call with the session of
+`cxm login`. No harness holds a server or a token. Do not add an MCP configuration file or a second login.
+
+- `cxm mcp` lists the tools, with the input schema of each one.
+- `cxm mcp <tool> '<json>'` calls one tool. The organization comes from the session.
+
+Each failure prints one text on stderr, exits with code 1 and prints no result. A failure is never an empty
+answer. The MCP does not run on each deployment.
 
 An agent that cannot reach the MCP says so. It prints no figure for that input.

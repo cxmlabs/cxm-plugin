@@ -7,12 +7,13 @@ import { test } from 'node:test';
 
 // The config module reads its directory when it loads, so it is set before the import.
 process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-http-'));
-const { cubeLoad, cubeMeta, currentUser, orgApi } = await import('../src/lib/http.js');
+const { cubeLoad, cubeMeta, currentUser, mcpRequest, orgApi } = await import('../src/lib/http.js');
 const { requireSession, saveConfig } = await import('../src/lib/config.js');
 const { classifyError } = await import('../src/lib/telemetry.js');
 
 const config = { baseUrl: 'https://example.test', organizationId: 'org', accessToken: 't' };
 const reads = {
+  mcpRequest: () => mcpRequest(config, 'tools/list'),
   cubeLoad: () => cubeLoad(config, {}),
   cubeMeta: () => cubeMeta(config),
   currentUser: () => currentUser(config),
@@ -38,7 +39,7 @@ function stub(t, answer) {
 
 test('a read is repeated after 502, 503 and 504 and then gives its rows', async (t) => {
   const rows = [{ id: 1 }];
-  const body = { cubeLoad: { data: rows }, cubeMeta: { cubes: rows }, currentUser: rows, orgApi: rows };
+  const body = { cubeLoad: { data: rows }, cubeMeta: { cubes: rows }, currentUser: rows, orgApi: rows, mcpRequest: { jsonrpc: '2.0', id: 1, result: rows } };
   for (const [name, read] of Object.entries(reads)) {
     const seen = stub(t, (n) => [[502], [503], [504], [200, body[name]]][n]);
     assert.deepEqual(await read(), rows, name);
@@ -89,6 +90,10 @@ test('a write, a session refresh, a 500 and a 4xx are sent once', async (t) => {
       t.mock.restoreAll();
     }
   }
+  const called = stub(t, () => [503]);
+  await assert.rejects(mcpRequest(config, 'tools/call', { name: 'x', arguments: {} }), /HTTP 503/);
+  assert.equal(called.calls, 1, 'a tool call is sent once');
+  t.mock.restoreAll();
   saveConfig({ ...config, refreshToken: 'r', expiresAt: 1 });
   const seen = stub(t, () => [503]);
   await assert.rejects(requireSession(), /Session expired/);
