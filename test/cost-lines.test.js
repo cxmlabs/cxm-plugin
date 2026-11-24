@@ -178,16 +178,38 @@ test('the section prints each line and each coverage entry, and prints once the 
 
 - direct, add: \`i-1\`, \`k-i-1\`, at \`src/i-1.js:1\`
   - \`t-1-i-1\` \`t-1\`: $1.00 to $5.00, grade C
+    = \`1–5 x/mo [C, dataset] × 1 $/x [A, dataset]\`
   - \`t-2-i-1\` \`t-2\`: $2.00 to $5.00, grade C
+    = \`2–5 x/mo [C, dataset] × 1 $/x [A, dataset]\`
 - direct, add: \`i-2\`, \`k-i-2\`, at \`src/i-2.js:1\`
   - \`t-1-i-2\` \`t-1\`: $1.00 to $6.00, grade C
+    = \`1–6 x/mo [C, dataset] × 1 $/x [A, dataset]\`
   - \`t-2-i-2\` \`t-2\`: $2.00 to $6.00, grade C
+    = \`2–6 x/mo [C, dataset] × 1 $/x [A, dataset]\`
 - one-off, add: \`i-3\`, \`requests\`, at \`src/i-3.js:1\`. \`once\` \`job-a\`: $7.00, grade B
+  = \`7 $ [B, dataset]\`
 `), section);
   assert.ok(section.includes('- uncovered_target: `w-1`, `w-2`. Why: `no lookup found it`. Source: tool, `synthetic`.'), section);
   // Two commits: each line keeps its own.
   const two = compute([dollars('a', 1, 1), dollars('b', 1, 1, 'B', { at: 'src/job.js:12@9999999' })]).section;
   for (const text of ['Lines, in dollars per month (', 'at `src/job.js:12@0123abc`. `a`', 'at `src/job.js:12@9999999`. `b`']) assert.ok(two.includes(text), two);
+});
+
+test('the section prints each factor of each line under its line, and a unit cannot leave its code span', () => {
+  const rate = point(0.05, '$/vCPU*h', 'A');
+  const lines = [
+    line('time', [factor(30, 45, 'run/mo', 'D'), point(2, 'min/run', 'C'), { constant: 'h_per_min' }, point(4, 'vCPU'), rate]),
+    line('keep', [point(60, 'GB/mo'), point(30, 'day'), { ...point(30.4375, 'day/mo', 'A'), divide: true }, point(0.8, '1'), point(0.02, '$/GB*mo')], { item: 'i-2' }),
+    line('token', [{ ...point(4, 'row/call'), divide: true }, point(1e-7, 'row/mo'), point(500, 'token/call'), { constant: 'million', of: 'token' }, point(0.4, '$/Mtoken')], { item: 'i-3', direction: 'remove' }),
+  ];
+  const { section } = compute(lines);
+  for (const [id, formula] of [
+    ['time', '30–45 run/mo [D, assumption] × 2 min/run [C, dataset] × h_per_min × 4 vCPU [B, dataset] × 0.05 $/vCPU*h [A, dataset]'],
+    ['keep', '60 GB/mo [B, dataset] × 30 day [B, dataset] ÷ 30.4375 day/mo [A, dataset] × 0.8 [B, dataset] × 0.02 $/GB*mo [B, dataset]'],
+    ['token', '1 ÷ 4 row/call [B, dataset] × 1e-7 row/mo [B, dataset] × 500 token/call [B, dataset] × million of token × 0.4 $/Mtoken [B, dataset]'],
+  ]) assert.match(section, new RegExp(`\`${id}\`.*\\n  = \`${formula.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\`\\n`), id);
+  assert.ok(!section.includes('synthetic'), 'no ref: it stays in the block');
+  for (const unit of ['x`y/mo', 'x\ny/mo', 'x y/mo']) assert.ok(computeCostResult(input([line('a', [point(1, unit), point(1, '$/x')])])).faults, unit);
 });
 
 test('the function imports nothing and the written block computes to the same result', () => {

@@ -165,10 +165,16 @@ function groups(values, prefix) {
   values.forEach((value, i) => found.set(prefix(value), [...(found.get(prefix(value)) ?? []), [value, i]]));
   return found;
 }
+// The factors as the input gives them, with no ref.
+function formula(factors) {
+  const value = ({ low, high }) => (low === high ? `${low}` : `${low}–${high}`);
+  const text = (f) => (f.constant ? `${f.constant}${f.of ? ` of ${f.of}` : ''}` : `${value(f)}${f.unit === '1' ? '' : ` ${f.unit}`} [${f.grade}, ${f.source.kind}]`);
+  return factors.map((f, i) => `${f.divide ? `${i ? '' : '1 '}÷ ` : i ? '× ' : ''}${text(f)}`).join(' ');
+}
 function lineRows(lines, computed, shared) {
   const prefix = (l) => `- ${l.tag}, ${l.direction}: ${code(l.item)}, ${code(l.key)}, at ${code(shared ? l.at.slice(0, -shared.length - 1) : l.at)}`;
-  const own = ([l, i]) => `${code(l.id)} ${code(l.target)}: ${span(computed[i])}, grade ${computed[i].grade}`;
-  return [...groups(lines, prefix)].map(([text, held]) => (held.length === 1 ? `${text}. ${own(held[0])}` : [text, ...held.map((h) => `  - ${own(h)}`)].join('\n')));
+  const own = ([l, i], indent) => `${code(l.id)} ${code(l.target)}: ${span(computed[i])}, grade ${computed[i].grade}\n${indent}= ${code(formula(l.factors))}`;
+  return [...groups(lines, prefix)].map(([text, held]) => (held.length === 1 ? `${text}. ${own(held[0], '  ')}` : [text, ...held.map((h) => `  - ${own(h, '    ')}`)].join('\n')));
 }
 function coverageRows(entries) {
   const reason = (c) => `Why: ${code(c.why)}. Source: ${c.source.kind}, ${code(c.source.ref)}.`;
