@@ -43,8 +43,6 @@ separate private `cxm-plugin-benchmark` repository.
   internal technology named in a comment, a prompt, or CLI output tells a customer what runs
   inside the platform. The query format is the exception, because a skill that cannot say `cubejs`
   cannot write a query. `test/structure.test.js` holds a word list.
-- Do not add an MCP server. The decision and the conditions that would reverse it are in
-  `docs/why-cli-not-mcp.md`; logic stays in `src/lib` either way.
 - The release path has a human owner. `.github/`, `scripts/sync-version.mjs`,
   `scripts/validate-manifests.mjs` and `scripts/install-cxm-shim.sh` need an SRE review — see
   `.github/CODEOWNERS` for why.
@@ -55,8 +53,7 @@ separate private `cxm-plugin-benchmark` repository.
 - The shape a skill must have, and what the structural test refuses: `skills/AGENTS.md`
 - How to run the suite, and what the structural tests refuse: `test/AGENTS.md`
 - The release gates and the user-facing shim: `scripts/AGENTS.md`
-- Release mechanics: `docs/releasing.md`. Why this is a CLI and not an MCP server:
-  `docs/why-cli-not-mcp.md`
+- Release mechanics: `docs/releasing.md`
 - Plugin hooks are one file for both harnesses, `hooks/hooks.json`, and each command resolves
   `${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}` so the same line works under Claude and Codex. A command
   that names one placeholder only fails silently at runtime, because hook output goes nowhere a
@@ -106,6 +103,15 @@ separate private `cxm-plugin-benchmark` repository.
   ship goes in `skills/`, which both harnesses load from.
 
 <!-- /bmad:context -->
+
+## API and MCP
+
+Decided on 2026-11-24. `docs/api-and-mcp.md` gives the reasons and an example of each call.
+
+- A purely deterministic operation uses the CxM API, through the `cxm` command.
+- An operation that needs thinking, to format its input or to interpret its output, uses the central
+  authenticated CxM MCP.
+- Prefer a CxM integration to a local call.
 
 ## Claude-only reply renderer
 
