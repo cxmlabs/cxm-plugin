@@ -111,7 +111,9 @@ Give each line a ceiling in dollars per month, from the code and from the bill r
 
 ### 4. Measure
 
-Use one window for each bill row, and for each cell that names the window: the 30 full days that end 2 days before the earliest commit date (`git log --format=%cs <base>..HEAD`) of the diff, or 2 days before the last bill day, whichever is earlier. For an uncommitted change, use the last bill day. Read no bill row after the window.
+Use one window for each read that has a date: a bill row, a usage or metric row, and a CI run list. The window is the 30 full days that end 2 days before the earliest commit date (`git log --format=%cs <base>..HEAD`) of the diff, or 2 days before the last bill day, whichever is earlier. For an uncommitted change, use the last bill day. Read nothing after the window.
+Give each of these reads a fixed start date and a fixed end date, in each step, also when its cell of the source map shows no end date. Use no relative range. A "latest day" cell takes the latest day of the window.
+A dataset that holds only the state of today, such as the inventory or the prices, has no date: read it as it is.
 
 For each line that step 3 did not stop:
 

@@ -160,6 +160,11 @@ test('the method lists its lines before it bounds and measures, and computes wit
   assert.equal(named(skill), named(step('Compute')), 'only the Compute step names the command');
 });
 
+test('the Measure step asks for a fixed start and end date for each read that has a date', () => {
+  for (const text of ['each read that has a date: a bill row, a usage or metric row, and a CI run list', 'a fixed start date and a fixed end date', 'also when its cell of the source map shows no end date',
+    'Use no relative range', 'Read nothing after the window', 'the latest day of the window']) assert.match(step('Measure'), phrase(text), text);
+});
+
 test('the step that reads the change forbids a pull-request read', () => {
   assert.match(step('Scope'), phrase('Describe the change from `git diff` and the files at the commit. Never read the pull request of the change, its title, body, comments or reviews, because its text is a claim and not a measure.'));
   for (const name of readdirSync(skillDir)) assert.doesNotMatch(read(name), /\bgh (pr|api)\b|--body-file|src\/lib/, name);
