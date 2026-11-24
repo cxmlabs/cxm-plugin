@@ -167,6 +167,15 @@ test('the Measure step asks for a fixed start and end date for each read that ha
     'Use no relative range', 'Write each date as a literal in the query itself, never through a shell variable, a loop or a script', 'Read nothing after the window', 'the latest day of the window']) assert.match(step('Measure'), phrase(text), text);
 });
 
+test('compute is direct for a run that did not happen before, and added-runtime when an earlier run takes longer', () => {
+  const tags = section(step('Scope'), '#### Tag').split('\n');
+  const tag = (name) => tags.find((l) => /^\d\. /.test(l) && ticks(l)[0] === name);
+  assert.match(tag('added-runtime'), phrase('extra time on a run of a task, a worker or a job that happened before the change'));
+  assert.match(tag('direct'), phrase('the compute of a run that did not happen before: a new schedule, job, asset or workflow with its own run of a task, a function or a runner, also when its definition or image exists before the change'));
+  assert.match(tag('direct'), phrase('The compute of one more item, step or call inside a run that happened before is `added-runtime`'));
+  assert.doesNotMatch(skill, /only when the diff adds a new task|one more item, step or workflow/);
+});
+
 test('the method reads the checkout of the change and the skill files only', () => {
   for (const text of ['Read only the checkout of the change, the folder of this skill and the CXM skill files that this file names', 'Do not list or read another folder of the machine, a shell profile or another checkout']) assert.match(step('Scope'), phrase(text), text);
 });

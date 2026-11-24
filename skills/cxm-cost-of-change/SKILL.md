@@ -91,9 +91,9 @@ Use the first that applies.
 2. `llm`: model tokens.
 3. `flag-gated`: each path to the code needs a flag whose default is off. When one path needs no flag, the line is not flag-gated; the gated path gets its own line.
 4. `one-off`: the code runs once or a person runs it for one deployment, such as a migration, a backfill or a check before or after the deployment.
-5. `added-runtime`: extra time on a task, a worker or a job definition that exists before the change, also when the change gives it one more item, step or workflow. Compute is `direct` only when the diff adds a new task, job or service definition.
+5. `added-runtime`: extra time on a run of a task, a worker or a job that happened before the change.
 6. `indirect`: another system bills as a reaction: key management, log lines that the code writes, events, the network path, files that a provider writes by itself, such as query results. The use that a commitment replaces is its own `indirect` line.
-7. `direct`: the diff states the billed work. The storage of an object has the tag of the call that writes it.
+7. `direct`: the diff states the billed work, also the compute of a run that did not happen before: a new schedule, job, asset or workflow with its own run of a task, a function or a runner, also when its definition or image exists before the change. The compute of one more item, step or call inside a run that happened before is `added-runtime`. The storage of an object has the tag of the call that writes it.
 
 #### Direction
 
