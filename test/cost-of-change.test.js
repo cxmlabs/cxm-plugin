@@ -167,9 +167,14 @@ test('the Measure step asks for a fixed start and end date for each read that ha
     'Use no relative range', 'Write each date as a literal in the query itself, never through a shell variable, a loop or a script', 'Read nothing after the window', 'the latest day of the window']) assert.match(step('Measure'), phrase(text), text);
 });
 
+test('the method reads the checkout of the change and the skill files only', () => {
+  for (const text of ['Read only the checkout of the change, the folder of this skill and the CXM skill files that this file names', 'Do not list or read another folder of the machine, a shell profile or another checkout']) assert.match(step('Scope'), phrase(text), text);
+});
+
 test('the answer is the printed section, and the skill names no block and no block file', () => {
   assert.match(step('Answer'), phrase('Print the section of step 5'));
   assert.match(step('Answer'), /unchanged/);
+  for (const text of ['Answer a question about units, counts or rates with the section', 'Write no table and no total of your own', 'A total over several tags is a figure that code did not compute: never write one']) assert.match(step('Answer'), phrase(text), text);
   assert.doesNotMatch(step('Answer'), /block/i);
   assert.doesNotMatch(skill, /CXM_COST_RESULT_FILE|cxm-cost-result/);
 });

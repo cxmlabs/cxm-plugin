@@ -69,6 +69,7 @@ An error or an empty answer is never 0. It is never proof that a target does not
 
 Describe the change from `git diff` and the files at the commit. Never read the pull request of the change, its title, body, comments or reviews, because its text is a claim and not a measure.
 Run `git diff <base>...HEAD` for commits. For an uncommitted change, run `git diff HEAD` and read each untracked file.
+Read only the checkout of the change, the folder of this skill and the CXM skill files that this file names. Do not list or read another folder of the machine, a shell profile or another checkout. You can read the results that the harness saved for this session.
 
 1. Read the full diff. List each changed file that runs in production or in CI. A test, a doc, a type or a translation moves no line, except CI time when a CI workflow changes.
 2. For each added, removed or changed code path, write each call, resource, task or job that a provider bills. A free control-plane call makes no line.
@@ -159,5 +160,6 @@ Each entry holds `kind`, `what`, `why` and `source`.
 
 1. Write one sentence that names CloudExMachina, the organization and the window of step 4.
 2. Print the section of step 5 after it, complete and unchanged. Copy each of its lines. Add no figure, no chart and no second summary.
+3. The section holds the counts, the rates and the source kinds. Answer a question about units, counts or rates with the section. Write no table and no total of your own. A total over several tags is a figure that code did not compute: never write one.
 
 The caller decides where the result goes.
