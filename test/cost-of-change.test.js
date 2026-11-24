@@ -155,6 +155,8 @@ test('the example input of the skill computes with no fault', () => {
 test('the method lists its lines before it bounds and measures, and computes with the command', () => {
   assert.deepEqual(section(skillOnly, '## Price a code change').split('\n').filter((l) => l.startsWith('### ')), STEPS);
   assert.match(step('Scope'), phrase('Print the list before any read of a quantity, a count or a rate'));
+  assert.match(step('Scope'), phrase('as text in a message to the user'));
+  assert.equal(step('Bound').trim().split('\n')[0], 'If the list is not yet in a message, stop and print it.');
   const named = (text) => text.split('cxm cost-result').length - 1;
   assert.ok(named(step('Compute')) > 0, 'the Compute step names the command');
   assert.equal(named(skill), named(step('Compute')), 'only the Compute step names the command');
@@ -162,7 +164,14 @@ test('the method lists its lines before it bounds and measures, and computes wit
 
 test('the Measure step asks for a fixed start and end date for each read that has a date', () => {
   for (const text of ['each read that has a date: a bill row, a usage or metric row, and a CI run list', 'a fixed start date and a fixed end date', 'also when its cell of the source map shows no end date',
-    'Use no relative range', 'Read nothing after the window', 'the latest day of the window']) assert.match(step('Measure'), phrase(text), text);
+    'Use no relative range', 'Write each date as a literal in the query itself, never through a shell variable, a loop or a script', 'Read nothing after the window', 'the latest day of the window']) assert.match(step('Measure'), phrase(text), text);
+});
+
+test('the answer is the printed section, and the skill names no block and no block file', () => {
+  assert.match(step('Answer'), phrase('Print the section of step 5'));
+  assert.match(step('Answer'), /unchanged/);
+  assert.doesNotMatch(step('Answer'), /block/i);
+  assert.doesNotMatch(skill, /CXM_COST_RESULT_FILE|cxm-cost-result/);
 });
 
 test('the step that reads the change forbids a pull-request read', () => {

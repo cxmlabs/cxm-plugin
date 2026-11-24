@@ -75,10 +75,11 @@ Run `git diff <base>...HEAD` for commits. For an uncommitted change, run `git di
 3. Follow each changed code path up to its trigger: schedule, request, event, CI or person. Note each flag, setting or tag that decides if the path runs, in the diff or in a caller, and read its default in the code.
 4. Follow a helper call one level. A line exists when the diff gives the helper the billed work: a query, an object, a list of items. Work that a helper does by itself to load configuration, secrets or credentials makes no line.
 5. List each deployment target that runs the code, as "Money rules" of `measurement.md` says. A target that the session cannot read is an `uncovered_target` entry. It does not lower the grade. Never claim that a target is not deployed.
-6. Give each line a `key` as "Keys" of `measurement.md` says, one tag, one direction and one target. Merge lines that have the same key, tag, direction, target and trigger.
+6. Give each line a `key` as "Keys" of `measurement.md` says, one tag, one direction and one target. Write one line for each key, tag, direction and target. It names each of its triggers. A quantity that is a sum holds its terms in `ref`.
 7. Run the List and Mark check of "Billing dimensions" of `measurement.md`. It reads names only.
 8. Read the list again against the diff once. Remove a line with no `file:line` of the diff. Add a line that you missed.
-9. Print the list before any read of a quantity, a count or a rate: `key`, tag, direction, target, trigger and `file:line@sha`. For an uncommitted file, use the sha of HEAD and add a `doubt`.
+9. Print the list before any read of a quantity, a count or a rate: write it as text in a message to the user, before the first command that reads one. A thought, a file, a plan or a command output is not a message.
+   Write one line for each entry: `key | tag | direction | target | trigger | file:line@sha`. For an uncommitted file, use the sha of HEAD and add a `doubt`. Then go on to step 3 and wait for no answer.
 10. Do not add a line after the list, except a line that a measure proves. Name that line in a `doubt`.
 
 #### Tag
@@ -101,6 +102,8 @@ When the diff multiplies the same work, write one `add` line for the difference.
 
 ### 3. Bound
 
+If the list is not yet in a message, stop and print it.
+
 Give each line a ceiling in dollars per month, from the code and from the bill rows of the window of step 4.
 
 - A ceiling of 0 is a `not_billed` entry. A line with no rate or no source is an `unmeasured` entry. Both leave the lines.
@@ -112,7 +115,7 @@ Give each line a ceiling in dollars per month, from the code and from the bill r
 ### 4. Measure
 
 Use one window for each read that has a date: a bill row, a usage or metric row, and a CI run list. The window is the 30 full days that end 2 days before the earliest commit date (`git log --format=%cs <base>..HEAD`) of the diff, or 2 days before the last bill day, whichever is earlier. For an uncommitted change, use the last bill day. Read nothing after the window.
-Give each of these reads a fixed start date and a fixed end date, in each step, also when its cell of the source map shows no end date. Use no relative range. A "latest day" cell takes the latest day of the window.
+Give each of these reads a fixed start date and a fixed end date, in each step, also when its cell of the source map shows no end date. Use no relative range. Write each date as a literal in the query itself, never through a shell variable, a loop or a script. A "latest day" cell takes the latest day of the window.
 A dataset that holds only the state of today, such as the inventory or the prices, has no date: read it as it is.
 
 For each line that step 3 did not stop:
@@ -155,6 +158,6 @@ Each entry holds `kind`, `what`, `why` and `source`.
 ### 6. Answer
 
 1. Write one sentence that names CloudExMachina, the organization and the window of step 4.
-2. Print the output of step 5 after it, unchanged: the section and its one block. Add no figure, no chart and no second summary.
+2. Print the section of step 5 after it, complete and unchanged. Copy each of its lines. Add no figure, no chart and no second summary.
 
 The caller decides where the result goes.
