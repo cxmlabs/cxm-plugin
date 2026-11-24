@@ -71,6 +71,7 @@ Everything else
   viz <chart|cube-chart|row|mermaid> '<body>' | <file> | - [--width n] [--color] [--csv <file>] [--svg <file>]
                                                 Draw one chart or diagram block as text
   cost-result < <lines.json>                    Compute amounts, totals and grades from tagged cost lines on stdin
+                                                (CXM_COST_RESULT_FILE=<file>: also write the JSON block there)
   --version, -v                                 Print the CLI version
 
 The datasets and the REST API are the interface. This command only carries your session.`;

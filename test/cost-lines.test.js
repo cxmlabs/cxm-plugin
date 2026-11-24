@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { computeCostResult, costResultBlock } from '../src/lib/cost-lines.js';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { computeCostResult } from '../src/lib/cost-lines.js';
 
 const source = (kind = 'dataset') => ({ kind, ref: 'synthetic' });
 const factor = (low, high, unit, grade = 'B') => ({ low, high, unit, grade, source: source(grade === 'D' ? 'assumption' : 'dataset') });
@@ -164,7 +168,29 @@ test('a coverage entry changes no amount and no grade', () => {
   assert.match(empty.section, /- not_billed: `a target`/);
 });
 
-test('the function imports nothing and the printed block computes to the same result', () => {
+test('the section prints each line and each coverage entry, and prints once the text that they share', () => {
+  const lines = ['t-1', 't-2'].flatMap((target, t) => ['i-1', 'i-2'].map((item, i) => dollars(`${target}-${item}`, 1 + t, 5 + i, 'C', { target, item, key: `k-${item}`, at: `src/${item}.js:1@0123abc` })));
+  const { section } = compute(
+    [...lines, line('once', [point(7, '$')], { tag: 'one-off', item: 'i-3', at: 'src/i-3.js:1@0123abc' })],
+    ['w-1', 'w-2'].map((what) => entry('uncovered_target', { what })),
+  );
+  assert.ok(section.includes(`Lines, at commit \`0123abc\`, in dollars per month (a one-off line: in dollars, once):
+
+- direct, add: \`i-1\`, \`k-i-1\`, at \`src/i-1.js:1\`
+  - \`t-1-i-1\` \`t-1\`: $1.00 to $5.00, grade C
+  - \`t-2-i-1\` \`t-2\`: $2.00 to $5.00, grade C
+- direct, add: \`i-2\`, \`k-i-2\`, at \`src/i-2.js:1\`
+  - \`t-1-i-2\` \`t-1\`: $1.00 to $6.00, grade C
+  - \`t-2-i-2\` \`t-2\`: $2.00 to $6.00, grade C
+- one-off, add: \`i-3\`, \`requests\`, at \`src/i-3.js:1\`. \`once\` \`job-a\`: $7.00, grade B
+`), section);
+  assert.ok(section.includes('- uncovered_target: `w-1`, `w-2`. Why: `no lookup found it`. Source: tool, `synthetic`.'), section);
+  // Two commits: each line keeps its own.
+  const two = compute([dollars('a', 1, 1), dollars('b', 1, 1, 'B', { at: 'src/job.js:12@9999999' })]).section;
+  for (const text of ['Lines, in dollars per month (', 'at `src/job.js:12@0123abc`. `a`', 'at `src/job.js:12@9999999`. `b`']) assert.ok(two.includes(text), two);
+});
+
+test('the function imports nothing and the written block computes to the same result', () => {
   const code = readFileSync(new URL('../src/lib/cost-lines.js', import.meta.url), 'utf8');
   assert.doesNotMatch(code, /^\s*import\b|\bimport\s*\(|\brequire\s*\(|\bfetch\s*\(|\bprocess\b|\bfrom\s+['"]/m);
 
@@ -178,13 +204,16 @@ test('the function imports nothing and the printed block computes to the same re
     [entry('doubt', { what: hostile, why: hostile, source: { kind: 'tool', ref: hostile } })],
   );
   const { result, section } = computeCostResult(given);
-  const printed = `${section}\n${costResultBlock(given, result)}\n`;
-  const fences = printed.match(/```/g);
-  assert.equal(fences.length, 2, 'a text field opens or closes no fence');
-  assert.doesNotMatch(printed, /[\x00-\x09\x0b-\x1f\x7f-\x9f\u2028\u202e]/);
-  const block = JSON.parse(/```cxm-cost-result\n(.*)\n```\n$/.exec(printed)[1]);
-  assert.deepEqual(block.result, result);
-  const again = computeCostResult(block);
-  assert.deepEqual(again, { result, section });
-  assert.equal(costResultBlock(block, again.result), costResultBlock(given, result));
+  assert.doesNotMatch(section, /```/, 'a text field opens no fence');
+  assert.doesNotMatch(section, /[\x00-\x09\x0b-\x1f\x7f-\x9f\u2028\u202e]/);
+  const file = join(mkdtempSync(join(tmpdir(), 'cxm-cost-lines-')), 'block.json');
+  const run = spawnSync(process.execPath, [fileURLToPath(new URL('../bin/cxm.js', import.meta.url)), 'cost-result'], {
+    input: JSON.stringify(given),
+    encoding: 'utf8',
+    env: { ...process.env, CXM_CONFIG_DIR: dirname(file), CXM_TELEMETRY: '0', CXM_COST_RESULT_FILE: file },
+  });
+  assert.equal(run.stdout, section, run.stderr);
+  const block = JSON.parse(readFileSync(file, 'utf8'));
+  assert.deepEqual(block, { ...JSON.parse(JSON.stringify(given)), result });
+  assert.deepEqual(computeCostResult(block), { result, section });
 });
