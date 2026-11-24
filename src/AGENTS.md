@@ -50,8 +50,8 @@ Do not copy either shape into new code, and do not grow them.
 ## Conventions that differ from defaults
 
 - A new capability goes in `lib/` with its logic and in `commands/` with its interface, even when
-  only one command needs it today. The skills, the hooks and a future MCP wrapper are all callers
-  of the same `lib/`.
+  only one command needs it today. The skills and the hooks are all callers of the same
+  `lib/`.
 - Name the capability, not the service behind it. The plugin ships as readable text, so a comment
   naming an internal technology tells a customer what runs inside the platform. The query format
   is the exception: a skill that cannot say `cubejs` cannot write a query, and the cube names are
