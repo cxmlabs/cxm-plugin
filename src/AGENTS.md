@@ -77,3 +77,5 @@ Do not copy either shape into new code, and do not grow them.
 - `lib/viz.js` is not a third compute exception. Its totals, shares and net figures show the rows
   of one block only. It fetches nothing and publishes no figure. When a `cube-chart` query returns
   `limit` rows, every total and net says `of top N`, because the platform can hold more rows.
+- `lib/cost-lines.js` is not a third compute exception. The function uses the lines of one input
+  only. It fetches nothing and publishes no figure.

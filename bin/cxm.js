@@ -35,6 +35,7 @@ const { context } = await import('../src/commands/wiki.js');
 const { scan } = await import('../src/commands/scan.js');
 const { resolve } = await import('../src/commands/resolve.js');
 const { viz } = await import('../src/commands/viz.js');
+const { costResult } = await import('../src/commands/cost-result.js');
 const { updateNotice } = await import('../src/lib/update.js');
 
 // Written for an agent. A person runs `setup` and `login`. A skill runs the rest, so this names
@@ -69,6 +70,7 @@ Everything else
   api <METHOD> <path> [--body '<json>']         Call a REST endpoint the datasets do not cover
   viz <chart|cube-chart|row|mermaid> '<body>' | <file> | - [--width n] [--color] [--csv <file>] [--svg <file>]
                                                 Draw one chart or diagram block as text
+  cost-result < <lines.json>                    Compute amounts, totals and grades from tagged cost lines on stdin
   --version, -v                                 Print the CLI version
 
 The datasets and the REST API are the interface. This command only carries your session.`;
@@ -97,6 +99,7 @@ const tree = {
   'report-opportunity': (a) => reportOpportunity(a),
   api: (a) => api(a),
   viz: (a) => viz(a),
+  'cost-result': () => costResult(),
 };
 
 // Pre-rename names. Each one routes to the handler it always used, so old call sites still work.
