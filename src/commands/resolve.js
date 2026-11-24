@@ -10,7 +10,7 @@ function getFlag(argv, name) {
 // without the network. `k(cube, field)` reads a cube-qualified key from a row.
 export function buildResolution(arn, { arnRow, costRows, opportunities }) {
   const k = (row, cube, field) => row?.[`${cube}.${field}`];
-  const A = 'resource_map';
+  const A = 'asset_map';
   const C = 'costs';
   const monthly = (costRows || []).reduce((s, r) => s + Number(k(r, C, 'sum_current_unblended_cost') || 0), 0);
   return {
@@ -31,7 +31,7 @@ export function buildResolution(arn, { arnRow, costRows, opportunities }) {
 // several analytics calls the cxm-repo-graph skill otherwise chains.
 export async function resolve(argv) {
   const config = await requireSession();
-  const A = 'resource_map';
+  const A = 'asset_map';
   let arn = getFlag(argv, '--arn');
   const address = getFlag(argv, '--address');
   const repo = getFlag(argv, '--repo');
@@ -51,7 +51,7 @@ export async function resolve(argv) {
     cubeLoad(config, { dimensions: dims, filters: [{ member: `${A}.arn`, operator: 'equals', values: [arn] }], limit: 1 }),
     cubeLoad(config, {
       measures: ['costs.sum_current_unblended_cost'],
-      filters: [{ member: 'costs.resource_id', operator: 'equals', values: [arn] }],
+      filters: [{ member: 'costs.asset_id', operator: 'equals', values: [arn] }],
       timeDimensions: [{ dimension: 'costs.billing_day', dateRange: 'last 30 days' }],
     }),
     orgApi(config, 'GET', `/acxm/opportunities?arn=${encodeURIComponent(arn)}`).catch(() => []),

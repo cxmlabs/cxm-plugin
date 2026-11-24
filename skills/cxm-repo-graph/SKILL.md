@@ -19,20 +19,20 @@ resource's live identity, spend, owner, and blast radius across the whole estate
 
 ## The one join that unlocks it: `terraform_address` → ARN
 
-`resource_map` maps, per crawled repo, a Terraform resource **address** (the
+`asset_map` maps, per crawled repo, a Terraform resource **address** (the
 `aws_ecs_cluster.main` you see in the `.tf`) to the **live ARN** it currently is, plus account, region,
 resource type, and the declaring file. So from a resource in front of you:
 
-1. Look it up: filter `resource_map` on `repo` (the git remote `owner/repo`) and
+1. Look it up: filter `asset_map` on `repo` (the git remote `owner/repo`) and
    `terraform_address` → get its **ARN**, account, region.
 2. Chain the ARN outward (this is where the value is):
-   - **Cost** → `costs` filtered `resource_id = <ARN>` — what this exact resource costs, and its trend.
+   - **Cost** → `costs` filtered `asset_id = <ARN>` — what this exact resource costs, and its trend.
    - **Waste** → the opportunities for that ARN — is there a rightsizing/idle/commitment finding on *this* resource.
    - **Owner / provenance** → `repo_graph_owners` and the node's git authorship — who created and maintains it.
    - **Blast radius** → `repo_graph_nodes` (`in_degree`/`out_degree`/`centrality`) and `repo_graph_edges`
      (`references` / `deploys` / `uses_module`) — what depends on it before you touch it.
 
-The exact field names live in the cube — `cxm analytics schema resource_map` (and the
+The exact field names live in the cube — `cxm analytics schema asset_map` (and the
 other `repo_graph_*` cubes) lists them in one call; don't guess. Note the mapped `source_file` is a
 **basename**, so join on the **address**, not a path.
 

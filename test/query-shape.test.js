@@ -15,12 +15,12 @@ test('queryShape harvests datasets but never filter values', async () => {
     timeDimensions: [{ dimension: 'costs.billing_day', dateRange: 'last 30 days' }],
     order: { 'smells.estimated_monthly_cost': 'desc' },
     filters: [
-      { member: 'costs.resource_id', operator: 'equals', values: ['arn:aws:s3:::acme.prod.bucket'] },
-      { or: [{ member: 'resource_map.repo', operator: 'equals', values: ['acme/infra.git'] }] },
+      { member: 'costs.asset_id', operator: 'equals', values: ['arn:aws:s3:::acme.prod.bucket'] },
+      { or: [{ member: 'asset_map.repo', operator: 'equals', values: ['acme/infra.git'] }] },
     ],
     limit: 10,
   });
-  assert.deepEqual(shape.datasets, ['costs', 'opportunities', 'resource_map', 'smells']);
+  assert.deepEqual(shape.datasets, ['asset_map', 'costs', 'opportunities', 'smells']);
   assert.equal(shape.measures, 1);
   assert.equal(shape.dimensions, 1);
   assert.equal(shape.filters, 2);

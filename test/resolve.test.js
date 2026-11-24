@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 const { buildResolution } = await import('../src/commands/resolve.js');
 
-const A = 'resource_map';
+const A = 'asset_map';
 const C = 'costs';
 
 test('buildResolution merges arn-source-map + summed cost + opportunities', () => {

@@ -21,6 +21,7 @@ fixes, including security fixes.
   Claude Code and Codex, signs in, and on a re-run updates to the latest version.
 - Releases run in CI: a `patch|minor|major` dispatch opens the version-bump PR; merging it tags,
   releases on GitHub, and stages the npm version for a 2FA approval.
+- `cxm resolve` and the skills read the asset map and the asset cost by the published names, `asset_map` and `asset_id`.
 
 ## 0.1.0 — first public release
 
