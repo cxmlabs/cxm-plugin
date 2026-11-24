@@ -14,13 +14,32 @@ function authHeaders(config) {
   };
 }
 
+const RETRY_WAITS_MS = [1000, 2000, 4000, 8000, 16000];
+
+// One per read, so the limit covers every poll of that read. Never send a write through it.
+function gatewayRetry(deadline = Infinity) {
+  let failures = 0;
+  return async (url, init) => {
+    for (;;) {
+      const res = await fetch(url, init);
+      if (![502, 503, 504].includes(res.status)) return res;
+      const wait = RETRY_WAITS_MS[failures++];
+      if (wait === undefined || Date.now() + wait > deadline) {
+        throw new Error(`CXM did not answer: HTTP ${res.status} after ${failures} tries. The request changed nothing. Try again in a few minutes.`);
+      }
+      await new Promise((r) => setTimeout(r, wait));
+    }
+  };
+}
+
 // CubeJS /load: bearer token + Active-Organization header, exactly like the web app.
 // A cold query answers with {"error":"Continue wait"} and must be re-polled until ready.
 export async function cubeLoad(config, query, { maxWaitMs = 150000 } = {}) {
   const { cube } = deriveHosts(config);
   const deadline = Date.now() + maxWaitMs;
+  const read = gatewayRetry(deadline);
   for (;;) {
-    const res = await fetch(`${cube}/load`, {
+    const res = await read(`${cube}/load`, {
       method: 'POST',
       headers: {
         ...clientHeaders(),
@@ -56,7 +75,7 @@ export async function cubeLoad(config, query, { maxWaitMs = 150000 } = {}) {
 // schema-discovery tax that burns turns.
 export async function cubeMeta(config) {
   const { cube } = deriveHosts(config);
-  const res = await fetch(`${cube}/meta`, {
+  const res = await gatewayRetry()(`${cube}/meta`, {
     headers: {
       ...clientHeaders(),
       'Content-Type': 'application/json',
@@ -73,7 +92,7 @@ export async function cubeMeta(config) {
 // Current user + organizations from the tenant API — the env-stable connection check.
 export async function currentUser(config) {
   const { tenantApi } = deriveHosts(config);
-  const res = await fetch(`${tenantApi}/users/current`, { headers: authHeaders(config) });
+  const res = await gatewayRetry()(`${tenantApi}/users/current`, { headers: authHeaders(config) });
   if (res.status === 401 || res.status === 403) throw new Error(RELOGIN);
   if (!res.ok) throw new Error(`Tenant API /users/current failed: ${res.status}`);
   return res.json();
@@ -88,7 +107,8 @@ export async function latestPublishedVersion() {
 // Passthrough for the per-organization REST API (actions + reporting).
 export async function orgApi(config, method, path, body) {
   const { orgApi: base } = deriveHosts(config);
-  const res = await fetch(`${base}/${config.organizationId}${path}`, {
+  const send = method === 'GET' ? gatewayRetry() : fetch;
+  const res = await send(`${base}/${config.organizationId}${path}`, {
     method,
     headers: authHeaders(config),
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
