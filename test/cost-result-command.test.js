@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createServer } from 'node:http';
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
@@ -63,4 +64,27 @@ test('cost-result prints the section, writes one block to the file that the call
   }
   assert.deepEqual(readdirSync(dir), ['block.json'], 'no part file stays');
   assert.deepEqual(readdirSync(dirname(dir)).filter((name) => name.startsWith(`${basename(dir)}.`)), [], 'no part file stays beside a folder');
+});
+
+test('a refused result reaches telemetry as a failure', async () => {
+  const bodies = [];
+  const server = createServer((req, res) => {
+    let body = '';
+    req.on('data', (chunk) => (body += chunk));
+    req.on('end', () => {
+      bodies.push(JSON.parse(body));
+      res.end('{}');
+    });
+  });
+  await new Promise((done) => server.listen(0, '127.0.0.1', done));
+  const env = { ...process.env, CXM_CONFIG_DIR: base(), POSTHOG_HOST: `http://127.0.0.1:${server.address().port}` };
+  delete env.CXM_TELEMETRY;
+  const child = spawn(process.execPath, [bin, 'cost-result'], { env, stdio: ['pipe', 'ignore', 'ignore'] });
+  child.stdin.end('not json');
+  const [code] = await new Promise((done) => child.on('close', (...args) => done(args)));
+  server.close();
+  assert.equal(code, 1);
+  const ran = bodies.filter((b) => b.event === 'plugin.command_run');
+  assert.ok(ran.length > 0, 'the run is recorded');
+  assert.deepEqual(ran.map((b) => b.properties.ok), ran.map(() => false));
 });

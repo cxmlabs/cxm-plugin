@@ -171,7 +171,7 @@ if (!run) {
 const started = Date.now();
 Promise.resolve()
   .then(run)
-  .then(() => emit('plugin.command_run', { command: name, ok: true, duration_ms: Date.now() - started }))
+  .then(() => emit('plugin.command_run', { command: name, ok: !process.exitCode, duration_ms: Date.now() - started }))
   // On stderr, so a command's JSON output stays clean for the agent that reads it.
   .then(async () => {
     const notice = name === 'install' ? null : await updateNotice().catch(() => null);
