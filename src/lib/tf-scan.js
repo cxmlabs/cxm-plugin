@@ -37,7 +37,7 @@ export function iacNudge(instances, { source = 'Terraform', region = null } = {}
   const regionHint = region ? ` (region ${region})` : '';
   return (
     `CloudExMachina: this ${source} change adds/updates ${list}${regionHint}. Enrich it before apply — ` +
-    'price it with cxm-cost-of-change (on-demand + the org\'s effective Savings Plan / RI / EDP rate), ' +
+    'price it with "Price a resource" of cxm-cost-of-change (on-demand + the org\'s effective Savings Plan / RI / EDP rate), ' +
     'check what CXM already knows about similar resources with cxm-cloud-context, and consider a cheaper ' +
     'equivalent with cxm-architecture-review. ' +
     'If you are editing an EXISTING resource, use cxm-repo-graph to resolve it to its live ARN and surface ' +
