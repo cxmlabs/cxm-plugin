@@ -95,7 +95,7 @@ test('cost-result sends one event after its print, and telemetry never changes i
     return { ...out, ms: Date.now() - started, cost: events.filter((e) => e.event === 'plugin.cost_result') };
   };
   const source = { kind: 'dataset', ref: 'secret-ref' };
-  const input = JSON.stringify({ schema_version: 2, organization: 'secret-org', coverage: [], lines: [{ id: 'L1', key: 'aws/amazons3/storage', target: 'secret-target', item: 'secret-item', at: 'secret/path.js:1@0123abc', tag: 'direct', direction: 'add', directive: 'secret-directive', gap: 'other', factors: [{ low: 0, high: 400, unit: '$/mo', grade: 'B', source }] }] });
+  const input = JSON.stringify({ schema_version: 2, organization: 'secret-org', coverage: [], lines: [{ id: 'L1', key: 'aws/amazons3/storage', target: 'secret-target', item: 'secret-item', at: 'secret/path.js:1@0123abc', tag: 'direct', direction: 'add', directive: 'secret-directive', trigger: 'secret-trigger', gap: 'other', factors: [{ low: 0, high: 400, unit: '$/mo', grade: 'B', source }] }] });
   const silent = run(input);
   const on = { CXM_TELEMETRY: '1' };
   const good = await send(input, on);

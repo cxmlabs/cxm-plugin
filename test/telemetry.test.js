@@ -62,7 +62,7 @@ const secret = (name) => `zq${name}zq`;
 const factor = (low, high, unit, grade = 'B', more) => ({ low, high, unit, grade, source: { kind: grade === 'D' ? 'assumption' : 'dataset', ref: secret('ref') }, ...more });
 const costLine = (id, key, factors, more) => ({ id: secret(id), key, target: secret('target'), item: secret('item'), at: `src/${secret('path')}.js:8117@0123abcdef`, tag: 'direct', direction: 'add', factors, ...more });
 const PLANTED = 'AKIAZQZQZQZQZQZQZQZQ';
-const asks = (gap, text = secret('directive')) => ({ directive: `${text} ${PLANTED} ${'x '.repeat(200)}`, gap });
+const asks = (gap, text = secret('directive')) => ({ directive: `${text} ${PLANTED} ${'x '.repeat(200)}`, gap, trigger: secret('trigger') });
 const COST_INPUT = {
   schema_version: 2,
   organization: secret('organization'),
@@ -163,6 +163,10 @@ test('a fault run sends closed codes only, and the buckets, the open reasons and
   const event = costResultEvent(bad, { faults });
   assert.deepEqual(event, { ok: false, fault_count: faults.length, fault_codes: ['at', 'units', 'unknown_direction', 'unknown_field', 'unknown_tag'] });
   assert.ok(!/zq/.test(JSON.stringify(await sent(bad))));
+  const codes = (change) => { const given = structuredClone(COST_INPUT); change(given); return costResultEvent(given, computeCostResult(given)).fault_codes; };
+  assert.deepEqual(codes((g) => delete g.coverage[0].trigger), ['no_trigger']);
+  assert.deepEqual(codes((g) => { g.coverage[1].trigger = secret('trigger'); }), ['extra_trigger']);
+  assert.deepEqual(codes((g) => { g.lines[0].trigger = ' '; }), ['missing_text']);
   for (const [given, code] of [[undefined, 'not_an_object'], [{}, 'missing_text'], [{ schema_version: 2, organization: 'o', lines: 1, coverage: [] }, 'not_a_list']]) assert.ok(costResultEvent(given, computeCostResult(given)).fault_codes.includes(code), code);
   assert.deepEqual(costResultEvent(undefined, { faults: ['file: CXM_COST_RESULT_FILE cannot be written (ENOENT)', 'a text of tomorrow'] }).fault_codes, ['file_not_written', 'other']);
 
@@ -194,7 +198,7 @@ test('a fault run sends closed codes only, and the buckets, the open reasons and
   assert.deepEqual(keyOf('openai/model-api/tokens'), ['other', 'model-api', 'tokens']);
   assert.deepEqual(keyOf('aws/amazons3/storage/more'), ['other', 'other', 'other']);
   assert.equal(costResultEvent(one(1, 2), computeCostResult(one(1, 2))).headline, null, 'no estimated line');
-  assert.deepEqual(['added-runtime', 'indirect', 'flag-gated'].map((tag) => line(1, 2, { tag }).state), ['estimated', 'estimated', 'outside']);
+  assert.deepEqual(['added-runtime', 'indirect', 'flag-gated'].map((tag) => line(1, 2, { tag, trigger: secret('trigger') }).state), ['estimated', 'estimated', 'outside']);
   const many = { ...COST_INPUT, coverage: [], lines: Array.from({ length: 61 }, (_, i) => costLine(`m${i}`, 'aws/amazons3/storage', [factor(1, 1, '$/mo'), ...Array.from({ length: 30 }, () => factor(1, 1, '1'))])) };
   const big = costResultEvent(many, computeCostResult(many));
   assert.deepEqual([big.line_count, big.lines.length, big.lines[0].factors.length], [61, 60, 20]);

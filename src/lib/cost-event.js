@@ -16,14 +16,14 @@ const MAX_DIRECTIVE = 300;
 // A fault quotes the input, so only a code of this list leaves. The order matters: the first match wins.
 const FAULT_CODES = [
   ['not_an_object', /^it is not (a JSON|an) object/], ['schema_version', /^schema_version is not/], ['not_a_list', /^(lines|coverage) is not a list|^factors is not a list/],
-  ['missing_text', /^(organization|id|key|target|item|what|why|source\.ref|shared) is not a text/], ['at', /^at is not/], ['amount_given', /^it holds an amount/],
+  ['missing_text', /^(organization|id|key|target|item|what|why|source\.ref|shared|trigger) is not a text/], ['at', /^at is not/], ['amount_given', /^it holds an amount/],
   ['units', /^the units reduce/], ['unit_shape', /^unit "/], ['currency', /is a currency other than/], ['range_order', /^low is above high/], ['number', /^(low|high) is not a finite/],
   ['divide', /^divide is not|^it divides by/], ['no_source', /^it has no source/], ['rate_source', /^a \$ factor needs a source/], ['grade_source', /needs a source of kind assumption$|needs grade D$/],
   ['grade_range', /^grade D needs a low below/], ['unknown_tag', /^unknown tag/], ['unknown_direction', /^unknown direction/], ['unknown_grade', /^unknown grade/],
   ['unknown_source_kind', /^unknown source kind/], ['unknown_coverage_kind', /^unknown coverage kind/], ['unknown_constant', /^unknown constant/], ['constant_of', /^constant \w+ needs "of"/],
   ['unknown_gap', /^unknown gap/], ['unknown_field', /^unknown field/], ['repeated_id', /^another line has this id/], ['zero', /^its high is 0/], ['not_finite', /is not finite$/],
   ['shared_count', /^\d+ shared texts/], ['shared_values', /^shared "/], ['activity', /activity/], ['no_directive', /states no directive/], ['extra_directive', /takes (no|a) directive$/],
-  ['extra_gap', /takes (no|a) gap$/], ['file_not_written', /^CXM_COST_RESULT_FILE cannot be written/],
+  ['extra_gap', /takes (no|a) gap$/], ['no_trigger', /states no trigger/], ['extra_trigger', /takes a trigger$/], ['file_not_written', /^CXM_COST_RESULT_FILE cannot be written/],
 ];
 const PREFIX = /^(input|lines|file|line \d+|line "[^"]*"|coverage \d+): (factor \d+: )?(source: )?/;
 const faultCode = (fault) => {
