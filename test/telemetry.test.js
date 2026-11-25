@@ -174,6 +174,7 @@ test('a fault run sends closed codes only, and the buckets, the open reasons and
   assert.deepEqual(costResultEvent(pair, computeCostResult(pair)).lines.map((l) => [l.open_reason, l.ratio]), [['opposite_signs', 'gt_10'], ['opposite_signs', '2_5']]);
   assert.equal(line(1, 20, { tag: 'direct', ...asks('other') }).open_reason, 'ratio');
   assert.equal(costResultEvent(one(1, 2), computeCostResult(one(1, 2))).headline, null, 'no estimated line');
+  assert.deepEqual(['added-runtime', 'indirect', 'flag-gated'].map((tag) => line(1, 2, { tag }).state), ['estimated', 'estimated', 'outside']);
   const many = { ...COST_INPUT, coverage: [], lines: Array.from({ length: 61 }, (_, i) => costLine(`m${i}`, 'aws/amazons3/storage', [factor(1, 1, '$/mo'), ...Array.from({ length: 30 }, () => factor(1, 1, '1'))])) };
   const big = costResultEvent(many, computeCostResult(many));
   assert.deepEqual([big.line_count, big.lines.length, big.lines[0].factors.length], [61, 60, 20]);
