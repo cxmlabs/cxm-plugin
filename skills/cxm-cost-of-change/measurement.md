@@ -66,7 +66,7 @@ Use the first that applies.
 A unit is `<atom>*<atom>/<atom>*<atom>`, with `1` for an empty numerator. The units of a line reduce to `$/mo`, or to `$` for `one-off`. The constants, which hold no grade and no source:
 
 - `h_per_min`: minutes to hours (h/min).
-- `h_per_mo`: 730.5 hours per month (h/mo). Use it with an hourly price.
+- `h_per_mo`: 730.5 hours per month (h/mo).
 - `day_per_mo`: 30.4375 days per month (day/mo).
 - `week_per_mo`: weeks per month (week/mo).
 - `million`: needs `"of": "<atom>"`, and gives M<atom>/<atom>.
@@ -88,15 +88,14 @@ Rules:
 
 ## Billing dimensions
 
-A change can move more than one dimension of a service. Check each service of the list.
+Check each service of the list.
 
-1. **List.** Read two sources, names only, with no measure. First, the `costs.usage_type` values that the bill holds for the product code in the target accounts, in the window of step 4 of `SKILL.md`. Second, the catalog usage types of the service and region: the `search` call of "Pricing routes". The catalog shows a dimension that the bill does not show yet. Write no dimension from memory.
+1. **List.** Read two sources, names only, with no measure. First, the `costs.usage_type` values that the bill holds for the product code in the target accounts, in the window of step 4 of `SKILL.md`. Second, the catalog usage types of the service and region: the `search` call of "Pricing routes". Write no dimension from memory.
 2. **Mark.** Mark each dimension `moved` or `not moved`, with a one-line reason and `file:line`. A change moves a dimension directly (the call or the resource itself) or through what it produces (data that it writes is ingested, then stored, then read). A moved dimension that the list does not hold becomes a line. Its tag comes from "Tag" of `SKILL.md`. A dimension that is not moved makes no line.
 
 ## Pricing routes
 
-Read list prices and negotiated discounts through `cxm api`. Quote the path: it holds `?` and `&`.
-The routes return lookups only.
+Quote the path: it holds `?` and `&`.
 
 ```bash
 # A rate and a tiered cost. Add &region=<region> only to override the usage-type prefix.
@@ -139,10 +138,11 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
 
 - **Rate.** When a rule of the rate map gives a floor and a ceiling, they are the `low` and the `high` of the rate factor.
 - Else, when a line has a list rate and an effective rate (the rate that the account pays), the rate factor holds the lower one as `low` and the higher one as `high`.
-- **Tiers.** When the list-price route returns more than one tier, do not use the average net rate: it misprices the units in a higher tier. AWS applies the tiers to the total of the payer. Sum the usage of that usage type over every account of the same `costs.payer_account_id`.
+- **Tiers.** When the list-price route returns more than one tier, do not use the average net rate. AWS applies the tiers to the total of the payer. Sum the usage of that usage type over every account of the same `costs.payer_account_id`.
 - Call the route with that sum plus the change, then with that sum alone. For a `remove`, call it with that sum, then with that sum minus the change.
 - The marginal list rate is the difference of the two `total_cost_for_volume` values ÷ the change. The marginal effective rate is that rate × the ratio `costs.sum_current_net_unblended_cost` ÷ `costs.sum_list_cost` of that usage type over the same accounts and window. Put the ratio in `ref`.
 - **Raw bill.** A `costs` query that reads `sum_usage_amount` or `operation` scans the raw bill. Filter it on `costs.account_id`, `costs.product_code`, `costs.usage_type` and the dates, use the `usage_charges_only` segment, and pass `--timeout 300`. Measures come back as strings.
+  `cxm analytics query '{"measures":["costs.sum_usage_amount","costs.sum_current_net_unblended_cost"],"dimensions":["costs.account_id","costs.usage_type","costs.billing_currency"],"segments":["costs.usage_charges_only"],"filters":[{"member":"costs.account_id","operator":"equals","values":["<account>"]},{"member":"costs.product_code","operator":"equals","values":["<product code>"]},{"member":"costs.usage_type","operator":"equals","values":["<usage type>"]}],"timeDimensions":[{"dimension":"costs.billing_day","dateRange":["<start>","<end>"]}]}' --timeout 300`
 - **Last bill day.** `cur_reach.latest_day` is a measure, not a dimension. Group it by `cur_reach.cloud_provider_id`.
 - **Payer.** A call with a role in another account bills that account. A call with the credentials of the platform bills the platform account. A change of payer is a `remove` on the old payer and an `add` on the new payer.
 - When the session does not hold the bill of the payer, each input that needs that bill is `unmeasured`.

@@ -6,7 +6,7 @@ description: Use when the user is writing or reviewing Terraform / IaC, running 
 # Cost of a change (CloudExMachina)
 
 **Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
-It holds how to query CXM and how to answer, for every CXM skill. Step 6 replaces its answer style and its visuals for the result of a code change.
+Step 6 replaces its answer style and its visuals for the result of a code change.
 
 - For a resource with no diff, follow "Price a resource".
 - For a diff, read `measurement.md` of this directory, then follow "Price a code change". A resource in the diff is a line of that method. Its rate comes from "Price a resource".
@@ -26,7 +26,7 @@ It holds how to query CXM and how to answer, for every CXM skill. Step 6 replace
    - **If committed:** the 1-year and 3-year rates, which the user pays if they reserve that family.
    - **Effective today:** read the discount of the usage account that will run the resource with the discount-rate route ("Pricing routes" of `measurement.md`).
      The net rate is `on_demand × (1 − rows[0].effective_discount_rate_pct ÷ 100)`. Label it and warn as the discount rules of "Rate map" say. With no row, or a null rate, skip this line.
-   - **Existing coverage:** the current effective savings rate of this commitment type, from `commitment_this_month_kpi` (`cxm-commitments` skill). It shows how much similar usage is already discounted, so if spare commitment can cover the resource.
+   - **Existing coverage:** the current effective savings rate of this commitment type, from `commitment_this_month_kpi` (`cxm-commitments` skill). It shows if spare commitment can cover the resource.
    Name which number is a list price, which is a catalog committed rate, and which is the effective rate of the organization.
 4. If the family is a previous generation (m5, r5, c5), say that a current one (m7g, r7g) is usually cheaper, and offer to price it.
    For a design critique use `cxm-architecture-review`.
@@ -141,9 +141,9 @@ cxm cost-result <<'EOF'
 {"schema_version": 2, "organization": "example-org", "lines": [
   {"id": "L1", "key": "aws/amazons3/write-requests", "target": "job-a, account-a, region-a", "item": "put of each report", "at": "src/example/report.py:41@0123abc", "tag": "direct", "direction": "add", "directive": "In src/example/report.py, count each put in the metric report_puts (requests per run). Check: the daily count appears in the metrics of job-a.", "gap": "assumed_ratio", "factors": [
     {"low": 6, "high": 6, "unit": "run/day", "grade": "C", "source": {"kind": "code", "ref": "src/example/schedule.py:9@0123abc"}}, {"constant": "day_per_mo"},
-    {"low": 100, "high": 300, "unit": "request/run", "grade": "D", "source": {"kind": "assumption", "ref": "one report for each item, 100 to 300 items"}}, {"constant": "thousand", "of": "request"},
-    {"low": 0.01, "high": 0.02, "unit": "$/krequest", "grade": "B", "source": {"kind": "dataset", "ref": "costs{net cost, usage; usage type; dates} as low, list-price route as high"}}]},
-  {"id": "L2", "key": "aws/amazoncloudwatch/storage", "target": "job-a, account-a, region-a", "item": "archive of the removed debug log", "at": "src/example/report.py:57@0123abc", "tag": "direct", "direction": "remove", "factors": [
+    {"low": 100, "high": 300, "unit": "request/run", "grade": "D", "source": {"kind": "assumption", "ref": "100 to 300 items"}}, {"constant": "thousand", "of": "request"},
+    {"low": 0.01, "high": 0.02, "unit": "$/krequest", "grade": "B", "source": {"kind": "dataset", "ref": "costs{net cost, usage} as low, list-price route as high"}}]},
+  {"id": "L2", "key": "aws/amazoncloudwatch/storage", "target": "job-a, account-a, region-a", "item": "removed debug log", "at": "src/example/report.py:57@0123abc", "tag": "direct", "direction": "remove", "factors": [
     {"low": 0.1, "high": 0.1, "unit": "GB/day", "grade": "B", "source": {"kind": "dataset", "ref": "costs{usage; asset; dates}, the only writer"}},
     {"low": 14, "high": 14, "unit": "day", "grade": "C", "source": {"kind": "code", "ref": "src/example/logs.tf:3@0123abc"}},
     {"low": 0.05, "high": 0.05, "unit": "$/GB*mo", "grade": "A", "source": {"kind": "route", "ref": "list-price?service_code=<code>&usage_type=<usage type>"}}]}],
