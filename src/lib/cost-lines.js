@@ -1,7 +1,8 @@
 // Computes the amounts, totals and grades of a cost-of-change result from its tagged lines. It imports nothing.
 
 const TAGS = ['direct', 'commitment', 'flag-gated', 'added-runtime', 'llm', 'indirect', 'one-off'];
-const HEADLINE = ['direct', 'commitment'];
+const HEADLINE = ['direct', 'commitment', 'indirect'];
+const MAX_SHARED = 4;
 const DIRECTIONS = ['add', 'remove'];
 const GRADES = ['A', 'B', 'C', 'D'];
 const KINDS = ['code', 'dataset', 'route', 'tool', 'public', 'assumption'];
@@ -80,27 +81,46 @@ function readFactor(factor, say) {
     if (takesOf && !(typeof factor.of === 'string' && ATOM.test(factor.of))) return say(`constant ${factor.constant} needs "of", one atom`) ?? {};
     return { low: known.value, high: known.value, atoms: readUnit(known.unit.replaceAll('@', () => factor.of), say) };
   }
-  const { low, high, unit, grade, source, divide = false } = factor;
-  refuseOthers(factor, ['low', 'high', 'unit', 'grade', 'source', 'divide'], say);
+  const { low, high, unit, grade, source, divide = false, activity = false, shared } = factor;
+  refuseOthers(factor, ['low', 'high', 'unit', 'grade', 'source', 'divide', 'activity', 'shared'], say);
   if (!isCount(low)) say('low is not a finite number of 0 or more');
   if (!isCount(high)) say('high is not a finite number of 0 or more');
   if (isCount(low) && isCount(high) && low > high) say('low is above high');
   if (typeof divide !== 'boolean') say('divide is not true or false');
   if (divide === true && low === 0) say('it divides by a low of 0');
+  if (typeof activity !== 'boolean') say('activity is not true or false');
+  if (Object.hasOwn(factor, 'shared') && !isText(shared)) say('shared is not a text');
   needOne(grade, GRADES, 'grade', say);
   if (grade === 'D' && low === high) say('grade D needs a low below its high');
   needSource(source, say);
   const atoms = readUnit(unit, say);
+  if (activity === true && atoms?.some(([atom]) => atom === '$')) say('a $ factor takes no activity');
   if (KINDS.includes(source?.kind)) {
     const assumed = source.kind === 'assumption';
     if (atoms?.some(([atom]) => atom === '$') && !RATE_KINDS.includes(source.kind)) say('a $ factor needs a source of kind dataset, route or public');
     else if (grade === 'D' && !assumed) say('grade D needs a source of kind assumption');
     else if (GRADES.includes(grade) && grade !== 'D' && assumed) say('a source of kind assumption needs grade D');
   }
-  return { low, high, grade, divide, atoms };
+  return { ...band(factor), unit, grade, divide, atoms, ...(isText(shared) ? { shared: clean(shared) } : {}) };
+}
+// A count that follows people or traffic moves between half of its low and twice its high.
+const band = ({ low, high, activity }) => (activity === true ? { low: low / 2, high: high * 2 } : { low, high });
+
+// The range of a line. `ends` holds the end of each shared factor that is fixed.
+function rangeOf(factors, direction, ends = new Map()) {
+  let low = 1;
+  let high = 1;
+  for (const f of factors) {
+    const end = ends.get(f.shared);
+    const [from, to] = end ? [f[end], f[end]] : [f.low, f.high];
+    low = f.divide ? low / to : low * from;
+    high = f.divide ? high / from : high * to;
+  }
+  // `0 - x` and `x + 0` never give -0, which JSON does not keep.
+  return direction === 'remove' ? { low: 0 - high, high: 0 - low } : { low: low + 0, high };
 }
 
-// Returns the computed line, or nothing when it has a fault.
+// Returns the computed line and its factors, or nothing when it has a fault.
 function computeLine(line, say) {
   let sound = true;
   const refuse = (reason) => {
@@ -126,23 +146,43 @@ function computeLine(line, say) {
   }
   if (!sound) return undefined;
 
-  let low = 1;
-  let high = 1;
-  for (const f of factors) {
-    low = f.divide ? low / f.high : low * f.low;
-    high = f.divide ? high / f.low : high * f.high;
-  }
-  if (!Number.isFinite(high)) return refuse('the amount is not finite');
-  if (high === 0) return refuse('its high is 0. Put it in coverage');
-  // `0 - x` and `x + 0` never give -0, which JSON does not keep.
-  const range = line.direction === 'remove' ? { low: 0 - high, high: 0 - low } : { low: low + 0, high };
-  return { id: line.id, ...range, unit, grade: lowest(factors.flatMap((f) => f.grade ?? [])) };
+  if (line.factors.filter((f) => f.activity === true).length > 1) return refuse('more than one activity factor');
+  const range = rangeOf(factors, line.direction);
+  if (!Number.isFinite(range.low) || !Number.isFinite(range.high)) return refuse('the amount is not finite');
+  if (weight(range) === 0) return refuse('its high is 0. Put it in coverage');
+  return { factors, computed: { id: line.id, ...range, unit, grade: lowest(factors.flatMap((f) => f.grade ?? [])) } };
 }
 
 const lowest = (grades) => grades.reduce((a, b) => (a > b ? a : b), '') || null;
 const total = (values) => values.reduce((a, b) => a + b, 0);
 const sumRange = (ranges) => ({ low: total(ranges.map((r) => r.low)), high: total(ranges.map((r) => r.high)) });
 const weight = (line) => Math.max(Math.abs(line.low), Math.abs(line.high));
+
+// A shared text stands for one unknown, so each line gives it the same values.
+function checkShared(lines, parts, on) {
+  const first = new Map();
+  parts.forEach(({ factors }, i) => factors.forEach((f, n) => {
+    if (!f.shared) return;
+    const same = first.get(f.shared) ?? first.set(f.shared, f).get(f.shared);
+    if (['low', 'high', 'unit', 'grade'].some((key) => same[key] !== f[key])) on(`line ${quote(lines[i].id)}`)(`factor ${n + 1}: shared ${quote(f.shared)} needs the same low, high, unit and grade in each line`);
+  }));
+  if (first.size > MAX_SHARED) on('input')(`${first.size} shared texts. At most ${MAX_SHARED}`);
+}
+// The least and the greatest sum over the ends of the shared factors.
+function headlineRange(lines, parts) {
+  const texts = [...new Set(parts.flatMap(({ factors }) => factors.flatMap((f) => f.shared ?? [])))];
+  const corners = texts.reduce((list, text) => list.flatMap((ends) => ['low', 'high'].map((end) => new Map([...ends, [text, end]]))), [new Map()]);
+  const sums = corners.map((ends) => sumRange(parts.map(({ factors }, i) => rangeOf(factors, lines[i].direction, ends))));
+  return { low: Math.min(...sums.map((r) => r.low)), high: Math.max(...sums.map((r) => r.high)) };
+}
+// `weights` sets the size of a float residue, which counts as 0 and as equal.
+function statusOf({ low, high }, weights) {
+  const [from, to] = [low, high].map((v) => (Math.abs(v) <= weights * 1e-9 ? 0 : v));
+  const [smaller, larger] = [Math.abs(from), Math.abs(to)].sort((a, b) => a - b);
+  if (larger < 1 - 1e-9) return 'estimate';
+  const wide = from < 0 && to > 0 ? smaller >= 1 - 1e-9 : larger > 10 * smaller * (1 + 1e-9);
+  return wide ? 'cannot_estimate' : 'estimate';
+}
 
 // Cents from $1. Below it, three digits down to a millionth of a dollar, so a float residue prints as zero.
 function dollars(v) {
@@ -168,7 +208,7 @@ function groups(values, prefix) {
 // The factors as the input gives them, with no ref.
 function formula(factors) {
   const value = ({ low, high }) => (low === high ? `${low}` : `${low}–${high}`);
-  const text = (f) => (f.constant ? `${f.constant}${f.of ? ` of ${f.of}` : ''}` : `${value(f)}${f.unit === '1' ? '' : ` ${f.unit}`} [${f.grade}, ${f.source.kind}]`);
+  const text = (f) => (f.constant ? `${f.constant}${f.of ? ` of ${f.of}` : ''}` : `${value(f)}${f.unit === '1' ? '' : ` ${f.unit}`} [${[f.grade, f.source.kind, ...(f.activity ? [`activity: ${value(band(f))}`] : []), ...(f.shared ? [`shared: ${f.shared}`] : [])].join(', ')}]`);
   return factors.map((f, i) => `${f.divide ? `${i ? '' : '1 '}÷ ` : i ? '× ' : ''}${text(f)}`).join(' ');
 }
 function lineRows(lines, computed, shared) {
@@ -181,6 +221,12 @@ function coverageRows(entries) {
   return [...groups(entries, (c) => `${c.kind} ${reason(c)}`).values()].map((held) => `- ${held[0][0].kind}: ${held.map(([c]) => code(c.what)).join(', ')}. ${reason(held[0][0])}`);
 }
 
+// The two headline lines with the largest width.
+function widest(lines, computed) {
+  const width = new Map(lines.map((l, i) => [l, computed[i].high - computed[i].low]));
+  return lines.filter((l) => HEADLINE.includes(l.tag)).sort((a, b) => width.get(b) - width.get(a)).slice(0, 2);
+}
+
 function sectionOf(input, result) {
   const { lines, totals, headline } = result;
   const uncovered = `Uncovered targets: ${headline.uncovered_targets}.`;
@@ -189,8 +235,14 @@ function sectionOf(input, result) {
   else {
     const held = TAGS.filter((tag) => input.lines.some((l) => l.tag === tag));
     const shares = GRADES.filter((g) => headline.shares[g] > 0).map((g) => `${g} ${(headline.shares[g] * 100).toFixed(1)} %`);
-    out.push(`**${amount(headline)}**, grade ${headline.grade ?? 'none'}. ${uncovered}`, '');
+    const cannot = headline.status === 'cannot_estimate';
+    const said = cannot ? `Cannot estimate: between ${dollars(headline.low)} and ${dollars(headline.high)} per month` : amount(headline);
+    out.push(`**${said}**, grade ${headline.grade ?? 'none'}. ${uncovered}`, '');
+    if (cannot) out.push(`The widest lines: ${widest(input.lines, lines).map((l) => `${code(l.id)} (${code(l.item)})`).join(', ')}.`, '');
     if (held.includes('commitment')) out.push(`Commitment fee inside the headline: ${amount(totals.commitment)}.`, '');
+    if (held.includes('indirect')) out.push(`Indirect cost inside the headline: ${amount(totals.indirect)}.`, '');
+    const texts = [...new Set(input.lines.flatMap((l) => l.factors.flatMap((f) => (f.shared ? clean(f.shared) : []))))];
+    if (texts.length) out.push(`The headline takes one end of each shared factor, so it can be narrower than the sum of the totals: ${texts.map(code).join(', ')}.`, '');
     if (shares.length) out.push(`Share of the weight by grade: ${shares.join(', ')}.`, '');
     out.push('Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`), '');
     const commits = new Set(input.lines.map((l) => l.at.slice(l.at.lastIndexOf('@') + 1)));
@@ -214,7 +266,7 @@ export function computeCostResult(input) {
   if (faults.length) return { faults };
 
   const ids = new Set();
-  const lines = [...input.lines].map((line, i) => {
+  const parts = [...input.lines].map((line, i) => {
     const named = isText(line?.id);
     const refuse = on(named ? `line ${quote(line.id)}` : `line ${i + 1}`);
     if (!isObject(line)) return refuse('it is not an object');
@@ -231,21 +283,25 @@ export function computeCostResult(input) {
       needSource(entry.source, refuse);
     } else refuse('it is not an object');
   }
+  if (faults.length === 0) checkShared(input.lines, parts, on);
   if (faults.length) return { faults };
+  const lines = parts.map((part) => part.computed);
   // Each total is at most this sum, so one check covers them all.
   if (!Number.isFinite(total(lines.map(weight)))) return { faults: ['lines: the sum of the amounts is not finite'] };
 
-  const tagged = (tags) => lines.filter((_, i) => tags.includes(input.lines[i].tag));
+  const tagged = (tags, values = lines) => values.filter((_, i) => tags.includes(input.lines[i].tag));
   const totals = Object.fromEntries(TAGS.map((tag) => [tag, { ...sumRange(tagged([tag])), unit: tag === 'one-off' ? '$' : '$/mo' }]));
   const main = tagged(HEADLINE);
   const weights = total(main.map(weight));
   const share = (line) => weight(line) / weights;
+  const range = headlineRange(tagged(HEADLINE, input.lines), tagged(HEADLINE, parts));
   const result = {
     lines,
     totals,
     headline: {
-      ...sumRange(HEADLINE.map((tag) => totals[tag])),
+      ...range,
       unit: '$/mo',
+      status: statusOf(range, weights),
       // The margin keeps a float residue from hiding a line that holds exactly 10 percent.
       grade: lowest(main.filter((line) => share(line) >= 0.1 - 1e-9).map((line) => line.grade)),
       shares: Object.fromEntries(GRADES.map((g) => [g, total(main.filter((line) => line.grade === g).map(share))])),
