@@ -1,4 +1,4 @@
-# Measurement for the cost-of-change skill
+# Measurement
 
 ## Keys
 
@@ -42,11 +42,11 @@
 | D | An assumption, with its basis, a low and a high. | `assumption` |
 
 - The cell of the source map and the mark of the rate map give the grade. The ceiling rule of step 4 of `SKILL.md` comes first.
-- A rate from the bill is B: its usage type has one rate for each caller.
+- A rate from the bill is B.
 - A quantity that is only a ceiling has 0 as its `low`, unless another source gives the low.
 - A factor that uses two sources takes the lower grade and the kind of that source. Its `ref` holds both lookups.
 - A value that you measured on one target and use for another drops one grade. Put "analog of <target>" in `ref`. Never do it for a target that has its own bill rows for that usage type. An analog of a C value is an assumption: use D.
-- `ref` holds the lookup, so that a reader can run it again: `file:line@sha`, `dataset{measures; filters; dates}`, `route?params`, `tool(params)` or `public:<url>@<date>`. Add the formula when the value has one.
+- `ref` holds the lookup: `file:line@sha`, `dataset{measures; filters; dates}`, `route?params`, `tool(params)` or `public:<url>@<date>`. Add the formula when the value has one.
 
 ## Gaps
 
@@ -110,8 +110,7 @@ cxm api GET "/pricing/aws/discount-rate?account_id=<usage account>&product_code=
   also `applicable_tier` and `total_cost_for_volume`. Without a `region`, the region comes from the
   usage-type prefix (`EUW3-` → eu-west-3; no known prefix → us-east-1). It returns USD only.
 - Pass the usage account that the call bills (`costs.account_id`) to the discount-rate route. Never
-  pass `costs.payer_account_id` in place of a different `costs.account_id`. When the two are
-  equal, pass that account. The route returns `rows` and
+  pass `costs.payer_account_id` in place of a different `costs.account_id`. The route returns `rows` and
   `row_count`, with at most one row. The row holds `effective_discount_rate_pct`, a percent, null
   when the list price is 0. With no row it also returns `product_code_verified` and
   `suggested_action`.
@@ -122,8 +121,7 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
   - `no_price_found`: the filter did not match. It is never a zero price. Search the catalog.
   - `no_usage_type_found`: search once with other words. Then the line is `unmeasured (no_usage_type_found: no usage type matched the search)`.
   - `ambiguous_usage_type`: take the rate from the `costs` row of that usage type. Else the
-    line is `unmeasured (ambiguous_usage_type: several prices share this usage type)`. The route takes no parameter that narrows it,
-    and `cxm api` cuts the candidate list.
+    line is `unmeasured (ambiguous_usage_type: several prices share this usage type)`.
   - `too_many_products`: use `cxm price --instance-type` for an instance. Else the line is `unmeasured`.
   - `no_aws_datasource`: the organization holds no AWS bill. Each input that needs it is
     `unmeasured`. Do not call the route again.
