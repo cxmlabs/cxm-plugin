@@ -297,7 +297,7 @@ test('the headline says that it cannot estimate on each side of the limits', () 
     [1, 10, 'estimate'], [1, 10.01, 'cannot_estimate'], [0.3, 3, 'estimate'], [-10, -1, 'estimate'], [-10.01, -1, 'cannot_estimate'],
     [0.05, 0.99, 'estimate'], [0.05, 1, 'cannot_estimate'],
     [0, 0.99, 'estimate'], [0, 1, 'cannot_estimate'], [-0.99, 0, 'estimate'], [-1, 0, 'cannot_estimate'],
-    [-1, 1, 'cannot_estimate'], [-0.99, 5, 'estimate'], [-5, 0.99, 'estimate'], [-5, 1, 'cannot_estimate'], [-1, 100, 'cannot_estimate'],
+    [-1, 1, 'cannot_estimate'], [-0.99, 100, 'cannot_estimate'], [-5, 0.01, 'cannot_estimate'], [-0.01, 1, 'cannot_estimate'], [-0.99, 0.99, 'estimate'],
     [5, 5, 'estimate'],
   ]) {
     const { result, section } = compute(ends(low, high));
@@ -307,7 +307,7 @@ test('the headline says that it cannot estimate on each side of the limits', () 
   }
   assert.equal(compute([]).result.headline.status, 'estimate');
   assert.equal(compute([dollars('a', 0, 50, 'B', { tag: 'llm' })]).result.headline.status, 'estimate', 'a line outside the headline');
-  // 0.3 - 0.1 - 0.2 leaves -2.8e-17. It is 0, so the range is one end 0 and not a range that crosses 0.
+  // 0.3 - 0.1 - 0.2 leaves -2.8e-17, and the status is the one of an end of 0.
   const residue = compute([dollars('a', 0.3, 5), dollars('b', 0.1, 0.1, 'B', { direction: 'remove' }), dollars('c', 0.2, 0.2, 'B', { direction: 'remove' })]).result.headline;
   assert.ok(residue.low < 0 && residue.low > -1e-9);
   assert.equal(residue.status, 'cannot_estimate');
