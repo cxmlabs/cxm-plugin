@@ -7,6 +7,7 @@ fixes, including security fixes.
 ## Unreleased
 
 - `cxm cost-result`: computes the amounts, totals and grades of a cost-of-change result from its tagged lines.
+  It prints what moves and, apart, what might move after the merge.
   `CXM_COST_RESULT_FILE=<file>` also writes its JSON block to that file.
 - `cxm-cost-of-change`: lists the lines of a code change first, then gives one range in dollars per month, with each amount from `cxm cost-result`.
 - Telemetry: each `cxm cost-result` run sends one event with the shape of the result, and no content unless you set `CXM_TELEMETRY=full`. `docs/privacy.md` lists its fields.

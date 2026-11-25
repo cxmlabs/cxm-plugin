@@ -9,6 +9,7 @@ const KINDS = ['code', 'dataset', 'route', 'tool', 'public', 'assumption'];
 const RATE_KINDS = ['dataset', 'route', 'public'];
 const COVERAGE = ['uncovered_target', 'unmeasured', 'not_billed', 'doubt'];
 const DIRECTIVE = 'Tell a coding agent what to expose, where, and how to check it';
+const TRIGGER = 'Say what would make it move after the merge';
 const GAPS = ['no_dataset', 'no_asset_row', 'no_caller_split', 'no_history', 'no_access', 'assumed_ratio', 'future_volume', 'other'];
 // `@` is the atom that `of` names.
 const CONSTANTS = new Map([
@@ -134,7 +135,8 @@ function computeLine(line, say) {
   needOne(line.tag, TAGS, 'tag', refuse);
   needOne(line.direction, DIRECTIONS, 'direction', refuse);
   if (Object.hasOwn(line, 'amount')) refuse('it holds an amount. Delete it: the amount is the product of the factors');
-  refuseOthers(line, ['id', 'key', 'target', 'item', 'at', 'tag', 'direction', 'factors', 'amount', 'directive', 'gap'], refuse);
+  refuseOthers(line, ['id', 'key', 'target', 'item', 'at', 'tag', 'direction', 'factors', 'amount', 'directive', 'gap', 'trigger'], refuse);
+  if (Object.hasOwn(line, 'trigger') && !isText(line.trigger)) refuse('trigger is not a text');
   if (!Array.isArray(line.factors) || line.factors.length === 0) return refuse('factors is not a list with a factor');
 
   const factors = [...line.factors].map((f, i) => readFactor(f, (reason) => refuse(`factor ${i + 1}: ${reason}`)));
@@ -212,6 +214,8 @@ function checkDirectives(parts, open, on) {
     const { line, computed } = part;
     const say = on(`line ${quote(line.id)}`);
     const low = open.includes(part) ? 'its group is open' : HEADLINE.includes(line.tag) && computed.grade === 'D' && reachesOne(computed) ? 'its grade is D' : '';
+    const waits = open.includes(part) ? 'its group is open' : line.tag === 'flag-gated' ? 'it is flag-gated' : '';
+    if (waits && !Object.hasOwn(line, 'trigger')) say(`${waits}, and it states no trigger. ${TRIGGER}`);
     if (low && !isText(line.directive)) say(`${low}, and it states no directive. ${DIRECTIVE}`);
     if (low) needOne(line.gap, GAPS, 'gap', say);
     if (!low && Object.hasOwn(line, 'directive')) say('it is not open and not a headline line of grade D at $1/mo or more, so it takes no directive');
@@ -254,28 +258,49 @@ function coverageRows(entries) {
   return ['', 'Coverage:', '', ...[...groups(entries, (c) => `${c.kind} ${reason(c)}`).values()].map((held) => `- ${held[0][0].kind}: ${held.map(([c]) => code(c.what)).join(', ')}. ${reason(held[0][0])}`)];
 }
 
-// The headline lines from the largest, then the unmeasured entries, then the other lines.
-function tableOf(input, result, commit) {
+const COLUMN = { commitment: 'direct (commitment)', 'added-runtime': 'direct (longer or shorter run)' };
+// What moves, the headline lines first and each part from the largest line, and what might move: the open lines, the flag-gated lines, the unmeasured entries and the small lines.
+function splitRows(input, result) {
   const lines = input.lines.map((line, i) => ({ line, computed: result.lines[i] }));
-  const inside = ({ line }) => HEADLINE.includes(line.tag);
-  const lineRow = ({ line, computed }) => {
-    const at = commit ? line.at.slice(0, -commit.length - 1) : line.at;
-    const open = result.open.lines.includes(line.id) ? 'not estimated yet: ' : '';
-    return {
-      cells: [`${inside({ line }) ? '' : `${line.tag}: `}${[line.item, line.key, line.target, at].map(cell).join(', ')}`, `${open}${span(computed)}${computed.unit === '$' ? ' once' : ''}`, computed.grade, cell(formula(line.factors))],
-      directive: line.directive,
-      gap: line.gap,
-    };
+  const open = lines.filter(({ line }) => result.open.lines.includes(line.id));
+  const flagged = lines.filter(({ line }) => line.tag === 'flag-gated');
+  const priced = lines.filter((l) => !open.includes(l) && !flagged.includes(l));
+  const sum = total(priced.map(({ computed }) => weight(computed)));
+  const bySize = (list) => [...list].sort((a, b) => weight(b.computed) - weight(a.computed));
+  // A line under $1/mo and under 10 percent of the priced lines is small, unless such lines are not small together. A line under a cent always is.
+  const little = priced.filter(({ computed }) => !reachesOne(computed) && weight(computed) < 0.1 * sum);
+  const together = total(little.map(({ computed }) => weight(computed)));
+  const small = priced.filter((l) => weight(l.computed) < 0.01 || (together < 0.1 * sum && little.includes(l)));
+  const unmeasured = input.coverage.filter((c) => c.kind === 'unmeasured');
+  const [inside, outside] = [true, false].map((want) => bySize(priced.filter((l) => !small.includes(l) && HEADLINE.includes(l.line.tag) === want)));
+  return { moves: [...inside, ...outside], open: bySize(open), flagged: bySize(flagged), unmeasured, small: bySize(small) };
+}
+// Two tables with one numbering. A caller can fold the second one under its heading.
+function tablesOf(rows, commit) {
+  const lineRow = ({ line, computed }, prefix = '') => ({
+    what: [line.item, line.key, line.target, commit ? line.at.slice(0, -commit.length - 1) : line.at].map(cell).join(', '),
+    kind: COLUMN[line.tag] ?? line.tag,
+    amount: `${prefix}${span(computed)}${computed.unit === '$' ? ' once' : ''}`,
+    grade: computed.grade,
+    how: cell(formula(line.factors)),
+    ...line,
+  });
+  const entryRow = (c) => ({ what: cell(c.what), kind: '-', amount: 'not measured', grade: '-', how: cell(c.why), trigger: c.trigger, directive: c.directive, gap: c.gap });
+  const moves = rows.moves.map((l) => lineRow(l));
+  const might = [...rows.open.map((l) => lineRow(l, 'not estimated yet: ')), ...rows.flagged.map((l) => lineRow(l, 'if on: ')), ...rows.unmeasured.map(entryRow), ...rows.small.map((l) => lineRow(l))];
+  const all = [...moves, ...might];
+  // A text that an earlier row printed is named by its row. Only the second table prints a trigger.
+  const said = (key, shown = all) => all.map((row) => (row[key] === undefined || !shown.includes(row) ? '-' : cell(row[key]))).map((text, i, list) => (text !== '-' && list.indexOf(text) < i ? `as row ${list.indexOf(text) + 1}` : text));
+  const [directives, triggers] = [said('directive'), said('trigger', might)];
+  const print = (list, from, withTrigger) => {
+    const head = ['#', 'What', 'Direct / indirect', ...(withTrigger ? ['What would trigger it'] : []), 'Pre-merge $/month', 'Post-merge $/month', 'Grade', 'How it is computed', 'Directive for a coding agent'];
+    const body = list.map((row, i) => [from + i + 1, row.what, row.kind, ...(withTrigger ? [triggers[from + i]] : []), row.amount, '-', row.grade, row.how, `${directives[from + i]}${row.gap ? `, gap: ${row.gap}` : ''}`]);
+    return [head, head.map(() => '---'), ...body].map((cells) => `| ${cells.join(' | ')} |`);
   };
-  const rows = [
-    ...lines.filter(inside).sort((a, b) => weight(b.computed) - weight(a.computed)).map(lineRow),
-    ...input.coverage.filter((c) => c.kind === 'unmeasured').map((c) => ({ cells: [cell(c.what), 'not measured', '-', cell(c.why)], directive: c.directive, gap: c.gap })),
-    ...lines.filter((l) => !inside(l)).map(lineRow),
+  return [
+    ...(moves.length ? ['', '#### What moves', '', ...print(moves, 0, false)] : []),
+    ...(might.length ? ['', `#### Might move after merge (${might.length} ${might.length === 1 ? 'row' : 'rows'})`, '', ...print(might, moves.length, true)] : []),
   ];
-  if (rows.length === 0) return [];
-  const asked = rows.map((row) => (row.directive === undefined ? '-' : cell(row.directive)));
-  const first = (text, i) => (text !== '-' && asked.indexOf(text) < i ? `as row ${asked.indexOf(text) + 1}` : text);
-  return ['', '| # | What | $/month | Grade | How it is computed | Directive for a coding agent |', '|---|---|---|---|---|---|', ...rows.map((row, i) => `| ${[i + 1, ...row.cells, `${first(asked[i], i)}${row.gap ? `, gap: ${row.gap}` : ''}`].join(' | ')} |`)];
 }
 
 function sectionOf(input, result, parts) {
@@ -289,7 +314,16 @@ function sectionOf(input, result, parts) {
   else if (asked || input.coverage.some((c) => c.kind === 'unmeasured' || c.kind === 'uncovered_target')) out.push(`No line can be estimated yet. ${asked ? share : ''}${uncovered}`);
   else if (lines.length) out.push(`No headline line. The other lines are in the totals. ${uncovered}`);
   else out.push(`No billed line moves. ${uncovered}`);
-  if (open.lines.length) out.push('', `Not estimated yet: between ${dollars(open.low)} and ${dollars(open.high)} per month, ${open.lines.length} ${open.lines.length === 1 ? 'line' : 'lines'}.`);
+  const rows = splitRows(input, result);
+  const many = (list, one, more = `${one}s`) => `${list.length} ${list.length === 1 ? one : more}`;
+  // The second table can be folded, so each part of it stands here too.
+  const outside = [
+    ...(open.lines.length ? [`Not estimated yet: between ${dollars(open.low)} and ${dollars(open.high)} per month, ${many(open.lines, 'line')}.`] : []),
+    ...(rows.flagged.length ? [`Behind a flag: ${amount(totals['flag-gated'])} if it is on, ${many(rows.flagged, 'line')}.`] : []),
+    ...(rows.unmeasured.length ? [`Not measured: ${many(rows.unmeasured, 'entry', 'entries')}.`] : []),
+    ...(rows.small.length ? [`Too small to show a change: ${many(rows.small, 'line')}.`] : []),
+  ];
+  if (outside.length) out.push('', outside.join(' '));
   const spread = parts.some(({ computed }) => headline.estimated_lines.includes(computed.id) && computed.grade !== 'A') && Math.abs(headline.low + headline.high) > 1e-9;
   if (spread) out.push('', 'The estimate is at least ±10 % around its midpoint.');
   const held = TAGS.filter((tag) => parts.some(({ line }) => line.tag === tag && !open.lines.includes(line.id)));
@@ -302,7 +336,7 @@ function sectionOf(input, result, parts) {
   const commits = new Set(input.lines.map((l) => l.at.slice(l.at.lastIndexOf('@') + 1)));
   const commit = commits.size === 1 ? [...commits][0] : '';
   if (commit) out.push('', `Each file is at commit ${code(commit)}.`);
-  out.push(...coverageRows(input.coverage.filter((c) => c.kind !== 'unmeasured')), ...tableOf(input, result, commit));
+  out.push(...coverageRows(input.coverage.filter((c) => c.kind !== 'unmeasured')), ...tablesOf(rows, commit));
   return `${out.join('\n')}\n`;
 }
 
@@ -340,10 +374,12 @@ export function computeCostResult(input) {
   for (const [i, entry] of input.coverage.entries()) {
     const refuse = on(`coverage ${i + 1}`);
     if (isObject(entry)) {
-      refuseOthers(entry, ['kind', 'what', 'why', 'source', 'directive', 'gap'], refuse);
+      refuseOthers(entry, ['kind', 'what', 'why', 'source', 'directive', 'gap', 'trigger'], refuse);
       needOne(entry.kind, COVERAGE, 'coverage kind', refuse);
       needTexts(entry, ['what', 'why'], refuse);
       if (entry.kind === 'unmeasured' && !isText(entry.directive)) refuse(`an unmeasured entry states no directive. ${DIRECTIVE}`);
+      if (entry.kind === 'unmeasured' && !isText(entry.trigger)) refuse(`an unmeasured entry states no trigger. ${TRIGGER}`);
+      if (entry.kind !== 'unmeasured' && Object.hasOwn(entry, 'trigger')) refuse('only an unmeasured entry takes a trigger');
       if (entry.kind !== 'unmeasured' && Object.hasOwn(entry, 'directive')) refuse('only an unmeasured entry takes a directive');
       if (entry.kind === 'unmeasured') needOne(entry.gap, GAPS, 'gap', refuse);
       else if (Object.hasOwn(entry, 'gap')) refuse('only an unmeasured entry takes a gap');
