@@ -12,7 +12,7 @@ const factor = (low, high, unit, grade = 'B') => ({ low, high, unit, grade, sour
 const point = (value, unit, grade) => factor(value, value, unit, grade);
 const line = (id, factors, more) => ({ id, key: 'requests', target: 'job-a', item: 'S3 PUT', at: 'src/job.js:12@0123abc', tag: 'direct', direction: 'add', factors, ...more });
 // A count per month at $1, so the amount is the count.
-const dollars = (id, low, high, grade, more) => line(id, [factor(low, high, 'x/mo', grade), point(1, '$/x', 'A')], { ...(grade === 'D' && (more?.tag ?? 'direct') === 'direct' ? { directive: 'the metric m' } : {}), ...more });
+const dollars = (id, low, high, grade, more) => line(id, [factor(low, high, 'x/mo', grade), point(1, '$/x', 'A')], { ...(grade === 'D' && high >= 1 && (more?.tag ?? 'direct') === 'direct' ? { directive: 'the metric m' } : {}), ...more });
 const input = (lines, coverage = []) => ({ schema_version: 2, organization: 'org-a', lines, coverage });
 const entry = (kind, more) => ({ kind, what: 'a target', why: 'no lookup found it', source: source('tool'), ...more });
 const compute = (lines, coverage) => {
@@ -142,7 +142,7 @@ test('the headline grade is the lowest grade of the lines that hold 10 percent o
   const grade = (...lines) => compute(lines).result.headline.grade;
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 0.5, 1, 'D')), 'D', 'a D line at 10 percent by its high');
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 0.5, 0.99, 'D')), 'A', 'the same line below 10 percent');
-  assert.equal(grade(dollars('a', 0.63, 0.63, 'A'), line('d', [factor(0.1, 0.7, 'x/mo', 'D'), point(0.1, '$/x', 'A')], { directive: 'the metric m' })), 'D', '10 percent with a float residue');
+  assert.equal(grade(dollars('a', 0.63, 0.63, 'A'), line('d', [factor(0.1, 0.7, 'x/mo', 'D'), point(0.1, '$/x', 'A')])), 'D', '10 percent with a float residue');
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 0.5, 1, 'D', { direction: 'remove' })), 'D', 'the weight of a removal is its larger absolute bound');
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 50, 100, 'D', { tag: 'llm' })), 'A', 'a line outside the headline has no weight');
   // The net is 0, so a share of the net would give D. The weight is 11 and D holds 1 of it.
@@ -222,7 +222,7 @@ test('a pipe, a line break and a control character in a text field stay in one c
 test('the table prints each factor of each line, and a unit cannot leave its code span', () => {
   const rate = point(0.05, '$/vCPU*h', 'A');
   const lines = [
-    line('time', [factor(30, 45, 'run/mo', 'D'), point(2, 'min/run', 'C'), { constant: 'h_per_min' }, point(4, 'vCPU'), rate], { directive: 'the run count', item: 'i-1' }),
+    line('time', [factor(30, 45, 'run/mo', 'D'), point(2, 'min/run', 'C'), { constant: 'h_per_min' }, point(4, 'vCPU'), rate], { item: 'i-1' }),
     line('keep', [point(60, 'GB/mo'), point(30, 'day'), { ...point(30.4375, 'day/mo', 'A'), divide: true }, point(0.8, '1'), point(0.02, '$/GB*mo')], { item: 'i-2' }),
     line('token', [{ ...point(4, 'row/call'), divide: true }, point(1e-7, 'row/mo'), point(500, 'token/call'), { constant: 'million', of: 'token' }, point(0.4, '$/Mtoken')], { item: 'i-3', direction: 'remove' }),
   ];
@@ -419,9 +419,15 @@ test('a directive stands on each line and entry of low confidence, and nowhere e
     for (const tag of ['direct', 'commitment', 'indirect']) assert.deepEqual(faults([dollars('g', 1, 2, 'D', { tag, directive: undefined, ...given })]), [`line "g": its grade is D${asks}`], String(directive));
     assert.deepEqual(faults([], [entry('unmeasured', given)]), ['coverage 1: an unmeasured entry states no directive. Tell a coding agent what to expose, where, and how to check it'], String(directive));
   }
+  // A grade D line of $0.5 to $0.99 needs none, and one of $0.5 to $1 needs one.
+  for (const direction of ['add', 'remove']) {
+    assert.deepEqual(faults([dollars('g', 0.5, 0.99, 'D', { direction })]), []);
+    assert.deepEqual(faults([{ ...dollars('g', 0.5, 1, 'D', { direction }), directive: '' }]), [`line "g": its grade is D${asks}`]);
+  }
   assert.deepEqual(faults([open('o', 0, 50), dollars('g', 1, 2, 'D')], [entry('unmeasured', { directive: 'x' })]), []);
   for (const directive of ['the metric m', '']) {
-    const other = 'it is not open and not a headline line of grade D, so it takes no directive';
+    const other = 'it is not open and not a headline line of grade D at $1/mo or more, so it takes no directive';
+    for (const direction of ['add', 'remove']) assert.deepEqual(faults([dollars('a', 0.5, 0.99, 'D', { directive, direction })]), [`line "a": ${other}`], 'grade D below $1');
     assert.deepEqual(faults([dollars('a', 1, 2, 'C', { directive })]), [`line "a": ${other}`]);
     for (const tag of ['flag-gated', 'added-runtime', 'llm']) assert.deepEqual(faults([dollars('a', 0, 900, 'D', { directive, tag })]), [`line "a": ${other}`]);
     for (const kind of ['uncovered_target', 'not_billed', 'doubt']) assert.deepEqual(faults([], [entry(kind, { directive })]), ['coverage 1: only an unmeasured entry takes a directive']);
