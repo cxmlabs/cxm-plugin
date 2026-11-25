@@ -1,8 +1,5 @@
 # Measurement for the cost-of-change skill
 
-This file gives the key, the grade, the unit, the rate and the source of each factor of a line.
-The steps of `SKILL.md` name its sections.
-
 ## Keys
 
 `key` is `<provider>/<service>/<dimension>`, in lower case.
@@ -49,6 +46,19 @@ The steps of `SKILL.md` name its sections.
 - A factor that uses two sources takes the lower grade and the kind of that source. Its `ref` holds both lookups.
 - A value that you measured on one target and use for another drops one grade. Put "analog of <target>" in `ref`. Never do it for a target that has its own bill rows for that usage type. An analog of a C value is an assumption: use D.
 - `ref` holds the lookup, so that a reader can run it again: `file:line@sha`, `dataset{measures; filters; dates}`, `route?params`, `tool(params)` or `public:<url>@<date>`. Add the formula when the value has one.
+
+## Gaps
+
+Use the first that applies.
+
+- `no_access`: the session cannot read the source.
+- `no_dataset`: no source holds the quantity.
+- `no_asset_row`: the bill has no row for the asset.
+- `no_caller_split`: the source mixes the callers.
+- `no_history`: the window has no data.
+- `assumed_ratio`: a share or a size is assumed.
+- `future_volume`: the count depends on later activity.
+- `other`: none of these.
 
 ## Units
 
@@ -132,7 +142,6 @@ A failed route prints `Org API GET <path> failed: <status>.` and the start of th
 - Call the route with that sum plus the change, then with that sum alone. For a `remove`, call it with that sum, then with that sum minus the change.
 - The marginal list rate is the difference of the two `total_cost_for_volume` values ÷ the change. The marginal effective rate is that rate × the ratio `costs.sum_current_net_unblended_cost` ÷ `costs.sum_list_cost` of that usage type over the same accounts and window. Put the ratio in `ref`.
 - **Raw bill.** A `costs` query that reads `sum_usage_amount` or `operation` scans the raw bill. Filter it on `costs.account_id`, `costs.product_code`, `costs.usage_type` and the dates, use the `usage_charges_only` segment, and pass `--timeout 300`. Measures come back as strings.
-  `cxm analytics query '{"measures":["costs.sum_usage_amount","costs.sum_current_net_unblended_cost"],"dimensions":["costs.account_id","costs.usage_type","costs.billing_currency"],"segments":["costs.usage_charges_only"],"filters":[{"member":"costs.account_id","operator":"equals","values":["<account>"]},{"member":"costs.product_code","operator":"equals","values":["<product code>"]},{"member":"costs.usage_type","operator":"equals","values":["<usage type>"]}],"timeDimensions":[{"dimension":"costs.billing_day","dateRange":["<start>","<end>"]}]}' --timeout 300`
 - **Last bill day.** `cur_reach.latest_day` is a measure, not a dimension. Group it by `cur_reach.cloud_provider_id`.
 - **Payer.** A call with a role in another account bills that account. A call with the credentials of the platform bills the platform account. A change of payer is a `remove` on the old payer and an `add` on the new payer.
 - When the session does not hold the bill of the payer, each input that needs that bill is `unmeasured`.
