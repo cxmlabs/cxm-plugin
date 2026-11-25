@@ -117,7 +117,7 @@ test('a line that does not reproduce is refused with its id and its reason', () 
 });
 
 test('the headline holds the direct lines and the commitment fee, and each other tag has its own total', () => {
-  const others = ['flag-gated', 'added-runtime', 'llm', 'one-off'];
+  const others = ['flag-gated', 'llm', 'one-off'];
   const { result, section } = compute([
     dollars('fee', 2, 2, 'B', { tag: 'commitment' }),
     dollars('add', 1, 3),
@@ -127,7 +127,7 @@ test('the headline holds the direct lines and the commitment fee, and each other
   range(result.headline, -17, -5, 'negative headline');
   range(result.totals.direct, -19, -7, 'direct');
   range(result.totals.commitment, 2, 2, 'commitment');
-  others.slice(0, 3).forEach((tag, i) => range(result.totals[tag], 100 + i, 200 + i, tag));
+  others.slice(0, 2).forEach((tag, i) => range(result.totals[tag], 100 + i, 200 + i, tag));
   assert.deepEqual(result.totals['one-off'], { low: 100, high: 100, unit: '$' });
   assert.match(section, /^\*\*-\$17\.00 to -\$5\.00 per month\*\*, grade B\. Estimated lines: 3 of 3 headline lines\. Uncovered targets: 0\.$/m);
   assert.match(section, /^Commitment fee inside the headline: \$2\.00 per month\.$/m);
@@ -242,7 +242,7 @@ test('the headline holds the indirect lines, and the section prints their share 
   // direct 1 to 3, commitment 2, indirect 10 to 20 less 4: the headline is 1 + 2 + 6 = 9 to 3 + 2 + 16 = 21.
   const { result, section } = compute([
     dollars('a', 1, 3, 'A'), dollars('fee', 2, 2, 'A', { tag: 'commitment' }), dollars('i', 10, 20, 'C', { tag: 'indirect' }),
-    dollars('j', 4, 4, 'A', { tag: 'indirect', direction: 'remove' }), ...['flag-gated', 'added-runtime', 'llm'].map((tag) => dollars(tag, 50, 60, 'D', { tag })),
+    dollars('j', 4, 4, 'A', { tag: 'indirect', direction: 'remove' }), ...['flag-gated', 'llm'].map((tag) => dollars(tag, 50, 60, 'D', { tag })),
   ]);
   range(result.headline, 9, 21, 'headline');
   range(result.totals.indirect, 6, 16, 'indirect');
@@ -419,7 +419,7 @@ test('a directive stands on each line and entry of low confidence, and nowhere e
     const given = directive === undefined ? {} : { directive };
     const gap = 'other';
     assert.deepEqual(faults([dollars('o', 0, 50, 'D', { directive: undefined, ...given, gap })]), [`line "o": its group is open${asks}`], String(directive));
-    for (const tag of ['direct', 'commitment', 'indirect']) assert.deepEqual(faults([dollars('g', 1, 2, 'D', { tag, directive: undefined, ...given, gap })]), [`line "g": its grade is D${asks}`], String(directive));
+    for (const tag of ['direct', 'commitment', 'indirect', 'added-runtime']) assert.deepEqual(faults([dollars('g', 1, 2, 'D', { tag, directive: undefined, ...given, gap })]), [`line "g": its grade is D${asks}`], String(directive));
     assert.deepEqual(faults([], [entry('unmeasured', { ...given, gap })]), ['coverage 1: an unmeasured entry states no directive. Tell a coding agent what to expose, where, and how to check it'], String(directive));
   }
   // A grade D line of $0.5 to $0.99 needs none, and one of $0.5 to $1 needs one.
@@ -432,9 +432,31 @@ test('a directive stands on each line and entry of low confidence, and nowhere e
     const other = 'it is not open and not a headline line of grade D at $1/mo or more, so it takes no directive';
     for (const direction of ['add', 'remove']) assert.deepEqual(faults([dollars('a', 0.5, 0.99, 'D', { directive, direction, gap: null })]), [`line "a": ${other}`], 'grade D below $1');
     assert.deepEqual(faults([dollars('a', 1, 2, 'C', { directive, gap: null })]), [`line "a": ${other}`]);
-    for (const tag of ['flag-gated', 'added-runtime', 'llm']) assert.deepEqual(faults([dollars('a', 0, 900, 'D', { directive, tag, gap: null })]), [`line "a": ${other}`]);
+    for (const tag of ['flag-gated', 'llm']) assert.deepEqual(faults([dollars('a', 0, 900, 'D', { directive, tag, gap: null })]), [`line "a": ${other}`]);
     for (const kind of ['uncovered_target', 'not_billed', 'doubt']) assert.deepEqual(faults([], [entry(kind, { directive, gap: null })]), ['coverage 1: only an unmeasured entry takes a directive']);
   }
+});
+
+test('the headline holds the added runtime, with the rules of the other headline tags', () => {
+  // direct 1 to 2, longer runs 10 to 20, shorter runs 4 to 6: 1 + 10 - 6 = 5 to 2 + 20 - 4 = 18.
+  const run = (id, low, high, more) => dollars(id, low, high, 'C', { tag: 'added-runtime', ...more });
+  const given = input([dollars('a', 1, 2, 'A'), dollars('l', 0, 900, 'B', { tag: 'llm' }), run('more', 10, 20), run('less', 4, 6, { direction: 'remove' })]);
+  const first = computeCostResult(given);
+  assert.deepEqual(first.faults, undefined);
+  range(first.result.headline, 5, 18, 'headline');
+  range(first.result.totals['added-runtime'], 4, 16, 'added-runtime');
+  assert.deepEqual([first.result.headline.estimated_lines, first.result.headline.grade], [['a', 'more', 'less'], 'C']);
+  // Headline rows first, from the largest end, and the llm row last with its tag.
+  assert.deepEqual([...first.section.matchAll(/^\| (\d) \|.*?\| (-?\$[\d.]+)/gm)].map((m) => m[2]), ['$10.00', '-$6.00', '$1.00', '$0.00']);
+  assert.match(first.section, /^\| 4 \| llm: /m);
+  assert.deepEqual(computeCostResult(JSON.parse(JSON.stringify({ ...given, result: first.result }))), first);
+  // An open one needs a directive, stands in the open part, and is in no total.
+  assert.match(computeCostResult(input([run('o', 0, 50)])).faults[0], /^line "o": its group is open/);
+  const open = compute([dollars('a', 1, 2), run('o', 0, 50, { directive: 'ask x' })]).result;
+  assert.deepEqual([open.open.lines, open.headline.high, open.totals['added-runtime'].high], [['o'], 2, 0]);
+  // It links with a direct line. v x (3 - 2) with v 10 to 20: 10 to 20.
+  const v = () => shared('v', factor(10, 20, 'GB/mo'));
+  range(compute([line('p', [v(), point(3, '$/GB')]), line('q', [v(), point(2, '$/GB')], { direction: 'remove', tag: 'added-runtime' })]).result.headline, 10, 20, 'linked');
 });
 
 test('a gap stands beside each directive, is one of the closed list, and stands nowhere else', () => {

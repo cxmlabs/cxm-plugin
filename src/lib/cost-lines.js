@@ -1,7 +1,7 @@
 // Computes the amounts, totals and grades of a cost-of-change result from its tagged lines. It imports nothing.
 
 const TAGS = ['direct', 'commitment', 'flag-gated', 'added-runtime', 'llm', 'indirect', 'one-off'];
-const HEADLINE = ['direct', 'commitment', 'indirect'];
+const HEADLINE = ['direct', 'commitment', 'indirect', 'added-runtime'];
 const MAX_SHARED = 4;
 const DIRECTIONS = ['add', 'remove'];
 const GRADES = ['A', 'B', 'C', 'D'];
