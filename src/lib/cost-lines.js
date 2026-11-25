@@ -264,29 +264,24 @@ function sectionOf(input, result, parts) {
   const { lines, totals, headline, open } = result;
   const uncovered = `Uncovered targets: ${headline.uncovered_targets}.`;
   const out = ['### Cost of this change', ''];
-  if (lines.length === 0) out.push(`No billed line moves. ${uncovered}`);
-  else {
-    const shares = GRADES.filter((g) => headline.shares[g] > 0).map((g) => `${g} ${(headline.shares[g] * 100).toFixed(1)} %`);
-    const counted = headline.estimated_lines.length;
-    const none = counted === 0 && open.lines.length > 0;
-    out.push(`${none ? 'No line can be estimated yet.' : `**${amount(headline)}**, grade ${headline.grade ?? 'none'}.`} Estimated lines: ${counted} of ${counted + open.lines.length} headline lines. ${uncovered}`, '');
-    const inside = (tag) => lines.filter((l, n) => input.lines[n].tag === tag && headline.estimated_lines.includes(l.id));
-    for (const [tag, name] of [['commitment', 'Commitment fee'], ['indirect', 'Indirect cost']]) {
-      if (inside(tag).length) out.push(`${name} inside the headline: ${amount(sumRange(inside(tag)))}.`, '');
-    }
-    if (shares.length) out.push(`Share of the weight by grade: ${shares.join(', ')}.`, '');
-    if (open.lines.length) out.push(`Not estimated yet: between ${dollars(open.low)} and ${dollars(open.high)} per month, ${open.lines.length} lines.`, '');
-    const texts = [...new Set(parts.flatMap((part) => (HEADLINE.includes(part.line.tag) ? part.factors.flatMap((f) => f.shared ?? []) : [])))];
-    if (texts.length) out.push(`Each part takes one end of each shared factor, so it can be narrower than the sum of its lines: ${texts.map(code).join(', ')}.`, '');
-  }
+  const counted = headline.estimated_lines.length;
+  const asked = counted + open.lines.length;
+  const share = `Estimated lines: ${counted} of ${asked} headline lines. `;
+  if (counted) out.push(`**${amount(headline)}**, grade ${headline.grade}. ${share}${uncovered}`);
+  else if (lines.length || input.coverage.some((c) => c.kind === 'unmeasured')) out.push(`No line can be estimated yet. ${asked ? share : ''}${uncovered}`);
+  else out.push(`No billed line moves. ${uncovered}`);
+  if (open.lines.length) out.push('', `Not estimated yet: between ${dollars(open.low)} and ${dollars(open.high)} per month, ${open.lines.length} ${open.lines.length === 1 ? 'line' : 'lines'}.`);
+  const held = TAGS.filter((tag) => parts.some(({ line }) => line.tag === tag && !open.lines.includes(line.id)));
+  for (const [tag, name] of [['commitment', 'Commitment fee'], ['indirect', 'Indirect cost']]) if (held.includes(tag)) out.push('', `${name} inside the headline: ${amount(totals[tag])}.`);
+  const shares = GRADES.filter((g) => headline.shares[g] > 0).map((g) => `${g} ${(headline.shares[g] * 100).toFixed(1)} %`);
+  if (shares.length) out.push('', `Share of the weight by grade: ${shares.join(', ')}.`);
+  const texts = [...new Set(parts.flatMap(({ line, factors }) => (HEADLINE.includes(line.tag) ? factors.flatMap((f) => f.shared ?? []) : [])))];
+  if (texts.length) out.push('', `Each part takes one end of each shared factor, so it can be narrower than the sum of its lines: ${texts.map(code).join(', ')}.`);
+  if (held.length) out.push('', 'Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`));
   const commits = new Set(input.lines.map((l) => l.at.slice(l.at.lastIndexOf('@') + 1)));
   const commit = commits.size === 1 ? [...commits][0] : '';
-  if (lines.length) {
-    const held = TAGS.filter((tag) => input.lines.some((l) => l.tag === tag));
-    out.push('Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`));
-    if (commit) out.push('', `Each file is at commit ${code(commit)}.`);
-  }
-  out.push(...tableOf(input, result, commit), ...coverageRows(input.coverage.filter((c) => c.kind !== 'unmeasured')));
+  if (commit) out.push('', `Each file is at commit ${code(commit)}.`);
+  out.push(...coverageRows(input.coverage.filter((c) => c.kind !== 'unmeasured')), ...tableOf(input, result, commit));
   return `${out.join('\n')}\n`;
 }
 
@@ -328,14 +323,15 @@ export function computeCostResult(input) {
   // Each total is at most this sum, so one check covers them all.
   if (!Number.isFinite(total(lines.map(weight)))) return { faults: ['lines: the sum of the amounts is not finite'] };
 
-  const tagged = (tags, values = lines) => values.filter((_, i) => tags.includes(input.lines[i].tag));
-  const totals = Object.fromEntries(TAGS.map((tag) => [tag, { ...sumRange(tagged([tag])), unit: tag === 'one-off' ? '$' : '$/mo' }]));
-  const bundles = linked(tagged(HEADLINE, parts));
+  const bundles = linked(parts.filter((part) => HEADLINE.includes(part.line.tag)));
   const opened = bundles.filter((g) => isOpen(g.range));
   const closed = bundles.filter((g) => !isOpen(g.range));
   const inOrder = (list) => parts.filter((part) => list.some((g) => g.parts.includes(part)));
   checkDirectives(parts, inOrder(opened), on);
   if (faults.length) return { faults };
+  // An open line is in no total: a total never adds an estimate and an unknown.
+  const kept = (tag) => parts.filter((part) => part.line.tag === tag && !inOrder(opened).includes(part)).map((part) => part.computed);
+  const totals = Object.fromEntries(TAGS.map((tag) => [tag, { ...sumRange(kept(tag)), unit: tag === 'one-off' ? '$' : '$/mo' }]));
   const idsOf = (list) => inOrder(list).map((part) => part.line.id);
   const main = inOrder(closed).map((part) => part.computed);
   const weights = total(main.map(weight));
