@@ -5,7 +5,7 @@ import { redact } from './session-trace.js';
 // The closed lists of the keys in the cost-of-change skill. A test holds both sides together.
 export const SERVICES = {
   aws: ['amazons3', 'amazonathena', 'awsglue', 'amazoncloudwatch', 'amazonecs', 'amazonecr', 'amazonec2', 'amazoneks', 'awslambda', 'awskms', 'awsqueueservice', 'amazonsns', 'awsevents', 'amazonstates', 'amazonrds', 'amazondynamodb', 'amazonelasticache', 'amazonredshift', 'amazonefs', 'amazonkinesis', 'amazonkinesisfirehose', 'amazonapigateway', 'amazoncloudfront', 'amazonroute53', 'amazonvpc', 'awselb', 'awsdatatransfer', 'awscloudtrail', 'awsxray', 'awssecretsmanager', 'amazonbedrock', 'computesavingsplans'],
-  github: ['actions', 'packages', 'git-lfs', 'copilot'],
+  github: ['actions', 'github_actions', 'packages', 'git-lfs', 'copilot'],
 };
 export const DIMENSIONS = ['write-requests', 'read-requests', 'api-requests', 'data-scanned', 'data-transfer', 'data-processed', 'ingestion', 'storage', 'compute-time', 'asset-time', 'ci-minutes', 'commitment-fee', 'tokens', 'events'];
 const MAX_ITEMS = 60;
