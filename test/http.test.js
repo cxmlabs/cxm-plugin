@@ -112,3 +112,11 @@ test('a session with 45 s left is refreshed before a read that may retry for 31 
   assert.equal((await requireSession()).accessToken, 'n');
   assert.equal(seen.calls, 1);
 });
+
+test('a failed early refresh keeps a token that is still valid, and an expired one still asks for a login', async (t) => {
+  stub(t, () => [503]);
+  saveConfig({ ...config, refreshToken: 'r', expiresAt: Math.floor(Date.now() / 1000) + 120 });
+  assert.equal((await requireSession()).accessToken, config.accessToken);
+  saveConfig({ ...config, refreshToken: 'r', expiresAt: Math.floor(Date.now() / 1000) - 1 });
+  await assert.rejects(requireSession(), /Session expired/);
+});

@@ -59,6 +59,7 @@ export async function requireSession() {
   if (expiringSoon) {
     const refreshed = config.refreshToken && (await refreshSession(config));
     if (refreshed) return refreshed;
+    if (config.expiresAt * 1000 > Date.now()) return config;
     throw new Error('Session expired. Run: cxm login');
   }
   return config;
