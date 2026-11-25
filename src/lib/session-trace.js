@@ -7,11 +7,12 @@ import { draw, needsRows, splitReply } from './viz.js';
 
 // `cxm` sub-commands we may name. Anything else is reported as `other`, so an argument can never leak.
 const CXM_COMMANDS = new Set([
-  'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'api',
+  'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'cost-result', 'api',
   'analytics query', 'analytics schema', 'cube', 'wiki', 'viz', 'viz chart', 'viz cube-chart', 'viz row', 'viz mermaid',
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
+const HEREDOC = /(<<-?\s*(['"]?)(\w+)\2[^\n]*)\n[\s\S]*?(?:\n\s*\3(?=\n|$)|$)/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
 const MAX_CHARS = 4000;
@@ -124,7 +125,8 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
 
   const spans = [...toolUses.entries()].map(([id, t]) => {
     const r = results.get(id);
-    const command = t.name === 'Bash' ? t.input?.command : null;
+    // A heredoc body holds free text, so neither read sees it.
+    const command = t.name === 'Bash' ? t.input?.command?.replace(HEREDOC, '$1') : null;
     return {
       id,
       tool: toolName(t.name),

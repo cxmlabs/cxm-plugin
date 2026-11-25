@@ -230,6 +230,7 @@ test('a small line leaves the first table only when the small lines are small to
   assert.deepEqual(folded([named('a', 2), named('b', 0.4)]), [], '10 percent or more moves');
   assert.deepEqual(folded(Array.from({ length: 50 }, (_, i) => named(`b${i}`, 0.9))), [], 'many small lines are a large change');
   assert.deepEqual(folded([named('a', 0.005)]), ['a'], 'under a cent, also alone');
+  assert.deepEqual(folded([named('a', 0.9), line('o', [point(500, '$')], { tag: 'one-off', item: 'o' })]), [], 'a one-off in $ is no part of the $/mo sum');
   assert.deepEqual(folded([named('a', 900, { tag: 'flag-gated' })]), ['a'], 'a flag-gated line is never in the first table');
 });
 

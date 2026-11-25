@@ -90,4 +90,5 @@ test('a refused result reaches telemetry as a failure', async () => {
   const ran = bodies.filter((b) => b.event === 'plugin.command_run');
   assert.ok(ran.length > 0, 'the run is recorded');
   assert.deepEqual(ran.map((b) => b.properties.ok), ran.map(() => false));
+  assert.deepEqual(ran.map((b) => [b.properties.error_class, b.properties.error_message]), ran.map(() => [undefined, undefined]));
 });

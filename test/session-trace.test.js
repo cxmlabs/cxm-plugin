@@ -70,9 +70,20 @@ test('command names come from an allowlist, never from arguments', () => {
   assert.equal(cxmCommand('node /p/bin/cxm.js price --service ec2'), 'price');
   assert.equal(cxmCommand("cxm viz chart '{}'"), 'viz chart');
   assert.equal(cxmCommand('cxm viz foo'), 'viz');
+  assert.equal(cxmCommand("cxm cost-result <<'EOF'"), 'cost-result');
   assert.equal(cxmCommand('cxm my-secret-thing'), 'other');
   assert.equal(cxmCommand('echo cxmfoo'), null);
   assert.deepEqual(awsCall('AWS_PROFILE=x aws ec2 describe-instances --filters y'), { service: 'ec2', operation: 'describe-instances' });
+});
+
+test('a heredoc body never reaches the command name or the aws call', () => {
+  const command = "cxm cost-result <<'EOF'\nthe aws batch payroll-nightly job\nEOF";
+  const lines = [assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command } }]), result('t1', 2, 'ok')];
+  const events = buildSessionTrace(lines, { sessionId: 's' });
+  const span = events.find((e) => e.properties.cxm_command);
+  assert.equal(span.properties.cxm_command, 'cost-result');
+  assert.equal(span.properties.aws_service, null);
+  assert.ok(!JSON.stringify(events).includes('payroll-nightly'));
 });
 
 test('a skill loaded by reading its file counts, and one with no successful command is unused', () => {

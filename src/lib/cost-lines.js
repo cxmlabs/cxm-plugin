@@ -265,10 +265,11 @@ function splitRows(input, result) {
   const open = lines.filter(({ line }) => result.open.lines.includes(line.id));
   const flagged = lines.filter(({ line }) => line.tag === 'flag-gated');
   const priced = lines.filter((l) => !open.includes(l) && !flagged.includes(l));
-  const sum = total(priced.map(({ computed }) => weight(computed)));
+  const monthly = priced.filter(({ computed }) => computed.unit !== '$');
+  const sum = total(monthly.map(({ computed }) => weight(computed)));
   const bySize = (list) => [...list].sort((a, b) => weight(b.computed) - weight(a.computed));
-  // A line under $1/mo and under 10 percent of the priced lines is small, unless such lines are not small together. A line under a cent always is.
-  const little = priced.filter(({ computed }) => !reachesOne(computed) && weight(computed) < 0.1 * sum);
+  // A $/mo line under $1/mo and under 10 percent of the priced $/mo lines is small, unless such lines are not small together. A line under a cent always is.
+  const little = monthly.filter(({ computed }) => !reachesOne(computed) && weight(computed) < 0.1 * sum);
   const together = total(little.map(({ computed }) => weight(computed)));
   const small = priced.filter((l) => weight(l.computed) < 0.01 || (together < 0.1 * sum && little.includes(l)));
   const unmeasured = input.coverage.filter((c) => c.kind === 'unmeasured');
