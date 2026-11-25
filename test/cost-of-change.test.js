@@ -234,8 +234,10 @@ test('the method names no provider, no benchmark question and no rule of one cra
 test('each key of the skill uses a dimension and a service of the map', () => {
   const keys = section(measurement, '## Keys');
   const dimensions = [...section(keys, '### Dimensions').matchAll(/^- `([^`]+)`: /gm)].map((m) => m[1]);
-  assert.deepEqual([...dimensions].sort(), ['api-requests', 'ci-minutes', 'commitment-fee', 'compute-time', 'data-processed', 'data-scanned',
+  assert.deepEqual([...dimensions].sort(), ['api-requests', 'asset-time', 'ci-minutes', 'commitment-fee', 'compute-time', 'data-processed', 'data-scanned',
     'data-transfer', 'events', 'ingestion', 'read-requests', 'storage', 'tokens', 'write-requests']);
+  assert.match(section(keys, '### Dimensions'), phrase('- `asset-time`: the time that an asset exists, when the bill charges for its existence'));
+  assert.match(section(keys, '### Dimensions'), phrase('- `compute-time`: the time of a task, a function, an instance or a service that runs work.'));
   const services = new Map([...section(keys, '### Services').matchAll(/^- `([^`]+)`: (.+)$/gm)].map((m) => [m[1], ticks(m[2])]));
   for (const { key } of example().lines) {
     const [provider, service, dimension, more] = key.split('/');

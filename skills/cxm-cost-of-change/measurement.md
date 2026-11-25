@@ -18,8 +18,9 @@
 - `data-transfer`: the volume that leaves a network, a zone or a region.
 - `data-processed`: the volume that a service transforms or forwards.
 - `ingestion`: the volume that a service takes in.
-- `storage`: the volume that a service keeps, per month.
-- `compute-time`: the time of a task, a function, an instance or a service.
+- `storage`: the bytes that a service keeps, per month.
+- `compute-time`: the time of a task, a function, an instance or a service that runs work.
+- `asset-time`: the time that an asset exists, when the bill charges for its existence: an endpoint, a web ACL, a key, a dashboard, a metric, a monitored identity.
 - `ci-minutes`: the billed minutes of a CI runner.
 - `commitment-fee`: the fee of a reservation or a plan.
 - `tokens`: the input and output tokens of a model.
