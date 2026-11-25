@@ -21,7 +21,7 @@ const reads = {
 };
 
 // `answer(n)` gives the status and the body of call n. Each wait moves the clock and returns at once.
-function stub(t, answer) {
+function stub(t, answer, fetchMs = 0) {
   const seen = { calls: 0, waits: [] };
   let now = 1_000_000;
   t.mock.method(Date, 'now', () => now);
@@ -32,6 +32,7 @@ function stub(t, answer) {
   });
   t.mock.method(globalThis, 'fetch', async () => {
     const [status, body = {}] = answer(seen.calls++);
+    now += fetchMs;
     return new Response(JSON.stringify(body), { status });
   });
   return seen;
@@ -73,6 +74,16 @@ test('a read stops after six tries with the status and the number of tries', asy
   }
 
   assert.equal(classifyError(gaveUp(503, 6)), 'http_5xx');
+
+  // A slow 504 counts its own time: no read runs more than 150 s.
+  for (const [name, read] of Object.entries(reads)) {
+    const seen = stub(t, () => [504], 60_000);
+    const start = Date.now();
+    await assert.rejects(read(), /CXM did not answer: HTTP 504/, name);
+    assert.ok(Date.now() - start <= 150_000, name);
+    assert.ok(seen.calls < 6, name);
+    t.mock.restoreAll();
+  }
 });
 
 test('a write, a session refresh, a 500 and a 4xx are sent once', async (t) => {
@@ -98,4 +109,19 @@ test('a write, a session refresh, a 500 and a 4xx are sent once', async (t) => {
   const seen = stub(t, () => [503]);
   await assert.rejects(requireSession(), /Session expired/);
   assert.equal(seen.calls, 1);
+});
+
+test('a session with 45 s left is refreshed before a read that may retry for 31 s', async (t) => {
+  const seen = stub(t, () => [200, { access_token: 'n', expires_in: 3600 }]);
+  saveConfig({ ...config, refreshToken: 'r', expiresAt: Math.floor(Date.now() / 1000) + 45 });
+  assert.equal((await requireSession()).accessToken, 'n');
+  assert.equal(seen.calls, 1);
+});
+
+test('a failed early refresh keeps a token that is still valid, and an expired one still asks for a login', async (t) => {
+  stub(t, () => [503]);
+  saveConfig({ ...config, refreshToken: 'r', expiresAt: Math.floor(Date.now() / 1000) + 120 });
+  assert.equal((await requireSession()).accessToken, config.accessToken);
+  saveConfig({ ...config, refreshToken: 'r', expiresAt: Math.floor(Date.now() / 1000) - 1 });
+  await assert.rejects(requireSession(), /Session expired/);
 });
