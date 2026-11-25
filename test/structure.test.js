@@ -130,7 +130,7 @@ test('no tracked file names an internal dataset', () => {
   assert.deepEqual(offenders, [], 'query the dataset by its published name (cxm analytics schema), not the cube behind it');
 });
 
-// The platform removed these two names, so a query that sends one gets no rows, only an error.
+// The platform removed these three names, so a query that sends one gets no rows, only an error.
 test('no shipped text names a dataset or a field that the asset rename removed', () => {
   const offenders = tracked('*')
     .filter((p) => /^(bin|src|skills|hooks|commands)\//.test(p))

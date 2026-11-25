@@ -6,7 +6,7 @@ function getFlag(argv, name) {
   return i >= 0 ? argv[i + 1] : undefined;
 }
 
-// A container bills on the lines of its members, and a line that no inventory asset claims keeps its bill spelling in asset_id.
+// A container bills on the lines of its members. A line with no inventory asset keeps the billing name in asset_id.
 export const costFilters = (arn) => [
   { or: ['asset_arn', 'container_asset_arn', 'asset_id'].map((field) => ({ member: `costs.${field}`, operator: 'equals', values: [arn] })) },
 ];
