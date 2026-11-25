@@ -259,5 +259,9 @@ test('the rate map and the money rules stay', () => {
   for (const text of ['total of the payer', '`total_cost_for_volume`', '`costs.sum_current_net_unblended_cost` ÷ `costs.sum_list_cost`']) {
     assert.match(money, phrase(text), text);
   }
+  // The raw-bill example is one query that parses, with each filter and the segment.
+  const query = JSON.parse(/`cxm analytics query '(\{.*\})' --timeout 300`/.exec(money)[1]);
+  assert.deepEqual(query.filters.map((f) => f.member), ['costs.account_id', 'costs.product_code', 'costs.usage_type']);
+  assert.deepEqual([query.segments, query.timeDimensions[0].dimension], [['costs.usage_charges_only'], 'costs.billing_day']);
   for (const text of ['--timeout 300', '`costs.account_id`', '`costs.product_code`', '`costs.usage_type`', '`usage_charges_only`']) assert.ok(money.includes(text), text);
 });
