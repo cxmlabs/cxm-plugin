@@ -8,6 +8,7 @@ const GRADES = ['A', 'B', 'C', 'D'];
 const KINDS = ['code', 'dataset', 'route', 'tool', 'public', 'assumption'];
 const RATE_KINDS = ['dataset', 'route', 'public'];
 const COVERAGE = ['uncovered_target', 'unmeasured', 'not_billed', 'doubt'];
+const DIRECTIVE = 'Tell a coding agent what to expose, where, and how to check it';
 // `@` is the atom that `of` names.
 const CONSTANTS = new Map([
   ['h_per_min', { value: 1 / 60, unit: 'h/min' }],
@@ -132,7 +133,7 @@ function computeLine(line, say) {
   needOne(line.tag, TAGS, 'tag', refuse);
   needOne(line.direction, DIRECTIONS, 'direction', refuse);
   if (Object.hasOwn(line, 'amount')) refuse('it holds an amount. Delete it: the amount is the product of the factors');
-  refuseOthers(line, ['id', 'key', 'target', 'item', 'at', 'tag', 'direction', 'factors', 'amount', 'needs'], refuse);
+  refuseOthers(line, ['id', 'key', 'target', 'item', 'at', 'tag', 'direction', 'factors', 'amount', 'directive'], refuse);
   if (!Array.isArray(line.factors) || line.factors.length === 0) return refuse('factors is not a list with a factor');
 
   const factors = [...line.factors].map((f, i) => readFactor(f, (reason) => refuse(`factor ${i + 1}: ${reason}`)));
@@ -190,13 +191,14 @@ function isOpen({ low, high }) {
   const [smaller, larger] = [Math.abs(low), Math.abs(high)].sort((a, b) => a - b);
   return larger >= 1 - 1e-9 && ((low < 0 && high > 0) || larger > 10 * smaller * (1 + 1e-9));
 }
-// An open line names what would narrow it. A line that is not open has nothing to narrow.
-function checkNeeds(parts, open, on) {
+// A line of low confidence tells a coding agent what to expose. A line of more confidence has nothing to ask.
+function checkDirectives(parts, open, on) {
   for (const part of parts) {
-    const say = on(`line ${quote(part.line.id)}`);
-    if (open.includes(part)) {
-      if (!isText(part.line.needs)) say('its group is open, and it states no needs. Name the metric, dataset, log or setting that narrows it, and where to expose it');
-    } else if (Object.hasOwn(part.line, 'needs')) say('its group is not open, so it takes no needs');
+    const { line, computed } = part;
+    const say = on(`line ${quote(line.id)}`);
+    const low = open.includes(part) ? 'its group is open' : HEADLINE.includes(line.tag) && computed.grade === 'D' ? 'its grade is D' : '';
+    if (low && !isText(line.directive)) say(`${low}, and it states no directive. ${DIRECTIVE}`);
+    if (!low && Object.hasOwn(line, 'directive')) say('it is not open and not a headline line of grade D, so it takes no directive');
   }
 }
 
@@ -214,6 +216,8 @@ function span({ low, high }) {
 const amount = (range) => `${span(range)} ${range.unit === '$' ? 'once' : 'per month'}`;
 // A one-line code span that its text cannot close, so a field renders as text only.
 const code = (s) => `\`${clean(s).replace(/`/g, "'")}\``;
+// In a table cell. A backslash before a pipe takes a space, because two backslashes free the pipe.
+const cell = (s) => code(s).replace(/(\\*)\|/g, (_, slashes) => `${slashes}${slashes && ' '}\\|`);
 
 // Each group holds the values of one printed prefix, in input order.
 function groups(values, prefix) {
@@ -227,25 +231,33 @@ function formula(factors) {
   const text = (f) => (f.constant ? `${f.constant}${f.of ? ` of ${f.of}` : ''}` : `${value(f)}${f.unit === '1' ? '' : ` ${f.unit}`} [${[f.grade, f.source.kind, ...(f.activity ? [`activity: ${value(band(f))}`] : []), ...(f.shared ? [`shared: ${f.shared}`] : [])].join(', ')}]`);
   return factors.map((f, i) => `${f.divide ? `${i ? '' : '1 '}÷ ` : i ? '× ' : ''}${text(f)}`).join(' ');
 }
-function lineRows(lines, computed, shared) {
-  const prefix = (l) => `- ${l.tag}, ${l.direction}: ${code(l.item)}, ${code(l.key)}, at ${code(shared ? l.at.slice(0, -shared.length - 1) : l.at)}`;
-  const own = ([l, i], indent) => `${code(l.id)} ${code(l.target)}: ${span(computed[i])}, grade ${computed[i].grade}\n${indent}= ${code(formula(l.factors))}`;
-  return [...groups(lines, prefix)].map(([text, held]) => (held.length === 1 ? `${text}. ${own(held[0], '  ')}` : [text, ...held.map((h) => `  - ${own(h, '    ')}`)].join('\n')));
-}
 function coverageRows(entries) {
+  if (entries.length === 0) return [];
   const reason = (c) => `Why: ${code(c.why)}. Source: ${c.source.kind}, ${code(c.source.ref)}.`;
-  return [...groups(entries, (c) => `${c.kind} ${reason(c)}`).values()].map((held) => `- ${held[0][0].kind}: ${held.map(([c]) => code(c.what)).join(', ')}. ${reason(held[0][0])}`);
+  return ['', 'Coverage:', '', ...[...groups(entries, (c) => `${c.kind} ${reason(c)}`).values()].map((held) => `- ${held[0][0].kind}: ${held.map(([c]) => code(c.what)).join(', ')}. ${reason(held[0][0])}`)];
 }
 
-// One row for each distinct text of `needs`: the open lines that it narrows, then the unmeasured entries.
-function needRows(parts, coverage, open) {
-  const asked = [...parts.filter((part) => open.lines.includes(part.line.id)).map((part) => ({ part, text: clean(part.line.needs) })), ...coverage.flatMap((c) => (c.kind === 'unmeasured' ? { what: c.what, text: clean(c.needs) } : []))];
-  return [...groups(asked, (a) => a.text)].map(([text, held]) => {
-    const narrowed = held.flatMap(([a]) => a.part ?? []);
-    const whats = held.flatMap(([a]) => (a.part ? [] : code(a.what)));
-    const lines = narrowed.length ? ` Narrows ${narrowed.map((part) => code(part.line.id)).join(', ')}: ${span(netRange(narrowed))} per month.` : '';
-    return `- ${code(text)}.${lines}${whats.length ? ` Unmeasured: ${whats.join(', ')}.` : ''}`;
-  });
+// The headline lines from the largest, then the unmeasured entries, then the other lines.
+function tableOf(input, result, commit) {
+  const lines = input.lines.map((line, i) => ({ line, computed: result.lines[i] }));
+  const inside = ({ line }) => HEADLINE.includes(line.tag);
+  const lineRow = ({ line, computed }) => {
+    const at = commit ? line.at.slice(0, -commit.length - 1) : line.at;
+    const open = result.open.lines.includes(line.id) ? 'not estimated yet: ' : '';
+    return {
+      cells: [`${inside({ line }) ? '' : `${line.tag}: `}${[line.item, line.key, line.target, at].map(cell).join(', ')}`, `${open}${span(computed)}${computed.unit === '$' ? ' once' : ''}`, computed.grade, cell(formula(line.factors))],
+      directive: line.directive,
+    };
+  };
+  const rows = [
+    ...lines.filter(inside).sort((a, b) => weight(b.computed) - weight(a.computed)).map(lineRow),
+    ...input.coverage.filter((c) => c.kind === 'unmeasured').map((c) => ({ cells: [cell(c.what), 'not measured', '-', cell(c.why)], directive: c.directive })),
+    ...lines.filter((l) => !inside(l)).map(lineRow),
+  ];
+  if (rows.length === 0) return [];
+  const asked = rows.map((row) => (row.directive === undefined ? '-' : cell(row.directive)));
+  const first = (text, i) => (text !== '-' && asked.indexOf(text) < i ? `as row ${asked.indexOf(text) + 1}` : text);
+  return ['', '| # | What | $/month | Grade | How it is computed | Directive for a coding agent |', '|---|---|---|---|---|---|', ...rows.map((row, i) => `| ${[i + 1, ...row.cells, first(asked[i], i)].join(' | ')} |`)];
 }
 
 function sectionOf(input, result, parts) {
@@ -267,16 +279,14 @@ function sectionOf(input, result, parts) {
     const texts = [...new Set(parts.flatMap((part) => (HEADLINE.includes(part.line.tag) ? part.factors.flatMap((f) => f.shared ?? []) : [])))];
     if (texts.length) out.push(`Each part takes one end of each shared factor, so it can be narrower than the sum of its lines: ${texts.map(code).join(', ')}.`, '');
   }
-  const rows = needRows(parts, input.coverage, open);
-  if (rows.length) out.push(...(lines.length ? [] : ['']), 'To narrow it, expose:', '', ...rows, ...(lines.length ? [''] : []));
+  const commits = new Set(input.lines.map((l) => l.at.slice(l.at.lastIndexOf('@') + 1)));
+  const commit = commits.size === 1 ? [...commits][0] : '';
   if (lines.length) {
     const held = TAGS.filter((tag) => input.lines.some((l) => l.tag === tag));
-    out.push('Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`), '');
-    const commits = new Set(input.lines.map((l) => l.at.slice(l.at.lastIndexOf('@') + 1)));
-    const shared = commits.size === 1 ? [...commits][0] : '';
-    out.push(`Lines,${shared && ` at commit ${code(shared)},`} in dollars per month (a one-off line: in dollars, once):`, '', ...lineRows(input.lines, lines, shared));
+    out.push('Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`));
+    if (commit) out.push('', `Each file is at commit ${code(commit)}.`);
   }
-  if (input.coverage.length) out.push('', 'Coverage:', '', ...coverageRows(input.coverage));
+  out.push(...tableOf(input, result, commit), ...coverageRows(input.coverage.filter((c) => c.kind !== 'unmeasured')));
   return `${out.join('\n')}\n`;
 }
 
@@ -304,11 +314,11 @@ export function computeCostResult(input) {
   for (const [i, entry] of input.coverage.entries()) {
     const refuse = on(`coverage ${i + 1}`);
     if (isObject(entry)) {
-      refuseOthers(entry, ['kind', 'what', 'why', 'source', 'needs'], refuse);
+      refuseOthers(entry, ['kind', 'what', 'why', 'source', 'directive'], refuse);
       needOne(entry.kind, COVERAGE, 'coverage kind', refuse);
       needTexts(entry, ['what', 'why'], refuse);
-      if (entry.kind === 'unmeasured' && !isText(entry.needs)) refuse('an unmeasured entry states no needs. Name the metric, dataset, log or setting to expose, and where');
-      else if (entry.kind !== 'unmeasured' && Object.hasOwn(entry, 'needs')) refuse('only an unmeasured entry takes needs');
+      if (entry.kind === 'unmeasured' && !isText(entry.directive)) refuse(`an unmeasured entry states no directive. ${DIRECTIVE}`);
+      if (entry.kind !== 'unmeasured' && Object.hasOwn(entry, 'directive')) refuse('only an unmeasured entry takes a directive');
       needSource(entry.source, refuse);
     } else refuse('it is not an object');
   }
@@ -324,7 +334,7 @@ export function computeCostResult(input) {
   const opened = bundles.filter((g) => isOpen(g.range));
   const closed = bundles.filter((g) => !isOpen(g.range));
   const inOrder = (list) => parts.filter((part) => list.some((g) => g.parts.includes(part)));
-  checkNeeds(parts, inOrder(opened), on);
+  checkDirectives(parts, inOrder(opened), on);
   if (faults.length) return { faults };
   const idsOf = (list) => inOrder(list).map((part) => part.line.id);
   const main = inOrder(closed).map((part) => part.computed);
