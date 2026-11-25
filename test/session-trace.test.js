@@ -59,6 +59,11 @@ test('the mcp command is named, and its tool and arguments are not', () => {
   assert.deepEqual(events[0].properties.cxm_commands, { mcp: 1 });
   assert.deepEqual(events[0].properties.aws_cli_calls, {});
   assert.ok(!JSON.stringify(events).includes('secret'));
+  const whoami = assistant('m0', 0, [{ type: 'tool_use', id: 't0', name: 'Bash', input: { command: 'cxm whoami' } }]);
+  const awsCalls = (command) => buildSessionTrace([whoami, assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command } }])], { sessionId: 's' })[0].properties.aws_cli_calls;
+  const argument = `'{"q":"our aws secretword secretverb"}'`;
+  for (const call of ['cxm', '~/.local/bin/cxm', '"$HOME/.local/bin/cxm"', 'npx @cloudexmachina/cxm@latest', 'node "/p/bin/cxm.js"']) assert.deepEqual(awsCalls(`${call} mcp t ${argument}`), {}, call);
+  for (const command of ['cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1']) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
 });
 
 test('a session that never used CXM sends nothing', () => {
