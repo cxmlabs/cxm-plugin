@@ -37,6 +37,6 @@ test('buildResolution tolerates missing rows / {items} opportunity shape', () =>
 test('the cost filter matches the asset ARN and the bill spelling', () => {
   const arn = 'arn:aws:s3:::app-bucket';
   assert.deepEqual(costFilters(arn), [
-    { or: [{ member: 'costs.asset_arn', operator: 'equals', values: [arn] }, { member: 'costs.asset_id', operator: 'equals', values: [arn] }] },
+    { or: ['costs.asset_arn', 'costs.container_asset_arn', 'costs.asset_id'].map((member) => ({ member, operator: 'equals', values: [arn] })) },
   ]);
 });
