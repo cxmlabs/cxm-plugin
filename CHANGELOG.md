@@ -6,6 +6,9 @@ fixes, including security fixes.
 
 ## Unreleased
 
+- `cxm cost-result`: computes the amounts, totals and grades of a cost-of-change result from its tagged lines.
+  `CXM_COST_RESULT_FILE=<file>` also writes its JSON block to that file.
+
 - Auto-update: the installer asks once whether to keep the plugin up to date. On yes, Claude Code's
   plugin auto-update is on for the CXM marketplace and Codex is refreshed at a session start, once a
   day. A `cxm` command says, at most once a day, when a newer version is out.
