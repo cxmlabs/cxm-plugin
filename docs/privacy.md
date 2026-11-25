@@ -16,7 +16,7 @@ or the agent wrote; it does not send your cloud data anywhere else.
 
 *Command events*, one per `cxm` command. Each carries:
 
-- the command name, whether it succeeded or failed, its duration, and on failure an error class and the error message with ARNs, account ids, ids, emails, URLs, local paths and secrets masked (200 characters at most);
+- the command name, whether it succeeded or failed, its duration, and on failure an error class and the error message with ARNs, account ids, ids, emails, URLs, local paths and secrets masked (200 characters at most); a refused `cxm cost-result` sends the failure only, with no error class or message;
 - `plugin_version`, `node_version`, `os`, `os_release`, `platform`, `arch`, `term_program`, whether it ran in CI, and whether a
   person or an agent ran it;
 - `session_id`, a random id made at each login, so the events of one login are joined;
