@@ -175,13 +175,11 @@ function headlineRange(lines, parts) {
   const sums = corners.map((ends) => sumRange(parts.map(({ factors }, i) => rangeOf(factors, lines[i].direction, ends))));
   return { low: Math.min(...sums.map((r) => r.low)), high: Math.max(...sums.map((r) => r.high)) };
 }
-// `weights` sets the size of a float residue, which counts as 0 and as equal.
-function statusOf({ low, high }, weights) {
-  const [from, to] = [low, high].map((v) => (Math.abs(v) <= weights * 1e-9 ? 0 : v));
-  const [smaller, larger] = [Math.abs(from), Math.abs(to)].sort((a, b) => a - b);
-  if (larger < 1 - 1e-9) return 'estimate';
-  const wide = from < 0 && to > 0 ? smaller >= 1 - 1e-9 : larger > 10 * smaller * (1 + 1e-9);
-  return wide ? 'cannot_estimate' : 'estimate';
+// Ends of opposite signs, or an end of 0, count as an infinite ratio.
+function statusOf({ low, high }) {
+  const [smaller, larger] = [Math.abs(low), Math.abs(high)].sort((a, b) => a - b);
+  const wide = (low < 0 && high > 0) || larger > 10 * smaller * (1 + 1e-9);
+  return larger >= 1 - 1e-9 && wide ? 'cannot_estimate' : 'estimate';
 }
 
 // Cents from $1. Below it, three digits down to a millionth of a dollar, so a float residue prints as zero.
@@ -301,7 +299,7 @@ export function computeCostResult(input) {
     headline: {
       ...range,
       unit: '$/mo',
-      status: statusOf(range, weights),
+      status: statusOf(range),
       // The margin keeps a float residue from hiding a line that holds exactly 10 percent.
       grade: lowest(main.filter((line) => share(line) >= 0.1 - 1e-9).map((line) => line.grade)),
       shares: Object.fromEntries(GRADES.map((g) => [g, total(main.filter((line) => line.grade === g).map(share))])),
