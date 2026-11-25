@@ -5,7 +5,7 @@ description: Use when the user is writing or reviewing Terraform / IaC, running 
 
 # Cost of a change (CloudExMachina)
 
-**Read `../cxm-shared-rules.md` first** (the path is relative to this skill's base directory).
+**Read `../cxm-shared-rules.md` first** (relative to this skill's base directory).
 Step 6 replaces its answer style and its visuals for the result of a code change.
 
 - For a resource with no diff, follow "Price a resource".
@@ -23,7 +23,7 @@ Step 6 replaces its answer style and its visuals for the result of a code change
    The output has three layers: `on_demand_list`, `committed_1yr` and `committed_3yr`. Each holds `hourly_usd`, `monthly_usd` and `savings_vs_on_demand_pct`.
 3. Report the layers as a short ladder:
    - **On-demand (list):** the upper bound.
-   - **If committed:** the 1-year and 3-year rates, which the user pays if they reserve that family.
+   - **If committed:** the 1-year and 3-year rates.
    - **Effective today:** read the discount of the usage account that will run the resource with the discount-rate route ("Pricing routes" of `measurement.md`).
      The net rate is `on_demand × (1 − rows[0].effective_discount_rate_pct ÷ 100)`. Label it and warn as the discount rules of "Rate map" say. With no row, or a null rate, skip this line.
    - **Existing coverage:** the current effective savings rate of this commitment type, from `commitment_this_month_kpi` (`cxm-commitments` skill). It shows if spare commitment can cover the resource.
@@ -106,7 +106,7 @@ If the list is not yet in a message, stop and print it.
 Give each line a ceiling in dollars per month, from the code and from the bill rows of the window of step 4.
 
 - A ceiling of 0 is a `not_billed` entry. A line with no rate or no source is an `unmeasured` entry. Both leave the lines.
-- The headline lines are the `direct`, `commitment` and `indirect` lines. A line that another system bills as a reaction counts. The asset and target rules of step 4 hold for a ceiling too.
+- The headline lines are the `direct`, `commitment`, `indirect` and `added-runtime` lines. A line that another system bills as a reaction counts. The asset and target rules of step 4 hold for a ceiling too.
 - When the ceiling is below $1/mo and below 10 percent of the sum of the ceilings of the headline lines, stop. Spend no more lookups on that line.
 - A stopped line keeps 0 to its ceiling. Write the 0 as the `low` of its quantity factor, with the grade and the source kind of the ceiling.
 - After step 4, the weight of a line is its ceiling, or its measured high. When a stopped headline line holds 10 percent or more of the weight of the headline lines, measure it.
@@ -115,7 +115,7 @@ Give each line a ceiling in dollars per month, from the code and from the bill r
 
 Use one window for each read that has a date: a bill row, a usage or metric row, and a CI run list. The window is the 30 full days that end 2 days before the earliest commit date (`git log --format=%cs <base>..HEAD`) of the diff, or 2 days before the last bill day, whichever is earlier. For an uncommitted change, use the last bill day. Read nothing after the window.
 Give each of these reads a fixed start date and a fixed end date, in each step, also when its cell of the source map shows no end date. Use no relative range. Write each date as a literal in the query itself, never through a shell variable, a loop or a script. A "latest day" cell takes the latest day of the window.
-A dataset that holds only the state of today, such as the inventory or the prices, has no date: read it as it is.
+A dataset that holds only the state of today, such as the inventory or the prices, has no date: read it as it is. Every other query and every list of runs carries literal dates: no undated count and no sample.
 
 For each line that step 3 did not stop:
 
@@ -134,20 +134,20 @@ For each line that step 3 did not stop:
 
 ### 5. Compute
 
-Send the lines and the coverage to the command through a quoted heredoc. Replace each value of this example:
+Send the lines and the coverage to the command through a quoted heredoc, with your values:
 
 ```bash
 cxm cost-result <<'EOF'
 {"schema_version": 2, "organization": "example-org", "lines": [
-  {"id": "L1", "key": "aws/amazons3/write-requests", "target": "job-a, account-a, region-a", "item": "put of each report", "at": "src/example/report.py:41@0123abc", "tag": "direct", "direction": "add", "directive": "In src/example/report.py, count each put in the metric report_puts (requests per run). Check: the daily count appears in the metrics of job-a.", "gap": "assumed_ratio", "factors": [
+  {"id": "L1", "key": "aws/amazons3/write-requests", "target": "job-a, account-a", "item": "put of each report", "at": "src/example/report.py:41@0123abc", "tag": "direct", "direction": "add", "directive": "In src/example/report.py, count each put in the metric report_puts (requests per run). Check: the daily count appears in the metrics of job-a.", "gap": "assumed_ratio", "factors": [
     {"low": 6, "high": 6, "unit": "run/day", "grade": "C", "source": {"kind": "code", "ref": "src/example/schedule.py:9@0123abc"}}, {"constant": "day_per_mo"},
     {"low": 100, "high": 300, "unit": "request/run", "grade": "D", "source": {"kind": "assumption", "ref": "100 to 300 items"}}, {"constant": "thousand", "of": "request"},
     {"low": 0.01, "high": 0.02, "unit": "$/krequest", "grade": "B", "source": {"kind": "dataset", "ref": "costs{net cost, usage} as low, list-price route as high"}}]},
-  {"id": "L2", "key": "aws/amazoncloudwatch/storage", "target": "job-a, account-a, region-a", "item": "removed debug log", "at": "src/example/report.py:57@0123abc", "tag": "direct", "direction": "remove", "factors": [
+  {"id": "L2", "key": "aws/amazoncloudwatch/storage", "target": "job-a, account-a", "item": "removed debug log", "at": "src/example/report.py:57@0123abc", "tag": "direct", "direction": "remove", "factors": [
     {"low": 0.1, "high": 0.1, "unit": "GB/day", "grade": "B", "source": {"kind": "dataset", "ref": "costs{usage; asset; dates}, the only writer"}},
     {"low": 14, "high": 14, "unit": "day", "grade": "C", "source": {"kind": "code", "ref": "src/example/logs.tf:3@0123abc"}},
     {"low": 0.05, "high": 0.05, "unit": "$/GB*mo", "grade": "A", "source": {"kind": "route", "ref": "list-price?service_code=<code>&usage_type=<usage type>"}}]}],
- "coverage": [{"kind": "uncovered_target", "what": "job-a, account-b", "why": "the session holds no bill of account-b", "source": {"kind": "dataset", "ref": "costs{account_id; dates}: no row"}}]}
+ "coverage": [{"kind": "uncovered_target", "what": "job-a, account-b", "why": "no bill of account-b", "source": {"kind": "dataset", "ref": "costs{account_id; dates}: no row"}}]}
 EOF
 ```
 

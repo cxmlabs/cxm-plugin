@@ -165,7 +165,7 @@ test('the method lists its lines before it bounds and measures, and computes wit
 
 test('the Measure step asks for a fixed start and end date for each read that has a date', () => {
   for (const text of ['each read that has a date: a bill row, a usage or metric row, and a CI run list', 'a fixed start date and a fixed end date', 'also when its cell of the source map shows no end date',
-    'Use no relative range', 'Write each date as a literal in the query itself, never through a shell variable, a loop or a script', 'Read nothing after the window', 'the latest day of the window']) assert.match(step('Measure'), phrase(text), text);
+    'Use no relative range', 'Every other query and every list of runs carries literal dates: no undated count and no sample', 'Write each date as a literal in the query itself, never through a shell variable, a loop or a script', 'Read nothing after the window', 'the latest day of the window']) assert.match(step('Measure'), phrase(text), text);
 });
 
 test('compute is direct for a run that did not happen before, and added-runtime when an earlier run takes longer', () => {
@@ -178,7 +178,7 @@ test('compute is direct for a run that did not happen before, and added-runtime 
 });
 
 test('the skill follows the headline, the activity band, the shared factor and the asset rows', () => {
-  assert.match(step('Bound'), phrase('The headline lines are the `direct`, `commitment` and `indirect` lines. A line that another system bills as a reaction counts.'));
+  assert.match(step('Bound'), phrase('The headline lines are the `direct`, `commitment`, `indirect` and `added-runtime` lines. A line that another system bills as a reaction counts.'));
   for (const text of ['A count that follows people or traffic (CI runs, requests, sessions, messages) is the measured value, with `"activity": true`', 'never a wider one by hand',
     'Two lines that depend on one unknown use one `shared` text on that factor', 'Read the bill by asset first (log group, bucket, function, database)', '`costs.asset_id`',
     'only when no asset row of the window exists, and only when a fact of the code bounds the share of the change', 'Never write 0 to the account total', 'never from memory',
