@@ -9,6 +9,7 @@ const KINDS = ['code', 'dataset', 'route', 'tool', 'public', 'assumption'];
 const RATE_KINDS = ['dataset', 'route', 'public'];
 const COVERAGE = ['uncovered_target', 'unmeasured', 'not_billed', 'doubt'];
 const DIRECTIVE = 'Tell a coding agent what to expose, where, and how to check it';
+const GAPS = ['no_dataset', 'no_asset_row', 'no_caller_split', 'no_history', 'no_access', 'assumed_ratio', 'future_volume', 'other'];
 // `@` is the atom that `of` names.
 const CONSTANTS = new Map([
   ['h_per_min', { value: 1 / 60, unit: 'h/min' }],
@@ -133,7 +134,7 @@ function computeLine(line, say) {
   needOne(line.tag, TAGS, 'tag', refuse);
   needOne(line.direction, DIRECTIONS, 'direction', refuse);
   if (Object.hasOwn(line, 'amount')) refuse('it holds an amount. Delete it: the amount is the product of the factors');
-  refuseOthers(line, ['id', 'key', 'target', 'item', 'at', 'tag', 'direction', 'factors', 'amount', 'directive'], refuse);
+  refuseOthers(line, ['id', 'key', 'target', 'item', 'at', 'tag', 'direction', 'factors', 'amount', 'directive', 'gap'], refuse);
   if (!Array.isArray(line.factors) || line.factors.length === 0) return refuse('factors is not a list with a factor');
 
   const factors = [...line.factors].map((f, i) => readFactor(f, (reason) => refuse(`factor ${i + 1}: ${reason}`)));
@@ -199,7 +200,9 @@ function checkDirectives(parts, open, on) {
     const say = on(`line ${quote(line.id)}`);
     const low = open.includes(part) ? 'its group is open' : HEADLINE.includes(line.tag) && computed.grade === 'D' && reachesOne(computed) ? 'its grade is D' : '';
     if (low && !isText(line.directive)) say(`${low}, and it states no directive. ${DIRECTIVE}`);
+    if (low) needOne(line.gap, GAPS, 'gap', say);
     if (!low && Object.hasOwn(line, 'directive')) say('it is not open and not a headline line of grade D at $1/mo or more, so it takes no directive');
+    if (!low && Object.hasOwn(line, 'gap')) say('it takes no directive, so it takes no gap');
   }
 }
 
@@ -248,17 +251,18 @@ function tableOf(input, result, commit) {
     return {
       cells: [`${inside({ line }) ? '' : `${line.tag}: `}${[line.item, line.key, line.target, at].map(cell).join(', ')}`, `${open}${span(computed)}${computed.unit === '$' ? ' once' : ''}`, computed.grade, cell(formula(line.factors))],
       directive: line.directive,
+      gap: line.gap,
     };
   };
   const rows = [
     ...lines.filter(inside).sort((a, b) => weight(b.computed) - weight(a.computed)).map(lineRow),
-    ...input.coverage.filter((c) => c.kind === 'unmeasured').map((c) => ({ cells: [cell(c.what), 'not measured', '-', cell(c.why)], directive: c.directive })),
+    ...input.coverage.filter((c) => c.kind === 'unmeasured').map((c) => ({ cells: [cell(c.what), 'not measured', '-', cell(c.why)], directive: c.directive, gap: c.gap })),
     ...lines.filter((l) => !inside(l)).map(lineRow),
   ];
   if (rows.length === 0) return [];
   const asked = rows.map((row) => (row.directive === undefined ? '-' : cell(row.directive)));
   const first = (text, i) => (text !== '-' && asked.indexOf(text) < i ? `as row ${asked.indexOf(text) + 1}` : text);
-  return ['', '| # | What | $/month | Grade | How it is computed | Directive for a coding agent |', '|---|---|---|---|---|---|', ...rows.map((row, i) => `| ${[i + 1, ...row.cells, first(asked[i], i)].join(' | ')} |`)];
+  return ['', '| # | What | $/month | Grade | How it is computed | Directive for a coding agent |', '|---|---|---|---|---|---|', ...rows.map((row, i) => `| ${[i + 1, ...row.cells, `${first(asked[i], i)}${row.gap ? `, gap: ${row.gap}` : ''}`].join(' | ')} |`)];
 }
 
 function sectionOf(input, result, parts) {
@@ -310,11 +314,13 @@ export function computeCostResult(input) {
   for (const [i, entry] of input.coverage.entries()) {
     const refuse = on(`coverage ${i + 1}`);
     if (isObject(entry)) {
-      refuseOthers(entry, ['kind', 'what', 'why', 'source', 'directive'], refuse);
+      refuseOthers(entry, ['kind', 'what', 'why', 'source', 'directive', 'gap'], refuse);
       needOne(entry.kind, COVERAGE, 'coverage kind', refuse);
       needTexts(entry, ['what', 'why'], refuse);
       if (entry.kind === 'unmeasured' && !isText(entry.directive)) refuse(`an unmeasured entry states no directive. ${DIRECTIVE}`);
       if (entry.kind !== 'unmeasured' && Object.hasOwn(entry, 'directive')) refuse('only an unmeasured entry takes a directive');
+      if (entry.kind === 'unmeasured') needOne(entry.gap, GAPS, 'gap', refuse);
+      else if (Object.hasOwn(entry, 'gap')) refuse('only an unmeasured entry takes a gap');
       needSource(entry.source, refuse);
     } else refuse('it is not an object');
   }
