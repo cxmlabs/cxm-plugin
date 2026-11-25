@@ -183,6 +183,10 @@ test('the section ends its lines in one table, in order, with the directive of e
   assert.ok(section.endsWith(`
 Each file is at commit \`0123abc\`.
 
+Coverage:
+
+- uncovered_target: \`w-2\`, \`w-3\`. Why: \`no lookup found it\`. Source: tool, \`synthetic\`.
+
 ${HEAD}| 1 | \`i-1\`, \`requests\`, \`job-a\`, \`src/b.js:2\` | -$40.00 to -$30.00 | D | \`30–40 x/mo [D, assumption] × 1 $/x [A, dataset]\` | \`ask x\` |
 | 2 | \`i-2\`, \`requests\`, \`job-a\`, \`src/b.js:3\` | not estimated yet: $0.00 to $35.00 | C | \`0–35 x/mo [C, dataset] × 1 $/x [A, dataset]\` | as row 1 |
 | 3 | \`S3 PUT\`, \`requests\`, \`job-a\`, \`src/a.js:1\` | $1.00 to $2.00 | A | \`1–2 x/mo [A, dataset] × 1 $/x [A, dataset]\` | - |
@@ -190,17 +194,13 @@ ${HEAD}| 1 | \`i-1\`, \`requests\`, \`job-a\`, \`src/b.js:2\` | -$40.00 to -$30.
 | 5 | \`w-4\` | not measured | - | \`y-4\` | as row 1 |
 | 6 | one-off: \`i-3\`, \`requests\`, \`job-a\`, \`src/c.js:1\` | $7.00 once | B | \`7 $ [B, dataset]\` | - |
 | 7 | flag-gated: \`i-4\`, \`requests\`, \`job-a\`, \`src/d.js:1\` | $800.00 to $900.00 | D | \`800–900 x/mo [D, assumption] × 1 $/x [A, dataset]\` | - |
-
-Coverage:
-
-- uncovered_target: \`w-2\`, \`w-3\`. Why: \`no lookup found it\`. Source: tool, \`synthetic\`.
 `), section);
   // Two commits: each line keeps its own.
   const two = compute([dollars('a', 1, 1), dollars('b', 1, 1, 'B', { at: 'src/job.js:12@9999999' })]).section;
   for (const text of ['`src/job.js:12@0123abc` |', '`src/job.js:12@9999999` |']) assert.ok(two.includes(text), two);
   assert.ok(!two.includes('is at commit'));
   // No line: the unmeasured entries make the table, and with none there is no table.
-  assert.ok(compute([], [entry('unmeasured', { directive: 'ask z' })]).section.endsWith(`No billed line moves. Uncovered targets: 0.\n\n${HEAD}| 1 | \`a target\` | not measured | - | \`no lookup found it\` | \`ask z\` |\n`));
+  assert.ok(compute([], [entry('unmeasured', { directive: 'ask z' })]).section.endsWith(`No line can be estimated yet. Uncovered targets: 0.\n\n${HEAD}| 1 | \`a target\` | not measured | - | \`no lookup found it\` | \`ask z\` |\n`));
   assert.equal(compute([]).section, '### Cost of this change\n\nNo billed line moves. Uncovered targets: 0.\n');
 });
 
@@ -377,20 +377,36 @@ test('the headline holds the estimated lines only, and the open part stands besi
 
 **$5.00 to $8.00 per month**, grade B. Estimated lines: 2 of 5 headline lines. Uncovered targets: 0.
 
+Not estimated yet: between -$3.00 and $70.00 per month, 3 lines.
+
 Indirect cost inside the headline: $1.00 to $2.00 per month.
 
 Share of the weight by grade: A 75.0 %, B 25.0 %.
 
-Not estimated yet: between -$3.00 and $70.00 per month, 3 lines.
-
 Totals:
-`), section);
+
+- direct: $4.00 to $6.00 per month
+- llm: $0.00 to $900.00 per month
+- indirect: $1.00 to $2.00 per month
+
+Each file is at commit`), section);
+  // A headline tag totals its estimated lines, and the commitment tag has none. Each other tag totals all of its lines.
+  range(result.totals.direct, 4, 6, 'direct');
+  range(result.totals.indirect, 1, 2, 'indirect');
+  range(result.totals.commitment, 0, 0, 'commitment');
+  range(result.totals.llm, 0, 900, 'llm');
   for (const sum of ['$2.00 to $78.00', 'Commitment fee', 'To narrow it']) assert.ok(!section.includes(sum), sum);
 
   const none = compute([open('o', 0, 50)]);
   assert.deepEqual([none.result.headline.low, none.result.headline.high, none.result.headline.grade, none.result.headline.shares], [0, 0, null, { A: 0, B: 0, C: 0, D: 0 }]);
-  assert.ok(none.section.startsWith('### Cost of this change\n\nNo line can be estimated yet. Estimated lines: 0 of 1 headline lines. Uncovered targets: 0.\n\nNot estimated yet: between $0.00 and $50.00 per month, 1 lines.\n'), none.section);
-  assert.match(compute([dollars('a', 5, 5, 'B', { tag: 'llm' })]).section, /^\*\*\$0\.00 per month\*\*, grade none\. Estimated lines: 0 of 0 headline lines\./m);
+  assert.ok(none.section.startsWith('### Cost of this change\n\nNo line can be estimated yet. Estimated lines: 0 of 1 headline lines. Uncovered targets: 0.\n\nNot estimated yet: between $0.00 and $50.00 per month, 1 line.\n'), none.section);
+  assert.doesNotMatch(none.section, /Totals:/);
+  // No headline line: another line or an unmeasured entry still says that there is something to estimate.
+  for (const [lines, coverage] of [[[dollars('a', 5, 5, 'B', { tag: 'llm' })], []], [[], [entry('unmeasured', { directive: 'ask z' })]], [[dollars('a', 5, 5, 'B', { tag: 'llm' })], [entry('unmeasured', { directive: 'ask z' })]]]) {
+    const { section: text } = compute(lines, coverage);
+    assert.ok(text.startsWith('### Cost of this change\n\nNo line can be estimated yet. Uncovered targets: 0.\n'), text);
+    assert.doesNotMatch(text, /\$0\.00 per month|0 of 0|No billed line moves/);
+  }
   assert.doesNotMatch(compute([dollars('a', 1, 2)]).section, /Not estimated yet/);
 });
 
