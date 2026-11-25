@@ -29,7 +29,7 @@
 ### Services
 
 - `aws`: `amazons3`, `amazonathena`, `awsglue`, `amazoncloudwatch`, `amazonecs`, `amazonecr`, `amazonec2`, `amazoneks`, `awslambda`, `awskms`, `awsqueueservice`, `amazonsns`, `awsevents`, `amazonstates`, `amazonrds`, `amazondynamodb`, `amazonelasticache`, `amazonredshift`, `amazonefs`, `amazonkinesis`, `amazonkinesisfirehose`, `amazonapigateway`, `amazoncloudfront`, `amazonroute53`, `amazonvpc`, `awselb`, `awsdatatransfer`, `awscloudtrail`, `awsxray`, `awssecretsmanager`, `amazonbedrock`, `computesavingsplans`
-- `github`: `actions`, `packages`, `git-lfs`, `copilot`
+- `github`: `actions`, `github_actions`, `packages`, `git-lfs`, `copilot`
 - each other provider: `model-api`, `object-storage`, `database`, `data-warehouse`, `compute`, `observability`, `messaging`, `ci`, `other`
 
 ## Grades
