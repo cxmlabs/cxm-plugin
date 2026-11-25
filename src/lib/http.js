@@ -17,14 +17,15 @@ function authHeaders(config) {
 const RETRY_WAITS_MS = [1000, 2000, 4000, 8000, 16000];
 
 // One per read, so the limit covers every poll of that read. Never send a write through it.
-function gatewayRetry(deadline = Infinity) {
+function gatewayRetry(deadline = Date.now() + 150000) {
   let failures = 0;
   return async (url, init) => {
     for (;;) {
+      const started = Date.now();
       const res = await fetch(url, init);
       if (![502, 503, 504].includes(res.status)) return res;
       const wait = RETRY_WAITS_MS[failures++];
-      if (wait === undefined || Date.now() + wait > deadline) {
+      if (wait === undefined || Date.now() + wait + (Date.now() - started) > deadline) {
         throw new Error(`CXM did not answer: HTTP ${res.status} after ${failures} tries. The request changed nothing. Try again in a few minutes.`);
       }
       await new Promise((r) => setTimeout(r, wait));
