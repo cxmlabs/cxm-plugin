@@ -171,8 +171,11 @@ function checkShared(parts, on) {
   if (first.size > MAX_SHARED) on('input')(`${first.size} shared texts. At most ${MAX_SHARED}`);
 }
 // The least and the greatest sum over the ends of the shared factors.
+// A text that divides in one line and not in another, or stands twice in a line, has no fixed end: its lines keep their own range.
 function netRange(parts) {
-  const texts = [...new Set(parts.flatMap(({ factors }) => factors.flatMap((f) => f.shared ?? [])))];
+  const uses = (text) => parts.map(({ factors }) => factors.filter((f) => f.shared === text));
+  const fixed = (text) => !uses(text).some((own) => own.length > 1) && new Set(uses(text).flat().map((f) => Boolean(f.divide))).size === 1;
+  const texts = [...new Set(parts.flatMap(({ factors }) => factors.flatMap((f) => f.shared ?? [])))].filter(fixed);
   const corners = texts.reduce((list, text) => list.flatMap((ends) => ['low', 'high'].map((end) => new Map([...ends, [text, end]]))), [new Map()]);
   const sums = corners.map((ends) => sumRange(parts.map(({ factors, line }) => rangeOf(factors, line.direction, ends))));
   return { low: Math.min(...sums.map((r) => r.low)), high: Math.max(...sums.map((r) => r.high)) };
@@ -280,7 +283,8 @@ function sectionOf(input, result, parts) {
   const asked = counted + open.lines.length;
   const share = `Estimated lines: ${counted} of ${asked} headline lines. `;
   if (counted) out.push(`**${amount(headline)}**, grade ${headline.grade}. ${share}${uncovered}`);
-  else if (lines.length || input.coverage.some((c) => c.kind === 'unmeasured')) out.push(`No line can be estimated yet. ${asked ? share : ''}${uncovered}`);
+  else if (asked || input.coverage.some((c) => c.kind === 'unmeasured' || c.kind === 'uncovered_target')) out.push(`No line can be estimated yet. ${asked ? share : ''}${uncovered}`);
+  else if (lines.length) out.push(`No headline line. The other lines are in the totals. ${uncovered}`);
   else out.push(`No billed line moves. ${uncovered}`);
   if (open.lines.length) out.push('', `Not estimated yet: between ${dollars(open.low)} and ${dollars(open.high)} per month, ${open.lines.length} ${open.lines.length === 1 ? 'line' : 'lines'}.`);
   const spread = parts.some(({ computed }) => headline.estimated_lines.includes(computed.id) && computed.grade !== 'A') && Math.abs(headline.low + headline.high) > 1e-9;
@@ -354,14 +358,15 @@ export function computeCostResult(input) {
   const share = (line) => weight(line) / weights;
   const net = sumRange(closed.map((g) => g.range));
   const exact = main.every((line) => line.grade === 'A');
+  // The margin keeps a float residue from hiding a line that holds exactly 10 percent. With no such line, every line counts.
+  const heavy = main.filter((line) => share(line) >= 0.1 - 1e-9);
   const result = {
     lines,
     totals,
     headline: {
       ...(exact ? net : widen(net)),
       unit: '$/mo',
-      // The margin keeps a float residue from hiding a line that holds exactly 10 percent.
-      grade: lowest(main.filter((line) => share(line) >= 0.1 - 1e-9).map((line) => line.grade)),
+      grade: lowest((heavy.length ? heavy : main).map((line) => line.grade)),
       shares: Object.fromEntries(GRADES.map((g) => [g, total(main.filter((line) => line.grade === g).map(share))])),
       uncovered_targets: input.coverage.filter((entry) => entry.kind === 'uncovered_target').length,
       estimated_lines: idsOf(closed),
