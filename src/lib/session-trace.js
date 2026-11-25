@@ -14,7 +14,8 @@ const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
 // An argument of a `cxm` call can hold the words of an AWS call.
 const MCP_CALL = /cxm[\s\S]*\bmcp\b/i;
-const QUOTED = /'[^']*'|"(?:\\.|[^"\\])*"/g;
+const HEREDOC = /((?<!<)<<-?[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([A-Za-z_][\w.-]*))[^\n]*)[\s\S]*?(?:\n\t*\2\3\4(?=\n|$)|$)/g;
+const QUOTED = /'[^']*'(?:\\''[^']*')*|"(?:\\[\s\S]|[^"\\])*"|(?<!\S)#.*/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
 const MAX_CHARS = 4000;
@@ -134,7 +135,7 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
       tool: toolName(t.name),
       skill: t.name === 'Skill' ? cxmSkill(t.input, ours) : skillRead(t.name, t.input, ours),
       cxm,
-      aws: command && !MCP_CALL.test(command) ? awsCall(/\bcxm\b/.test(command) ? command.replace(QUOTED, ' ') : command) : null,
+      aws: command && !MCP_CALL.test(command) ? awsCall(/\bcxm\b/.test(command) ? command.replace(HEREDOC, '$1').replace(QUOTED, "''") : command) : null,
       isError: r?.isError ?? false,
       latency: ms(t.at, r?.at),
       at: t.at,

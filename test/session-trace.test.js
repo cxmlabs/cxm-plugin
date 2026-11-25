@@ -64,7 +64,10 @@ test('the mcp command is named, and its tool and arguments are not', () => {
   const argument = `'{"q":"our aws secretword secretverb"}'`;
   for (const call of ['cxm', '~/.local/bin/cxm', '"$HOME/.local/bin/cxm"', 'npx @cloudexmachina/cxm@latest', 'node "/p/bin/cxm.js"', 'cxm \\\n', 'C=cxm; $C']) assert.deepEqual(awsCalls(`${call} mcp t ${argument}`), {}, call);
   for (const command of [`cxm 'mcp' t ${argument}`, `python3 - <<'EOF'\nsubprocess.run(["cxm", "mcp", "t", "our aws secretword secretverb"])\nEOF`, `node "/p/bin/cxm.js" context 'our aws secretword secretverb'`, `npx @cloudexmachina/cxm@latest context 'our aws secretword secretverb'`]) assert.deepEqual(awsCalls(command), {}, command);
-  for (const command of ['cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1']) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
+  // A quoted word is a boundary: the words on its two sides never join.
+  for (const command of ['aws "s3" ls my-bucket --profile cxm', 'aws --profile "cxm-prod" sts get-caller-identity']) assert.deepEqual(awsCalls(command), {}, command);
+  for (const command of ['cxm context - <<EOF\nour aws secretword secretverb\nEOF', "cxm context 'it'\\''s aws secretword secretverb'"]) assert.deepEqual(awsCalls(command), {}, command);
+  for (const command of ["cxm whoami # don't\naws s3 ls\n# don't", 'cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1']) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
 });
 
 test('a session that never used CXM sends nothing', () => {
