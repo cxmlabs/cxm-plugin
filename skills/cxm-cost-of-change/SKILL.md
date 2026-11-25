@@ -79,7 +79,7 @@ Read only the checkout of the change, the folder of this skill and the CXM skill
 7. Run the List and Mark check of "Billing dimensions". It reads names only.
 8. Read the list again against the diff once. Remove a line with no `file:line` of the diff. Add a line that you missed.
 9. Print the list before any read of a quantity, a count or a rate: write it as text in a message to the user, before the first command that reads one. A thought, a file, a plan or a command output is not a message.
-   Write one line for each entry: `key | tag | direction | target | trigger | file:line@sha`. For an uncommitted file, use the sha of HEAD and add a `doubt`. Then go on to step 3 and wait for no answer.
+   Write one line for each entry: `key | tag | direction | target | trigger | file:line@sha`. For an uncommitted file, use the sha of HEAD and add a `doubt`. Then continue to step 3. Do not wait for a reply.
 10. Do not add a line after the list, except a line that a measure proves. Name that line in a `doubt`.
 
 #### Tag
@@ -115,7 +115,8 @@ Give each line a ceiling in dollars per month, from the code and from the bill r
 
 Use one window for each read that has a date: a bill row, a usage or metric row, and a CI run list. The window is the 30 full days that end 2 days before the earliest commit date (`git log --format=%cs <base>..HEAD`) of the diff, or 2 days before the last bill day, whichever is earlier. For an uncommitted change, use the last bill day. Read nothing after the window.
 Give each of these reads a fixed start date and a fixed end date, in each step, also when its cell of the source map shows no end date. Use no relative range. Write each date as a literal in the query itself, never through a shell variable, a loop or a script. A "latest day" cell takes the latest day of the window.
-A dataset that holds only the state of today, such as the inventory or the prices, has no date: read it as it is. A quantity from it is the state of its crawl date: write the date in `ref`. When the change is older than the crawl, the factor is C, and its `low` is the lowest count that a bill row of the window or the code supports, else half: never a point. Every other query and every list of runs carries literal dates: no undated count and no sample.
+A dataset that holds only the state of today, such as the inventory or the prices, has no date: read it as it is. A quantity from it is the state of its crawl date: write the date in `ref`. When the change is older than the crawl, the factor is C, and its `low` is the lowest count that a bill row of the window or the code supports. With none, the factor is D, of kind `assumption`, and its `low` is half: never a point. Every other query and every list of runs carries literal dates: no undated count and no sample.
+A list of runs returns 1000 rows at most, whatever its limit: when a read returns 1000 rows, split the window into shorter literal date ranges and add the counts.
 
 For each line that step 3 did not stop:
 

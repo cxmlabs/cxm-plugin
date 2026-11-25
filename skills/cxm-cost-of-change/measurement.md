@@ -174,10 +174,7 @@ allowance, the tiers, the commitments and the negotiated discount. A datasource 
 
 **AWS rules**
 
-- Prefer the rate the account pays: net cost ÷ usage per usage type from `costs`. Otherwise use
-  the list-price route with `volume_amount`. Quote `total_cost_for_volume` for a tiered cost, never
-  `applicable_tier` × the whole volume. For a change on top of current usage, price the current
-  usage plus the change, and the current usage alone, and give the difference. Put the formula in `ref`.
+- The rate factor and the tiers: "Money rules" (Rate, Tiers). Quote `total_cost_for_volume` for a tiered cost, never `applicable_tier` × the whole volume.
 - Copy the usage type verbatim from a `costs` row. Do not add or strip a region prefix. If the bill
   has no row for it, find it with the `search` call.
 - Map an API operation to its usage type from a `costs` row that holds both. If no row of the
@@ -201,7 +198,6 @@ allowance, the tiers, the commitments and the negotiated discount. A datasource 
   route returns USD: compare a list rate with an effective rate, or set a floor and a ceiling from
   them, only when `costs.billing_currency` is USD. Otherwise follow the currency rule of
   step 5 of `SKILL.md`. For another datasource, follow its row of the rate map.
-- Tiers: "Money rules" applies them to the total of the payer.
 - Commitment: when a usage type has `costs.pricing_term` = `OnDemand` usage in the window, the marginal
   unit bills at the on-demand rate. When all its usage is `Reserved`, give 0 as the floor and the
   on-demand rate as the ceiling. Add the doubt that the use of a commitment is known over its life only

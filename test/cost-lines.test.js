@@ -155,6 +155,9 @@ test('the headline grade is the lowest grade of the lines that hold 10 percent o
   assert.match(section, /^Share of the weight by grade: A 45\.5 %, B 45\.5 %, D 9\.1 %\.$/m);
   assert.equal(grade(line('a', [point(1, 'run/day', 'A'), { constant: 'day_per_mo' }, point(1, '$/run', 'A')])), 'A', 'a constant has no grade');
   assert.equal(grade(), null);
+  const crowd = compute(Array.from({ length: 11 }, (_, i) => dollars(`b${i}`, 5, 5, 'B')));
+  assert.equal(crowd.result.headline.grade, 'B', 'no line holds 10 percent');
+  assert.doesNotMatch(crowd.section, /grade null/);
 });
 
 test('a coverage entry changes no amount and no grade', () => {
@@ -266,11 +269,13 @@ test('lines that share a factor take the same end of it, and the headline is the
   assert.match(section, /^Each part takes one end of each shared factor, so it can be narrower than the sum of its lines: `daily volume`\.$/m);
   assert.ok(section.includes('10–20 GB/mo [C, dataset, shared: daily volume]'), section);
 
-  // A divided factor: 12 ÷ s plus 3 × s. s = 1: 12 + 3 = 15. s = 2: 6 + 6 = 12. The headline is 12 to 15, and the simple sum is 9 to 18.
+  // A text that divides in one line and multiplies in another has no fixed end: each line keeps its own range, so the headline is the simple sum, 9 to 18.
   const s = () => shared('rows', factor(1, 2, 'x/y', 'C'));
   const divided = compute([line('a', [point(12, 'x/mo'), { ...s(), divide: true }, point(1, '$/y')]), line('b', [s(), point(3, 'y/mo'), point(1, '$/x')])]).result;
-  range(divided.headline, 12, 15, 'divided');
+  range(divided.headline, 9, 18, 'divided');
   range(divided.totals.direct, 9, 18, 'divided');
+  // A text that stands twice in one line has no fixed end either: s ÷ s × 5 is 2.5 to 10 with each end free.
+  range(compute([line('a', [s(), { ...s(), divide: true }, point(5, '$/mo')])]).result.headline, 2.5, 10, 'twice in one line');
 
   // Two texts move alone: u in 1 to 2 and v in 10 to 20. (u - v) at $1 is 1 - 20 = -19 to 2 - 10 = -8, as without a share.
   const two = compute([line('u', [shared('u', factor(1, 2, 'x/mo')), point(1, '$/x')]), line('v', [shared('v', factor(10, 20, 'x/mo')), point(1, '$/x')], { direction: 'remove' })]).result;
@@ -406,11 +411,16 @@ Each file is at commit`), section);
   assert.ok(none.section.startsWith('### Cost of this change\n\nNo line can be estimated yet. Estimated lines: 0 of 1 headline lines. Uncovered targets: 0.\n\nNot estimated yet: between $0.00 and $50.00 per month, 1 line.\n'), none.section);
   assert.doesNotMatch(none.section, /Totals:/);
   // No headline line: another line or an unmeasured entry still says that there is something to estimate.
-  for (const [lines, coverage] of [[[dollars('a', 5, 5, 'B', { tag: 'llm' })], []], [[], [entry('unmeasured', { directive: 'ask z' })]], [[dollars('a', 5, 5, 'B', { tag: 'llm' })], [entry('unmeasured', { directive: 'ask z' })]]]) {
+  for (const [lines, coverage] of [[[], [entry('unmeasured', { directive: 'ask z' })]], [[dollars('a', 5, 5, 'B', { tag: 'llm' })], [entry('unmeasured', { directive: 'ask z' })]]]) {
     const { section: text } = compute(lines, coverage);
     assert.ok(text.startsWith('### Cost of this change\n\nNo line can be estimated yet. Uncovered targets: 0.\n'), text);
     assert.doesNotMatch(text, /\$0\.00 per month|0 of 0|No billed line moves/);
   }
+  const lone = compute([], [entry('uncovered_target')]).section;
+  assert.ok(lone.startsWith('### Cost of this change\n\nNo line can be estimated yet. Uncovered targets: 1.\n'), lone);
+  const other = compute([dollars('a', 5, 5, 'B', { tag: 'llm' })]).section;
+  assert.ok(other.startsWith('### Cost of this change\n\nNo headline line. The other lines are in the totals. Uncovered targets: 0.\n'), other);
+  assert.doesNotMatch(other, /No line can be estimated yet/);
   assert.doesNotMatch(compute([dollars('a', 1, 2)]).section, /Not estimated yet/);
 });
 
