@@ -186,19 +186,20 @@ function linked(parts) {
   }
   return found.map((g) => ({ parts: g.parts, range: netRange(g.parts) }));
 }
+const reachesOne = (range) => weight(range) >= 1 - 1e-9;
 // Ends of opposite signs, or an end of 0, count as an infinite ratio.
 function isOpen({ low, high }) {
   const [smaller, larger] = [Math.abs(low), Math.abs(high)].sort((a, b) => a - b);
-  return larger >= 1 - 1e-9 && ((low < 0 && high > 0) || larger > 10 * smaller * (1 + 1e-9));
+  return reachesOne({ low, high }) && ((low < 0 && high > 0) || larger > 10 * smaller * (1 + 1e-9));
 }
 // A line of low confidence tells a coding agent what to expose. A line of more confidence has nothing to ask.
 function checkDirectives(parts, open, on) {
   for (const part of parts) {
     const { line, computed } = part;
     const say = on(`line ${quote(line.id)}`);
-    const low = open.includes(part) ? 'its group is open' : HEADLINE.includes(line.tag) && computed.grade === 'D' ? 'its grade is D' : '';
+    const low = open.includes(part) ? 'its group is open' : HEADLINE.includes(line.tag) && computed.grade === 'D' && reachesOne(computed) ? 'its grade is D' : '';
     if (low && !isText(line.directive)) say(`${low}, and it states no directive. ${DIRECTIVE}`);
-    if (!low && Object.hasOwn(line, 'directive')) say('it is not open and not a headline line of grade D, so it takes no directive');
+    if (!low && Object.hasOwn(line, 'directive')) say('it is not open and not a headline line of grade D at $1/mo or more, so it takes no directive');
   }
 }
 
