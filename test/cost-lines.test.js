@@ -12,7 +12,7 @@ const factor = (low, high, unit, grade = 'B') => ({ low, high, unit, grade, sour
 const point = (value, unit, grade) => factor(value, value, unit, grade);
 const line = (id, factors, more) => ({ id, key: 'requests', target: 'job-a', item: 'S3 PUT', at: 'src/job.js:12@0123abc', tag: 'direct', direction: 'add', factors, ...more });
 // A count per month at $1, so the amount is the count.
-const dollars = (id, low, high, grade, more) => line(id, [factor(low, high, 'x/mo', grade), point(1, '$/x', 'A')], more);
+const dollars = (id, low, high, grade, more) => line(id, [factor(low, high, 'x/mo', grade), point(1, '$/x', 'A')], { ...(grade === 'D' && (more?.tag ?? 'direct') === 'direct' ? { directive: 'the metric m' } : {}), ...more });
 const input = (lines, coverage = []) => ({ schema_version: 2, organization: 'org-a', lines, coverage });
 const entry = (kind, more) => ({ kind, what: 'a target', why: 'no lookup found it', source: source('tool'), ...more });
 const compute = (lines, coverage) => {
@@ -142,7 +142,7 @@ test('the headline grade is the lowest grade of the lines that hold 10 percent o
   const grade = (...lines) => compute(lines).result.headline.grade;
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 0.5, 1, 'D')), 'D', 'a D line at 10 percent by its high');
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 0.5, 0.99, 'D')), 'A', 'the same line below 10 percent');
-  assert.equal(grade(dollars('a', 0.63, 0.63, 'A'), line('d', [factor(0.1, 0.7, 'x/mo', 'D'), point(0.1, '$/x', 'A')])), 'D', '10 percent with a float residue');
+  assert.equal(grade(dollars('a', 0.63, 0.63, 'A'), line('d', [factor(0.1, 0.7, 'x/mo', 'D'), point(0.1, '$/x', 'A')], { directive: 'the metric m' })), 'D', '10 percent with a float residue');
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 0.5, 1, 'D', { direction: 'remove' })), 'D', 'the weight of a removal is its larger absolute bound');
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 50, 100, 'D', { tag: 'llm' })), 'A', 'a line outside the headline has no weight');
   // The net is 0, so a share of the net would give D. The weight is 11 and D holds 1 of it.
@@ -159,55 +159,79 @@ test('a coverage entry changes no amount and no grade', () => {
   const lines = [dollars('a', 1, 3, 'A'), dollars('b', 1, 2, 'C')];
   const kinds = ['uncovered_target', 'unmeasured', 'not_billed', 'doubt'];
   const bare = compute(lines);
-  const full = compute(lines, kinds.map((kind) => entry(kind, { what: `what ${kind}`, ...(kind === 'unmeasured' ? { needs: 'the metric m on service s' } : {}) })));
+  const full = compute(lines, kinds.map((kind) => entry(kind, { what: `what ${kind}`, ...(kind === 'unmeasured' ? { directive: 'the metric m on service s' } : {}) })));
   assert.deepEqual(full.result, { ...bare.result, headline: { ...bare.result.headline, uncovered_targets: 1 } });
-  for (const kind of kinds) assert.ok(full.section.includes(`- ${kind}: \`what ${kind}\`. Why: \`no lookup found it\`. Source: tool, \`synthetic\`.`));
+  for (const kind of kinds) assert.equal(full.section.includes(`- ${kind}: \`what ${kind}\`. Why: \`no lookup found it\`. Source: tool, \`synthetic\`.`), kind !== 'unmeasured', kind);
+  assert.ok(full.section.includes('| 3 | `what unmeasured` | not measured | - | `no lookup found it` | `the metric m on service s` |'), full.section);
   assert.match(full.section, /grade C\. Estimated lines: 2 of 2 headline lines\. Uncovered targets: 1\.$/m);
   const empty = compute([], [entry('not_billed')]);
   assert.match(empty.section, /^No billed line moves\. Uncovered targets: 0\.$/m);
   assert.match(empty.section, /- not_billed: `a target`/);
 });
 
-test('the section prints each line and each coverage entry, and prints once the text that they share', () => {
-  const lines = ['t-1', 't-2'].flatMap((target, t) => ['i-1', 'i-2'].map((item, i) => dollars(`${target}-${item}`, 1 + t, 5 + i, 'C', { target, item, key: `k-${item}`, at: `src/${item}.js:1@0123abc` })));
+const HEAD = '| # | What | $/month | Grade | How it is computed | Directive for a coding agent |\n|---|---|---|---|---|---|\n';
+test('the section ends its lines in one table, in order, with the directive of each line of low confidence', () => {
   const { section } = compute(
-    [...lines, line('once', [point(7, '$')], { tag: 'one-off', item: 'i-3', at: 'src/i-3.js:1@0123abc' })],
-    ['w-1', 'w-2'].map((what) => entry('uncovered_target', { what })),
+    [
+      dollars('small', 1, 2, 'A', { at: 'src/a.js:1@0123abc' }), line('once', [point(7, '$')], { tag: 'one-off', item: 'i-3', at: 'src/c.js:1@0123abc' }),
+      dollars('flag', 800, 900, 'D', { tag: 'flag-gated', item: 'i-4', at: 'src/d.js:1@0123abc' }), dollars('cut', 30, 40, 'D', { direction: 'remove', item: 'i-1', at: 'src/b.js:2@0123abc', directive: 'ask x' }),
+      dollars('wide', 0, 35, 'C', { tag: 'indirect', item: 'i-2', at: 'src/b.js:3@0123abc', directive: ' ask  x ' }),
+    ],
+    [entry('unmeasured', { what: 'w-1', why: 'y-1', directive: 'ask z' }), entry('uncovered_target', { what: 'w-2' }), entry('uncovered_target', { what: 'w-3' }), entry('unmeasured', { what: 'w-4', why: 'y-4', directive: 'ask x' })],
   );
-  assert.ok(section.includes(`Lines, at commit \`0123abc\`, in dollars per month (a one-off line: in dollars, once):
+  // The larger absolute ends are 40, 35 and 2. The two other lines keep the order of the input.
+  assert.ok(section.endsWith(`
+Each file is at commit \`0123abc\`.
 
-- direct, add: \`i-1\`, \`k-i-1\`, at \`src/i-1.js:1\`
-  - \`t-1-i-1\` \`t-1\`: $1.00 to $5.00, grade C
-    = \`1–5 x/mo [C, dataset] × 1 $/x [A, dataset]\`
-  - \`t-2-i-1\` \`t-2\`: $2.00 to $5.00, grade C
-    = \`2–5 x/mo [C, dataset] × 1 $/x [A, dataset]\`
-- direct, add: \`i-2\`, \`k-i-2\`, at \`src/i-2.js:1\`
-  - \`t-1-i-2\` \`t-1\`: $1.00 to $6.00, grade C
-    = \`1–6 x/mo [C, dataset] × 1 $/x [A, dataset]\`
-  - \`t-2-i-2\` \`t-2\`: $2.00 to $6.00, grade C
-    = \`2–6 x/mo [C, dataset] × 1 $/x [A, dataset]\`
-- one-off, add: \`i-3\`, \`requests\`, at \`src/i-3.js:1\`. \`once\` \`job-a\`: $7.00, grade B
-  = \`7 $ [B, dataset]\`
+${HEAD}| 1 | \`i-1\`, \`requests\`, \`job-a\`, \`src/b.js:2\` | -$40.00 to -$30.00 | D | \`30–40 x/mo [D, assumption] × 1 $/x [A, dataset]\` | \`ask x\` |
+| 2 | \`i-2\`, \`requests\`, \`job-a\`, \`src/b.js:3\` | not estimated yet: $0.00 to $35.00 | C | \`0–35 x/mo [C, dataset] × 1 $/x [A, dataset]\` | as row 1 |
+| 3 | \`S3 PUT\`, \`requests\`, \`job-a\`, \`src/a.js:1\` | $1.00 to $2.00 | A | \`1–2 x/mo [A, dataset] × 1 $/x [A, dataset]\` | - |
+| 4 | \`w-1\` | not measured | - | \`y-1\` | \`ask z\` |
+| 5 | \`w-4\` | not measured | - | \`y-4\` | as row 1 |
+| 6 | one-off: \`i-3\`, \`requests\`, \`job-a\`, \`src/c.js:1\` | $7.00 once | B | \`7 $ [B, dataset]\` | - |
+| 7 | flag-gated: \`i-4\`, \`requests\`, \`job-a\`, \`src/d.js:1\` | $800.00 to $900.00 | D | \`800–900 x/mo [D, assumption] × 1 $/x [A, dataset]\` | - |
+
+Coverage:
+
+- uncovered_target: \`w-2\`, \`w-3\`. Why: \`no lookup found it\`. Source: tool, \`synthetic\`.
 `), section);
-  assert.ok(section.includes('- uncovered_target: `w-1`, `w-2`. Why: `no lookup found it`. Source: tool, `synthetic`.'), section);
   // Two commits: each line keeps its own.
   const two = compute([dollars('a', 1, 1), dollars('b', 1, 1, 'B', { at: 'src/job.js:12@9999999' })]).section;
-  for (const text of ['Lines, in dollars per month (', 'at `src/job.js:12@0123abc`. `a`', 'at `src/job.js:12@9999999`. `b`']) assert.ok(two.includes(text), two);
+  for (const text of ['`src/job.js:12@0123abc` |', '`src/job.js:12@9999999` |']) assert.ok(two.includes(text), two);
+  assert.ok(!two.includes('is at commit'));
+  // No line: the unmeasured entries make the table, and with none there is no table.
+  assert.ok(compute([], [entry('unmeasured', { directive: 'ask z' })]).section.endsWith(`No billed line moves. Uncovered targets: 0.\n\n${HEAD}| 1 | \`a target\` | not measured | - | \`no lookup found it\` | \`ask z\` |\n`));
+  assert.equal(compute([]).section, '### Cost of this change\n\nNo billed line moves. Uncovered targets: 0.\n');
 });
 
-test('the section prints each factor of each line under its line, and a unit cannot leave its code span', () => {
+test('a pipe, a line break and a control character in a text field stay in one cell', () => {
+  const bad = 'a|b\\|c\\\\|d\n| x |\r\u2028\x1b[2J`e\\';
+  const { section } = compute(
+    [line('l', [shared(bad, factor(0, 50, 'x/mo')), point(1, '$/x')], { item: bad, key: bad, target: bad, at: 'src/a|b.js:1@0123abc', directive: bad })],
+    [entry('unmeasured', { what: bad, why: bad, directive: `${bad} 2` })],
+  );
+  const rows = section.split('\n').filter((l) => /^\| \d/.test(l));
+  assert.equal(rows.length, 2, section);
+  // A cell ends at a pipe that no backslash escapes. A backslash and the character after it are one unit.
+  for (const row of rows) assert.equal([...row.matchAll(/\\.|\|/g)].filter((m) => m[0] === '|').length, 7, row);
+  const safe = "`a\\|b\\ \\|c\\\\ \\|d \\| x \\| [2J'e\\`";
+  assert.equal(rows[0], `| 1 | ${safe}, ${safe}, ${safe}, \`src/a\\|b.js:1\` | not estimated yet: $0.00 to $50.00 | B | ${safe.replace('`a', '`0–50 x/mo [B, dataset, shared: a').replace(/`$/, '] × 1 $/x [B, dataset]`')} | ${safe} |`);
+  assert.doesNotMatch(section, /[\x00-\x09\x0b-\x1f\x7f-\x9f\u2028]/);
+});
+
+test('the table prints each factor of each line, and a unit cannot leave its code span', () => {
   const rate = point(0.05, '$/vCPU*h', 'A');
   const lines = [
-    line('time', [factor(30, 45, 'run/mo', 'D'), point(2, 'min/run', 'C'), { constant: 'h_per_min' }, point(4, 'vCPU'), rate]),
+    line('time', [factor(30, 45, 'run/mo', 'D'), point(2, 'min/run', 'C'), { constant: 'h_per_min' }, point(4, 'vCPU'), rate], { directive: 'the run count', item: 'i-1' }),
     line('keep', [point(60, 'GB/mo'), point(30, 'day'), { ...point(30.4375, 'day/mo', 'A'), divide: true }, point(0.8, '1'), point(0.02, '$/GB*mo')], { item: 'i-2' }),
     line('token', [{ ...point(4, 'row/call'), divide: true }, point(1e-7, 'row/mo'), point(500, 'token/call'), { constant: 'million', of: 'token' }, point(0.4, '$/Mtoken')], { item: 'i-3', direction: 'remove' }),
   ];
   const { section } = compute(lines);
-  for (const [id, formula] of [
-    ['time', '30–45 run/mo [D, assumption] × 2 min/run [C, dataset] × h_per_min × 4 vCPU [B, dataset] × 0.05 $/vCPU*h [A, dataset]'],
-    ['keep', '60 GB/mo [B, dataset] × 30 day [B, dataset] ÷ 30.4375 day/mo [A, dataset] × 0.8 [B, dataset] × 0.02 $/GB*mo [B, dataset]'],
-    ['token', '1 ÷ 4 row/call [B, dataset] × 1e-7 row/mo [B, dataset] × 500 token/call [B, dataset] × million of token × 0.4 $/Mtoken [B, dataset]'],
-  ]) assert.match(section, new RegExp(`\`${id}\`.*\\n  = \`${formula.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\`\\n`), id);
+  for (const [item, formula] of [
+    ['i-1', '30–45 run/mo [D, assumption] × 2 min/run [C, dataset] × h_per_min × 4 vCPU [B, dataset] × 0.05 $/vCPU*h [A, dataset]'],
+    ['i-2', '60 GB/mo [B, dataset] × 30 day [B, dataset] ÷ 30.4375 day/mo [A, dataset] × 0.8 [B, dataset] × 0.02 $/GB*mo [B, dataset]'],
+    ['i-3', '1 ÷ 4 row/call [B, dataset] × 1e-7 row/mo [B, dataset] × 500 token/call [B, dataset] × million of token × 0.4 $/Mtoken [B, dataset]'],
+  ]) assert.ok(section.split('\n').some((row) => row.includes(`| \`${item}\`, `) && row.includes(` | \`${formula}\` | `)), item);
   assert.ok(!section.includes('synthetic'), 'no ref: it stays in the block');
   for (const unit of ['x`y/mo', 'x\ny/mo', 'x y/mo']) assert.ok(computeCostResult(input([line('a', [point(1, unit), point(1, '$/x')])])).faults, unit);
 });
@@ -272,7 +296,7 @@ test('an activity factor takes half of its low and twice its high, and the secti
   range(result.headline, 40, 160, 'headline');
   assert.ok(section.includes('40 run/mo [B, dataset, activity: 20–80] × 2 $/run'), section);
   // 10 to 30 runs at $2: 5 x 2 = 10 to 60 x 2 = 120.
-  range(compute([line('a', [active(factor(10, 30, 'run/mo')), point(2, '$/run')], { needs: 'the run count' })]).result.lines[0], 10, 120, 'a range');
+  range(compute([line('a', [active(factor(10, 30, 'run/mo')), point(2, '$/run')], { directive: 'the run count' })]).result.lines[0], 10, 120, 'a range');
   // 800 rows ÷ 10 rows in a request: 800 / 20 = 40 to 800 / 5 = 160.
   range(compute([line('a', [point(800, 'row/mo'), { ...active(point(10, 'row/request')), divide: true }, point(1, '$/request')])]).result.lines[0], 40, 160, 'divided');
   // A shared activity factor of 10 moves in 5 to 20. (3 - 2) x 5 = 5 to (3 - 2) x 20 = 20.
@@ -286,7 +310,7 @@ test('an activity factor takes half of its low and twice its high, and the secti
   assert.match(computeCostResult(input([line('a', [both(), point(3, '$/run')]), line('b', [shared('runs', point(10, 'run/mo')), point(2, '$/run')])])).faults[0], /shared "runs" needs the same/, 'the band is part of the value');
 });
 
-const open = (id, low, high, needs = 'the metric m on service s', more) => dollars(id, low, high, 'B', { needs, ...more });
+const open = (id, low, high, directive = 'the metric m on service s', more) => dollars(id, low, high, 'B', { directive, ...more });
 test('a group is open by an end of 0, by opposite signs or by its ratio, at $1 or more', () => {
   // Opposite signs need two linked lines: n at a range of rates, less the same n at one rate. One line has one sign.
   const cross = (n, plus, minus) => [
@@ -320,20 +344,19 @@ test('linked lines are one group: a pair that nets narrow is estimated, and one 
   range(result.headline, 0.04, 0.8, 'pair');
   assert.deepEqual([result.headline.estimated_lines, result.headline.open_lines], [['add', 'cut'], []]);
   // A third line holds v at $0 to $2.5. v = 1: 0.04 to 2.54. v = 20: 0.8 to 50.8. The group is 0.04 to 50.8, so the three lines are open.
-  const needs = 'the metric m';
+  const directive = 'the metric m';
   const third = [
-    { ...line('add', [v(), point(3, '$/GB')]), needs }, { ...line('cut', [v(), point(2.96, '$/GB')], { direction: 'remove' }), needs },
-    { ...line('far', [v(), factor(0, 2.5, '$/GB')]), needs }, dollars('alone', 4, 5),
+    { ...line('add', [v(), point(3, '$/GB')]), directive }, { ...line('cut', [v(), point(2.96, '$/GB')], { direction: 'remove' }), directive },
+    { ...line('far', [v(), factor(0, 2.5, '$/GB')]), directive }, dollars('alone', 4, 5),
   ];
   const opened = compute(third).result;
   range(opened.open, 0.04, 50.8, 'group');
   assert.deepEqual([opened.open.lines, opened.headline.estimated_lines], [['add', 'cut', 'far'], ['alone']]);
   range(opened.headline, 4, 5, 'the other line');
-  assert.match(compute(third).section, /- `the metric m`\. Narrows `add`, `cut`, `far`: \$0\.04 to \$50\.80 per month\.$/m, 'the row nets the linked lines');
   // A chain: a and b share s, b and c share t. They are one group, also when the line that joins them comes last.
   const s = (f) => [shared('s', factor(1, 2, 'x/mo')), ...f];
   const t = () => shared('t', factor(1, 2, '1'));
-  const chain = [line('a', s([point(1, '$/x')]), { needs }), line('c', [t(), factor(0, 9, '$/mo')], { needs }), line('b', s([t(), point(1, '$/x')]), { needs }), line('d', [t(), point(1, '$/mo')], { needs }), line('e', s([point(1, '$/x')]), { needs })];
+  const chain = [line('a', s([point(1, '$/x')]), { directive }), line('c', [t(), factor(0, 90, '$/mo')], { directive }), line('b', s([t(), point(1, '$/x')]), { directive }), line('d', [t(), point(1, '$/mo')], { directive }), line('e', s([point(1, '$/x')]), { directive })];
   assert.deepEqual(compute(chain).result.open.lines, ['a', 'c', 'b', 'd', 'e']);
   // Outside the headline a line links nothing and is never open.
   assert.deepEqual(compute([...pair(2.96), dollars('l', 0, 900, 'B', { tag: 'llm' })]).result.open, { low: 0, high: 0, unit: '$/mo', lines: [] });
@@ -345,12 +368,11 @@ test('the headline holds the estimated lines only, and the open part stands besi
   const { result, section } = compute([
     dollars('a', 4, 6, 'A'), dollars('i', 1, 2, 'B', { tag: 'indirect' }), open('o', 0, 50, metric), open('p', 0, 20, 'the log m', { tag: 'indirect' }),
     open('r', 0, 3, ` ${metric.replace(' ', '  ')}`, { direction: 'remove', tag: 'commitment' }), dollars('l', 0, 900, 'D', { tag: 'llm' }),
-  ], [entry('unmeasured', { what: 'w-1', needs: metric }), entry('unmeasured', { what: 'w-2', needs: 'the setting n' }), entry('doubt')]);
+  ], [entry('unmeasured', { what: 'w-1', directive: metric }), entry('unmeasured', { what: 'w-2', directive: 'the setting n' }), entry('doubt')]);
   assert.deepEqual(result.headline, {
     low: 5, high: 8, unit: '$/mo', grade: 'B', shares: { A: 0.75, B: 0.25, C: 0, D: 0 }, uncovered_targets: 0, estimated_lines: ['a', 'i'], open_lines: ['o', 'p', 'r'],
   });
   assert.deepEqual(result.open, { low: -3, high: 70, unit: '$/mo', lines: ['o', 'p', 'r'] });
-  // The row of the metric: o and r, 0 - 3 to 50 - 0.
   assert.ok(section.startsWith(`### Cost of this change
 
 **$5.00 to $8.00 per month**, grade B. Estimated lines: 2 of 5 headline lines. Uncovered targets: 0.
@@ -361,44 +383,39 @@ Share of the weight by grade: A 75.0 %, B 25.0 %.
 
 Not estimated yet: between -$3.00 and $70.00 per month, 3 lines.
 
-To narrow it, expose:
-
-- \`${metric}\`. Narrows \`o\`, \`r\`: -$3.00 to $50.00 per month. Unmeasured: \`w-1\`.
-- \`the log m\`. Narrows \`p\`: $0.00 to $20.00 per month.
-- \`the setting n\`. Unmeasured: \`w-2\`.
-
 Totals:
 `), section);
-  for (const sum of ['$2.00 to $78.00', 'Commitment fee']) assert.ok(!section.includes(sum), sum);
+  for (const sum of ['$2.00 to $78.00', 'Commitment fee', 'To narrow it']) assert.ok(!section.includes(sum), sum);
 
   const none = compute([open('o', 0, 50)]);
   assert.deepEqual([none.result.headline.low, none.result.headline.high, none.result.headline.grade, none.result.headline.shares], [0, 0, null, { A: 0, B: 0, C: 0, D: 0 }]);
   assert.ok(none.section.startsWith('### Cost of this change\n\nNo line can be estimated yet. Estimated lines: 0 of 1 headline lines. Uncovered targets: 0.\n\nNot estimated yet: between $0.00 and $50.00 per month, 1 lines.\n'), none.section);
   assert.match(compute([dollars('a', 5, 5, 'B', { tag: 'llm' })]).section, /^\*\*\$0\.00 per month\*\*, grade none\. Estimated lines: 0 of 0 headline lines\./m);
-  assert.doesNotMatch(compute([dollars('a', 1, 2)]).section, /Not estimated yet|To narrow it/);
-  assert.match(compute([], [entry('unmeasured', { needs: 'the setting n' })]).section, /^No billed line moves\. Uncovered targets: 0\.\n\nTo narrow it, expose:\n\n- `the setting n`\. Unmeasured: `a target`\.\n\nCoverage:/m);
-  const hostile = compute([open('o', 0, 50, 'x`\n```\n# y')]).section;
-  assert.ok(!hostile.includes('```') && hostile.includes("- `x' ''' # y`. Narrows"), hostile);
+  assert.doesNotMatch(compute([dollars('a', 1, 2)]).section, /Not estimated yet/);
 });
 
-test('needs stands on each open line and each unmeasured entry, and nowhere else', () => {
+test('a directive stands on each line and entry of low confidence, and nowhere else', () => {
   const faults = (lines, coverage) => computeCostResult(input(lines, coverage)).faults ?? [];
-  for (const needs of [undefined, '', ' ', 5, null]) {
-    const given = needs === undefined ? {} : { needs };
-    assert.deepEqual(faults([dollars('o', 0, 50, 'B', given)]).map((f) => f.slice(0, 40)), ['line "o": its group is open, and it stat'], String(needs));
-    assert.deepEqual(faults([], [entry('unmeasured', given)]).map((f) => f.slice(0, 40)), ['coverage 1: an unmeasured entry states n'], String(needs));
+  const asks = ', and it states no directive. Tell a coding agent what to expose, where, and how to check it';
+  for (const directive of [undefined, '', ' ', 5, null]) {
+    const given = directive === undefined ? {} : { directive };
+    assert.deepEqual(faults([dollars('o', 0, 50, 'D', { directive: undefined, ...given })]), [`line "o": its group is open${asks}`], String(directive));
+    for (const tag of ['direct', 'commitment', 'indirect']) assert.deepEqual(faults([dollars('g', 1, 2, 'D', { tag, directive: undefined, ...given })]), [`line "g": its grade is D${asks}`], String(directive));
+    assert.deepEqual(faults([], [entry('unmeasured', given)]), ['coverage 1: an unmeasured entry states no directive. Tell a coding agent what to expose, where, and how to check it'], String(directive));
   }
-  for (const needs of ['the metric m', '']) {
-    assert.deepEqual(faults([dollars('a', 1, 2, 'B', { needs })]), ['line "a": its group is not open, so it takes no needs']);
-    assert.deepEqual(faults([dollars('a', 0, 900, 'B', { needs, tag: 'llm' })]), ['line "a": its group is not open, so it takes no needs']);
-    for (const kind of ['uncovered_target', 'not_billed', 'doubt']) assert.deepEqual(faults([], [entry(kind, { needs })]), ['coverage 1: only an unmeasured entry takes needs']);
+  assert.deepEqual(faults([open('o', 0, 50), dollars('g', 1, 2, 'D')], [entry('unmeasured', { directive: 'x' })]), []);
+  for (const directive of ['the metric m', '']) {
+    const other = 'it is not open and not a headline line of grade D, so it takes no directive';
+    assert.deepEqual(faults([dollars('a', 1, 2, 'C', { directive })]), [`line "a": ${other}`]);
+    for (const tag of ['flag-gated', 'added-runtime', 'llm']) assert.deepEqual(faults([dollars('a', 0, 900, 'D', { directive, tag })]), [`line "a": ${other}`]);
+    for (const kind of ['uncovered_target', 'not_billed', 'doubt']) assert.deepEqual(faults([], [entry(kind, { directive })]), ['coverage 1: only an unmeasured entry takes a directive']);
   }
 });
 
 test('a result with an estimated part, an open part, a shared factor and an activity factor computes again to the same result', () => {
   const both = () => shared('runs', { ...point(10, 'run/mo'), activity: true });
-  const needs = 'the run count of job-a';
-  const given = input([line('a', [both(), factor(0, 3, '$/run')], { needs }), line('b', [both(), point(2, '$/run')], { direction: 'remove', tag: 'indirect', needs }), dollars('c', 1, 2)], [entry('unmeasured', { needs })]);
+  const directive = 'the run count of job-a';
+  const given = input([line('a', [both(), factor(0, 3, '$/run')], { directive }), line('b', [both(), point(2, '$/run')], { direction: 'remove', tag: 'indirect', directive }), dollars('c', 1, 2)], [entry('unmeasured', { directive })]);
   const first = computeCostResult(given);
   assert.deepEqual(first.faults, undefined);
   assert.deepEqual([first.result.open.lines, first.result.headline.estimated_lines], [['a', 'b'], ['c']]);
