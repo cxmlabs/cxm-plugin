@@ -31,7 +31,7 @@ test('cost-result prints the section, writes one block to the file that the call
   for (const none of [undefined, '']) {
     const good = run(JSON.stringify(input), none);
     assert.deepEqual([good.status, good.stderr], [0, '']);
-    assert.match(good.stdout, /^\*\*\$2\.00 to \$4\.00 per month\*\*, grade B\. Uncovered targets: 0\.$/m);
+    assert.match(good.stdout, /^\*\*\$2\.00 to \$4\.00 per month\*\*, grade B\. Estimated lines: 1 of 1 headline lines\. Uncovered targets: 0\.$/m);
     assert.doesNotMatch(good.stdout, /```|schema_version/, 'no variable: the section only');
   }
   const first = run(JSON.stringify(input), file);

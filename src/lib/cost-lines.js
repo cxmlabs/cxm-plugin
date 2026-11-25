@@ -132,7 +132,7 @@ function computeLine(line, say) {
   needOne(line.tag, TAGS, 'tag', refuse);
   needOne(line.direction, DIRECTIONS, 'direction', refuse);
   if (Object.hasOwn(line, 'amount')) refuse('it holds an amount. Delete it: the amount is the product of the factors');
-  refuseOthers(line, ['id', 'key', 'target', 'item', 'at', 'tag', 'direction', 'factors', 'amount'], refuse);
+  refuseOthers(line, ['id', 'key', 'target', 'item', 'at', 'tag', 'direction', 'factors', 'amount', 'needs'], refuse);
   if (!Array.isArray(line.factors) || line.factors.length === 0) return refuse('factors is not a list with a factor');
 
   const factors = [...line.factors].map((f, i) => readFactor(f, (reason) => refuse(`factor ${i + 1}: ${reason}`)));
@@ -150,7 +150,7 @@ function computeLine(line, say) {
   const range = rangeOf(factors, line.direction);
   if (!Number.isFinite(range.low) || !Number.isFinite(range.high)) return refuse('the amount is not finite');
   if (weight(range) === 0) return refuse('its high is 0. Put it in coverage');
-  return { factors, computed: { id: line.id, ...range, unit, grade: lowest(factors.flatMap((f) => f.grade ?? [])) } };
+  return { line, factors, computed: { id: line.id, ...range, unit, grade: lowest(factors.flatMap((f) => f.grade ?? [])) } };
 }
 
 const lowest = (grades) => grades.reduce((a, b) => (a > b ? a : b), '') || null;
@@ -159,27 +159,45 @@ const sumRange = (ranges) => ({ low: total(ranges.map((r) => r.low)), high: tota
 const weight = (line) => Math.max(Math.abs(line.low), Math.abs(line.high));
 
 // A shared text stands for one unknown, so each line gives it the same values.
-function checkShared(lines, parts, on) {
+function checkShared(parts, on) {
   const first = new Map();
-  parts.forEach(({ factors }, i) => factors.forEach((f, n) => {
+  parts.forEach(({ line, factors }) => factors.forEach((f, n) => {
     if (!f.shared) return;
     const same = first.get(f.shared) ?? first.set(f.shared, f).get(f.shared);
-    if (['low', 'high', 'unit', 'grade'].some((key) => same[key] !== f[key])) on(`line ${quote(lines[i].id)}`)(`factor ${n + 1}: shared ${quote(f.shared)} needs the same low, high, unit and grade in each line`);
+    if (['low', 'high', 'unit', 'grade'].some((key) => same[key] !== f[key])) on(`line ${quote(line.id)}`)(`factor ${n + 1}: shared ${quote(f.shared)} needs the same low, high, unit and grade in each line`);
   }));
   if (first.size > MAX_SHARED) on('input')(`${first.size} shared texts. At most ${MAX_SHARED}`);
 }
 // The least and the greatest sum over the ends of the shared factors.
-function headlineRange(lines, parts) {
+function netRange(parts) {
   const texts = [...new Set(parts.flatMap(({ factors }) => factors.flatMap((f) => f.shared ?? [])))];
   const corners = texts.reduce((list, text) => list.flatMap((ends) => ['low', 'high'].map((end) => new Map([...ends, [text, end]]))), [new Map()]);
-  const sums = corners.map((ends) => sumRange(parts.map(({ factors }, i) => rangeOf(factors, lines[i].direction, ends))));
+  const sums = corners.map((ends) => sumRange(parts.map(({ factors, line }) => rangeOf(factors, line.direction, ends))));
   return { low: Math.min(...sums.map((r) => r.low)), high: Math.max(...sums.map((r) => r.high)) };
 }
+// The lines that a shared text connects, also through a third line. Any other line is its own group.
+function linked(parts) {
+  let found = [];
+  for (const part of parts) {
+    const texts = part.factors.flatMap((f) => f.shared ?? []);
+    const [joined, rest] = [true, false].map((want) => found.filter((g) => g.texts.some((t) => texts.includes(t)) === want));
+    found = [...rest, { texts: [...joined.flatMap((g) => g.texts), ...texts], parts: [...joined.flatMap((g) => g.parts), part] }];
+  }
+  return found.map((g) => ({ parts: g.parts, range: netRange(g.parts) }));
+}
 // Ends of opposite signs, or an end of 0, count as an infinite ratio.
-function statusOf({ low, high }) {
+function isOpen({ low, high }) {
   const [smaller, larger] = [Math.abs(low), Math.abs(high)].sort((a, b) => a - b);
-  const wide = (low < 0 && high > 0) || larger > 10 * smaller * (1 + 1e-9);
-  return larger >= 1 - 1e-9 && wide ? 'cannot_estimate' : 'estimate';
+  return larger >= 1 - 1e-9 && ((low < 0 && high > 0) || larger > 10 * smaller * (1 + 1e-9));
+}
+// An open line names what would narrow it. A line that is not open has nothing to narrow.
+function checkNeeds(parts, open, on) {
+  for (const part of parts) {
+    const say = on(`line ${quote(part.line.id)}`);
+    if (open.includes(part)) {
+      if (!isText(part.line.needs)) say('its group is open, and it states no needs. Name the metric, dataset, log or setting that narrows it, and where to expose it');
+    } else if (Object.hasOwn(part.line, 'needs')) say('its group is not open, so it takes no needs');
+  }
 }
 
 // Cents from $1. Below it, three digits down to a millionth of a dollar, so a float residue prints as zero.
@@ -219,29 +237,40 @@ function coverageRows(entries) {
   return [...groups(entries, (c) => `${c.kind} ${reason(c)}`).values()].map((held) => `- ${held[0][0].kind}: ${held.map(([c]) => code(c.what)).join(', ')}. ${reason(held[0][0])}`);
 }
 
-// The two headline lines with the largest width.
-function widest(lines, computed) {
-  const width = new Map(lines.map((l, i) => [l, computed[i].high - computed[i].low]));
-  return lines.filter((l) => HEADLINE.includes(l.tag)).sort((a, b) => width.get(b) - width.get(a)).slice(0, 2);
+// One row for each distinct text of `needs`: the open lines that it narrows, then the unmeasured entries.
+function needRows(parts, coverage, open) {
+  const asked = [...parts.filter((part) => open.lines.includes(part.line.id)).map((part) => ({ part, text: clean(part.line.needs) })), ...coverage.flatMap((c) => (c.kind === 'unmeasured' ? { what: c.what, text: clean(c.needs) } : []))];
+  return [...groups(asked, (a) => a.text)].map(([text, held]) => {
+    const narrowed = held.flatMap(([a]) => a.part ?? []);
+    const whats = held.flatMap(([a]) => (a.part ? [] : code(a.what)));
+    const lines = narrowed.length ? ` Narrows ${narrowed.map((part) => code(part.line.id)).join(', ')}: ${span(netRange(narrowed))} per month.` : '';
+    return `- ${code(text)}.${lines}${whats.length ? ` Unmeasured: ${whats.join(', ')}.` : ''}`;
+  });
 }
 
-function sectionOf(input, result) {
-  const { lines, totals, headline } = result;
+function sectionOf(input, result, parts) {
+  const { lines, totals, headline, open } = result;
   const uncovered = `Uncovered targets: ${headline.uncovered_targets}.`;
   const out = ['### Cost of this change', ''];
   if (lines.length === 0) out.push(`No billed line moves. ${uncovered}`);
   else {
-    const held = TAGS.filter((tag) => input.lines.some((l) => l.tag === tag));
     const shares = GRADES.filter((g) => headline.shares[g] > 0).map((g) => `${g} ${(headline.shares[g] * 100).toFixed(1)} %`);
-    const cannot = headline.status === 'cannot_estimate';
-    const said = cannot ? `Cannot estimate: between ${dollars(headline.low)} and ${dollars(headline.high)} per month` : amount(headline);
-    out.push(`**${said}**, grade ${headline.grade ?? 'none'}. ${uncovered}`, '');
-    if (cannot) out.push(`The widest lines: ${widest(input.lines, lines).map((l) => `${code(l.id)} (${code(l.item)})`).join(', ')}.`, '');
-    if (held.includes('commitment')) out.push(`Commitment fee inside the headline: ${amount(totals.commitment)}.`, '');
-    if (held.includes('indirect')) out.push(`Indirect cost inside the headline: ${amount(totals.indirect)}.`, '');
-    const texts = [...new Set(input.lines.flatMap((l) => l.factors.flatMap((f) => (f.shared ? clean(f.shared) : []))))];
-    if (texts.length) out.push(`The headline takes one end of each shared factor, so it can be narrower than the sum of the totals: ${texts.map(code).join(', ')}.`, '');
+    const counted = headline.estimated_lines.length;
+    const none = counted === 0 && open.lines.length > 0;
+    out.push(`${none ? 'No line can be estimated yet.' : `**${amount(headline)}**, grade ${headline.grade ?? 'none'}.`} Estimated lines: ${counted} of ${counted + open.lines.length} headline lines. ${uncovered}`, '');
+    const inside = (tag) => lines.filter((l, n) => input.lines[n].tag === tag && headline.estimated_lines.includes(l.id));
+    for (const [tag, name] of [['commitment', 'Commitment fee'], ['indirect', 'Indirect cost']]) {
+      if (inside(tag).length) out.push(`${name} inside the headline: ${amount(sumRange(inside(tag)))}.`, '');
+    }
     if (shares.length) out.push(`Share of the weight by grade: ${shares.join(', ')}.`, '');
+    if (open.lines.length) out.push(`Not estimated yet: between ${dollars(open.low)} and ${dollars(open.high)} per month, ${open.lines.length} lines.`, '');
+    const texts = [...new Set(parts.flatMap((part) => (HEADLINE.includes(part.line.tag) ? part.factors.flatMap((f) => f.shared ?? []) : [])))];
+    if (texts.length) out.push(`Each part takes one end of each shared factor, so it can be narrower than the sum of its lines: ${texts.map(code).join(', ')}.`, '');
+  }
+  const rows = needRows(parts, input.coverage, open);
+  if (rows.length) out.push(...(lines.length ? [] : ['']), 'To narrow it, expose:', '', ...rows, ...(lines.length ? [''] : []));
+  if (lines.length) {
+    const held = TAGS.filter((tag) => input.lines.some((l) => l.tag === tag));
     out.push('Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`), '');
     const commits = new Set(input.lines.map((l) => l.at.slice(l.at.lastIndexOf('@') + 1)));
     const shared = commits.size === 1 ? [...commits][0] : '';
@@ -275,13 +304,15 @@ export function computeCostResult(input) {
   for (const [i, entry] of input.coverage.entries()) {
     const refuse = on(`coverage ${i + 1}`);
     if (isObject(entry)) {
-      refuseOthers(entry, ['kind', 'what', 'why', 'source'], refuse);
+      refuseOthers(entry, ['kind', 'what', 'why', 'source', 'needs'], refuse);
       needOne(entry.kind, COVERAGE, 'coverage kind', refuse);
       needTexts(entry, ['what', 'why'], refuse);
+      if (entry.kind === 'unmeasured' && !isText(entry.needs)) refuse('an unmeasured entry states no needs. Name the metric, dataset, log or setting to expose, and where');
+      else if (entry.kind !== 'unmeasured' && Object.hasOwn(entry, 'needs')) refuse('only an unmeasured entry takes needs');
       needSource(entry.source, refuse);
     } else refuse('it is not an object');
   }
-  if (faults.length === 0) checkShared(input.lines, parts, on);
+  if (faults.length === 0) checkShared(parts, on);
   if (faults.length) return { faults };
   const lines = parts.map((part) => part.computed);
   // Each total is at most this sum, so one check covers them all.
@@ -289,22 +320,30 @@ export function computeCostResult(input) {
 
   const tagged = (tags, values = lines) => values.filter((_, i) => tags.includes(input.lines[i].tag));
   const totals = Object.fromEntries(TAGS.map((tag) => [tag, { ...sumRange(tagged([tag])), unit: tag === 'one-off' ? '$' : '$/mo' }]));
-  const main = tagged(HEADLINE);
+  const bundles = linked(tagged(HEADLINE, parts));
+  const opened = bundles.filter((g) => isOpen(g.range));
+  const closed = bundles.filter((g) => !isOpen(g.range));
+  const inOrder = (list) => parts.filter((part) => list.some((g) => g.parts.includes(part)));
+  checkNeeds(parts, inOrder(opened), on);
+  if (faults.length) return { faults };
+  const idsOf = (list) => inOrder(list).map((part) => part.line.id);
+  const main = inOrder(closed).map((part) => part.computed);
   const weights = total(main.map(weight));
   const share = (line) => weight(line) / weights;
-  const range = headlineRange(tagged(HEADLINE, input.lines), tagged(HEADLINE, parts));
   const result = {
     lines,
     totals,
     headline: {
-      ...range,
+      ...sumRange(closed.map((g) => g.range)),
       unit: '$/mo',
-      status: statusOf(range),
       // The margin keeps a float residue from hiding a line that holds exactly 10 percent.
       grade: lowest(main.filter((line) => share(line) >= 0.1 - 1e-9).map((line) => line.grade)),
       shares: Object.fromEntries(GRADES.map((g) => [g, total(main.filter((line) => line.grade === g).map(share))])),
       uncovered_targets: input.coverage.filter((entry) => entry.kind === 'uncovered_target').length,
+      estimated_lines: idsOf(closed),
+      open_lines: idsOf(opened),
     },
+    open: { ...sumRange(opened.map((g) => g.range)), unit: '$/mo', lines: idsOf(opened) },
   };
-  return { result, section: sectionOf(input, result) };
+  return { result, section: sectionOf(input, result, parts) };
 }
