@@ -6,6 +6,11 @@ function getFlag(argv, name) {
   return i >= 0 ? argv[i + 1] : undefined;
 }
 
+// A line that no inventory asset claims keeps its bill spelling in asset_id, so the filter holds both members.
+export const costFilters = (arn) => [
+  { or: [{ member: 'costs.asset_arn', operator: 'equals', values: [arn] }, { member: 'costs.asset_id', operator: 'equals', values: [arn] }] },
+];
+
 // Merge the repo-graph + cost + opportunity lookups into one answer. Pure, so it's unit-testable
 // without the network. `k(cube, field)` reads a cube-qualified key from a row.
 export function buildResolution(arn, { arnRow, costRows, opportunities }) {
@@ -51,7 +56,7 @@ export async function resolve(argv) {
     cubeLoad(config, { dimensions: dims, filters: [{ member: `${A}.arn`, operator: 'equals', values: [arn] }], limit: 1 }),
     cubeLoad(config, {
       measures: ['costs.sum_current_unblended_cost'],
-      filters: [{ member: 'costs.asset_id', operator: 'equals', values: [arn] }],
+      filters: costFilters(arn),
       timeDimensions: [{ dimension: 'costs.billing_day', dateRange: 'last 30 days' }],
     }),
     orgApi(config, 'GET', `/acxm/opportunities?arn=${encodeURIComponent(arn)}`).catch(() => []),

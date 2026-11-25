@@ -62,7 +62,7 @@ The line-item cube **`costs`** goes finer — `usage_type`, `asset_id`, `account
   service). S3 requests: `Requests-Tier1` = PUT/COPY/POST/LIST, `Requests-Tier2` = GET/SELECT. Quote
   the usage types with $ (and volume where the row has it).
 - **Per-resource** ("by bucket", "which instance") — add `asset_id` to the dimensions (drop the rows
-  where it's null). This is how you answer "GET vs PUT **by bucket**" — `usage_type` × `asset_id`.
+  where it's null or empty). This is how you answer "GET vs PUT **by bucket**" — `usage_type` × `asset_id`.
 - **A spike / "what drove it"** — group `costs` by `billing_day` (× account/service), compare
   the spike window to the prior baseline, name what moved, then drill to `usage_type`. Lead with the
   driver, its $, and the delta vs baseline.

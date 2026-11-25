@@ -26,7 +26,7 @@ resource type, and the declaring file. So from a resource in front of you:
 1. Look it up: filter `asset_map` on `repo` (the git remote `owner/repo`) and
    `terraform_address` → get its **ARN**, account, region.
 2. Chain the ARN outward (this is where the value is):
-   - **Cost** → `costs` filtered `asset_id = <ARN>` — what this exact resource costs, and its trend.
+   - **Cost** → `costs` filtered `asset_arn = <ARN>`, or `asset_id = <ARN>` for a line that no asset claims — what this exact resource costs, and its trend.
    - **Waste** → the opportunities for that ARN — is there a rightsizing/idle/commitment finding on *this* resource.
    - **Owner / provenance** → `repo_graph_owners` and the node's git authorship — who created and maintains it.
    - **Blast radius** → `repo_graph_nodes` (`in_degree`/`out_degree`/`centrality`) and `repo_graph_edges`

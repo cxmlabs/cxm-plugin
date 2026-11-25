@@ -33,7 +33,7 @@ When the user asks about savings, optimizations, or how to cut their cloud costs
    ```bash
    cxm analytics query '{
      "measures": ["opportunities.sum_annual_savings", "opportunities.count_opportunities"],
-     "dimensions": ["opportunities.opportunity_id", "opportunities.hri_name", "opportunities.description", "opportunities.lifecycle_stage", "opportunities.resource_type", "opportunities.effort_level", "opportunities.priority_indicator"],
+     "dimensions": ["opportunities.opportunity_id", "opportunities.hri_name", "opportunities.description", "opportunities.lifecycle_stage", "opportunities.asset_type", "opportunities.effort_level", "opportunities.priority_indicator"],
      "segments": ["opportunities.not_dismissed"],
      "filters": [{"member": "opportunities.published_at", "operator": "set"}],
      "order": {"opportunities.sum_annual_savings": "desc"},

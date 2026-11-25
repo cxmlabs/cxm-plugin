@@ -134,8 +134,8 @@ test('no tracked file names an internal dataset', () => {
 test('no shipped text names a dataset or a field that the asset rename removed', () => {
   const offenders = tracked('*')
     .filter((p) => /^(bin|src|skills|hooks|commands)\//.test(p))
-    .filter((p) => words(read(p)).some((w) => w === 'resource_map' || w === 'resource_id'));
-  assert.deepEqual(offenders, [], 'send asset_map and asset_id');
+    .filter((p) => words(read(p)).some((w) => w === 'resource_map' || w === 'resource_id') || /\bopportunities\.resource_type\b/.test(read(p)));
+  assert.deepEqual(offenders, [], 'send asset_map, asset_id and opportunities.asset_type');
 });
 
 // The Node floor is declared twice — package.json "engines" and the startup guard — and they must
