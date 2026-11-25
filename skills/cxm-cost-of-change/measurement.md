@@ -47,7 +47,7 @@ The steps of `SKILL.md` name its sections.
 - A rate from the bill is B: its usage type has one rate for each caller.
 - A quantity that is only a ceiling has 0 as its `low`, unless another source gives the low.
 - A factor that uses two sources takes the lower grade and the kind of that source. Its `ref` holds both lookups.
-- A value that you measured on one target and use for another drops one grade. Put "analog of <target>" in `ref`. An analog of a C value is an assumption: use D.
+- A value that you measured on one target and use for another drops one grade. Put "analog of <target>" in `ref`. Never do it for a target that has its own bill rows for that usage type. An analog of a C value is an assumption: use D.
 - `ref` holds the lookup, so that a reader can run it again: `file:line@sha`, `dataset{measures; filters; dates}`, `route?params`, `tool(params)` or `public:<url>@<date>`. Add the formula when the value has one.
 
 ## Units
@@ -71,6 +71,8 @@ Rules:
 - For an hourly price, use `hourly_usd` × `h_per_mo`, and never `monthly_usd`. `cxm price` is a lookup of the rate catalog: use grade A and kind `dataset`.
 - A total of the 30-day window becomes a `/day` factor: total ÷ 30, with both terms in `ref`. Then use `day_per_mo`.
 - A grade D factor has a `low` below its `high`.
+- `"activity": true` makes the calculator take half of the low and twice the high. Use it on one factor of a line at most, and never on a `$` factor or a constant.
+- `"shared": "<text>"` makes lines take the same end of a factor. The same text needs the same low, high, unit, grade and `activity`. Use at most 4 different texts.
 - A `$` factor comes only from a dataset, a route or a public source.
 
 ## Billing dimensions

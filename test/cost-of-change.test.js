@@ -176,6 +176,19 @@ test('compute is direct for a run that did not happen before, and added-runtime 
   assert.doesNotMatch(skill, /only when the diff adds a new task|one more item, step or workflow/);
 });
 
+test('the skill follows the headline, the activity band, the shared factor and the asset rows', () => {
+  assert.match(step('Bound'), phrase('The headline lines are the `direct`, `commitment` and `indirect` lines. A line that another system bills as a reaction counts.'));
+  for (const text of ['A count that follows people or traffic (CI runs, requests, sessions, messages) is the measured value, with `"activity": true`', 'never a wider one by hand',
+    'Two lines that depend on one unknown use one `shared` text on that factor', 'Read the bill by asset first (log group, bucket, function, database)', '`costs.asset_id`',
+    'only when no asset row of the window exists, and only when a fact of the code bounds the share of the change', 'Never write 0 to the account total', 'never from memory',
+    'Never use another target as a ceiling of a target that has its own bill rows for that usage type']) assert.match(step('Measure'), phrase(text), text);
+  assert.match(step('Scope'), phrase('When the diff only changes a volume that both lines hold, write one line of the difference'));
+  // The calculator takes both fields as the skill writes them.
+  const given = example();
+  Object.assign(given.lines[0].factors[0], { activity: true, shared: 'runs of job-a' });
+  assert.equal(computeCostResult(given).faults, undefined);
+});
+
 test('the method reads the checkout of the change and the skill files only', () => {
   for (const text of ['Read only the checkout of the change, the folder of this skill and the CXM skill files that this file names', 'Do not list or read another folder of the machine, a shell profile or another checkout']) assert.match(step('Scope'), phrase(text), text);
 });

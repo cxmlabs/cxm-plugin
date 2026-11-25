@@ -98,7 +98,7 @@ Use the first that applies.
 #### Direction
 
 Directions: `add`, `remove`.
-When the diff replaces work, write one `add` line and one `remove` line.
+When the diff replaces work, write one `add` line and one `remove` line. When the diff only changes a volume that both lines hold, write one line of the difference.
 When the diff multiplies the same work, write one `add` line for the difference. When it decreases the same work, write one `remove` line for the difference.
 
 ### 3. Bound
@@ -108,7 +108,7 @@ If the list is not yet in a message, stop and print it.
 Give each line a ceiling in dollars per month, from the code and from the bill rows of the window of step 4.
 
 - A ceiling of 0 is a `not_billed` entry. A line with no rate or no source is an `unmeasured` entry. Both leave the lines.
-- The headline lines are the `direct` and `commitment` lines.
+- The headline lines are the `direct`, `commitment` and `indirect` lines. A line that another system bills as a reaction counts. The asset and target rules of step 4 hold for a ceiling too.
 - When the ceiling is below $1/mo and below 10 percent of the sum of the ceilings of the headline lines, stop. Spend no more lookups on that line.
 - A stopped line keeps 0 to its ceiling. Write the 0 as the `low` of its quantity factor, with the grade and the source kind of the ceiling.
 - After step 4, the weight of a line is its ceiling, or its measured high. When a stopped headline line holds 10 percent or more of the weight of the headline lines, measure it.
@@ -125,7 +125,12 @@ For each line that step 3 did not stop:
 - When a CxM cell and a local cell both give the factor, use the CxM cell.
 - A cell that gives only a ceiling does not give the factor. Use it only when no other cell does.
 - Use the `scoped_accounts_only` cell only for code that runs with the read role of the platform. For other code, start at the account list of the code, then the bill.
+- Read the bill by asset first (log group, bucket, function, database): `costs.asset_id` or `costs.asset_arn`.
 - A quantity from a bill row is grade B only when the usage type or the asset shows no other caller. Else it is a ceiling with grade C.
+- Use a ceiling of a whole account or a whole usage type only when no asset row of the window exists, and only when a fact of the code bounds the share of the change. Else the line is `unmeasured`. Never write 0 to the account total. State the start of the asset rows with `cur_reach` or the first dated row, never from memory.
+- Never use another target as a ceiling of a target that has its own bill rows for that usage type.
+- A count that follows people or traffic (CI runs, requests, sessions, messages) is the measured value, with `"activity": true`. State the measured value, never a wider one by hand.
+- Two lines that depend on one unknown use one `shared` text on that factor.
 - Take each rate from the rate map, and follow "Money rules", "Grades" and "Units" of `measurement.md`.
 - A deterministic lookup uses the `cxm` command. An operation that needs thinking uses the central CxM MCP when the session holds it. When the session does not hold it, write an `unmeasured` entry that says that the MCP was not reachable, and give no figure.
 
