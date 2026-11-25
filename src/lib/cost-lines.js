@@ -177,6 +177,13 @@ function netRange(parts) {
   const sums = corners.map((ends) => sumRange(parts.map(({ factors, line }) => rangeOf(factors, line.direction, ends))));
   return { low: Math.min(...sums.map((r) => r.low)), high: Math.max(...sums.map((r) => r.high)) };
 }
+// The least spread of an estimate that holds a factor below grade A. A midpoint of 0 keeps its range.
+const MIN_SPREAD = 0.1;
+function widen({ low, high }) {
+  const middle = (low + high) / 2;
+  const half = MIN_SPREAD * Math.abs(middle);
+  return { low: Math.min(low, middle - half), high: Math.max(high, middle + half) };
+}
 // The lines that a shared text connects, also through a third line. Any other line is its own group.
 function linked(parts) {
   let found = [];
@@ -276,6 +283,8 @@ function sectionOf(input, result, parts) {
   else if (lines.length || input.coverage.some((c) => c.kind === 'unmeasured')) out.push(`No line can be estimated yet. ${asked ? share : ''}${uncovered}`);
   else out.push(`No billed line moves. ${uncovered}`);
   if (open.lines.length) out.push('', `Not estimated yet: between ${dollars(open.low)} and ${dollars(open.high)} per month, ${open.lines.length} ${open.lines.length === 1 ? 'line' : 'lines'}.`);
+  const spread = parts.some(({ computed }) => headline.estimated_lines.includes(computed.id) && computed.grade !== 'A') && Math.abs(headline.low + headline.high) > 1e-9;
+  if (spread) out.push('', 'The estimate is at least ±10 % around its midpoint.');
   const held = TAGS.filter((tag) => parts.some(({ line }) => line.tag === tag && !open.lines.includes(line.id)));
   for (const [tag, name] of [['commitment', 'Commitment fee'], ['indirect', 'Indirect cost']]) if (held.includes(tag)) out.push('', `${name} inside the headline: ${amount(totals[tag])}.`);
   const shares = GRADES.filter((g) => headline.shares[g] > 0).map((g) => `${g} ${(headline.shares[g] * 100).toFixed(1)} %`);
@@ -343,11 +352,13 @@ export function computeCostResult(input) {
   const main = inOrder(closed).map((part) => part.computed);
   const weights = total(main.map(weight));
   const share = (line) => weight(line) / weights;
+  const net = sumRange(closed.map((g) => g.range));
+  const exact = main.every((line) => line.grade === 'A');
   const result = {
     lines,
     totals,
     headline: {
-      ...sumRange(closed.map((g) => g.range)),
+      ...(exact ? net : widen(net)),
       unit: '$/mo',
       // The margin keeps a float residue from hiding a line that holds exactly 10 percent.
       grade: lowest(main.filter((line) => share(line) >= 0.1 - 1e-9).map((line) => line.grade)),
