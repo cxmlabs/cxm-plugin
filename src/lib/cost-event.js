@@ -1,12 +1,13 @@
 // The shape of one cost result for telemetry: counts, closed words and buckets. No amount and no text of the input.
-import { sanitizeMessage } from './errors.js';
 import { openReasons } from './cost-lines.js';
 import { redact } from './session-trace.js';
 
 // The closed lists of the keys in the cost-of-change skill. A test holds both sides together.
-export const PROVIDERS = ['aws', 'github'];
+export const SERVICES = {
+  aws: ['amazons3', 'amazonathena', 'awsglue', 'amazoncloudwatch', 'amazonecs', 'amazonecr', 'amazonec2', 'amazoneks', 'awslambda', 'awskms', 'awsqueueservice', 'amazonsns', 'awsevents', 'amazonstates', 'amazonrds', 'amazondynamodb', 'amazonelasticache', 'amazonredshift', 'amazonefs', 'amazonkinesis', 'amazonkinesisfirehose', 'amazonapigateway', 'amazoncloudfront', 'amazonroute53', 'amazonvpc', 'awselb', 'awsdatatransfer', 'awscloudtrail', 'awsxray', 'awssecretsmanager', 'amazonbedrock', 'computesavingsplans'],
+  github: ['actions', 'packages', 'git-lfs', 'copilot'],
+};
 export const DIMENSIONS = ['write-requests', 'read-requests', 'api-requests', 'data-scanned', 'data-transfer', 'data-processed', 'ingestion', 'storage', 'compute-time', 'asset-time', 'ci-minutes', 'commitment-fee', 'tokens', 'events'];
-const SERVICE = /^[a-z0-9_.-]{1,40}$/;
 const MAX_ITEMS = 60;
 const MAX_FACTORS = 20;
 const MAX_DIRECTIVE = 300;
@@ -36,10 +37,10 @@ function ratioBucket({ low, high }) {
   if (larger === smaller) return '1_2';
   return larger > 10 * smaller ? 'gt_10' : larger >= 5 * smaller ? '5_10' : larger >= 2 * smaller ? '2_5' : '1_2';
 }
-// A text that the masks of an error message would change can hold an id, so it does not leave.
+// Each part is a word of a closed list, or the key is `other`.
 function keyParts(key) {
   const [provider, service, dimension, more] = key.split('/');
-  const known = more === undefined && PROVIDERS.includes(provider) && DIMENSIONS.includes(dimension) && SERVICE.test(service) && sanitizeMessage(service) === service;
+  const known = more === undefined && Object.hasOwn(SERVICES, provider) && SERVICES[provider].includes(service) && DIMENSIONS.includes(dimension);
   return known ? { provider, service, dimension } : { provider: 'other', service: 'other', dimension: 'other' };
 }
 

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,11 +69,12 @@ test('cost-result prints the section, writes one block to the file that the call
 test('cost-result sends one event after its print, and telemetry never changes its output, its exit code or its end', async (t) => {
   const events = [];
   let hang = false;
+  let hold = 0;
   const server = createServer(async (req, res) => {
     let body = '';
     for await (const chunk of req) body += chunk;
     events.push(JSON.parse(body));
-    if (!hang) res.end('{}');
+    if (!hang) setTimeout(() => res.end('{}'), events.at(-1).event === 'plugin.cost_result' ? hold : 0);
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
   t.after(() => {
@@ -83,6 +84,8 @@ test('cost-result sends one event after its print, and telemetry never changes i
   const send = async (stdin, env) => {
     events.length = 0;
     const dir = base();
+    // A fresh check date, so no run asks the npm registry.
+    writeFileSync(join(dir, 'credentials.json'), JSON.stringify({ latestCheckedAt: Date.now() }));
     const child = spawn(process.execPath, [bin, 'cost-result'], { env: { ...process.env, CXM_CONFIG_DIR: dir, POSTHOG_HOST: `http://127.0.0.1:${server.address().port}`, ...env } });
     const out = { stdout: '', stderr: '' };
     for (const name of ['stdout', 'stderr']) child[name].on('data', (chunk) => { out[name] += chunk; });
@@ -107,6 +110,11 @@ test('cost-result sends one event after its print, and telemetry never changes i
   assert.deepEqual([unwritten.status, unwritten.stdout, unwritten.cost[0].properties.fault_codes], [1, '', ['file_not_written']]);
   const off = await send(input, { CXM_TELEMETRY: '0' });
   assert.deepEqual([off.status, off.stdout, events.length], [0, silent.stdout, 0]);
+  // The command event is answered at once, so only the cost-result event holds the process. It ends by itself after the answer.
+  hold = 1200;
+  const held = await send(input, on);
+  assert.deepEqual([held.status, held.stdout, held.cost.length], [0, silent.stdout, 1]);
+  assert.ok(held.ms >= 1200, `${held.ms} ms`);
   hang = true;
   const slow = await send(input, on);
   assert.deepEqual([slow.status, slow.stdout], [0, silent.stdout]);

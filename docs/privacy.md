@@ -34,10 +34,8 @@ or the agent wrote; it does not send your cloud data anywhere else.
 - for at most 60 lines: the tag, the direction, the grade, whether the line is estimated, open or outside the
   estimate, the fixed reason that it is open, a size bucket and a ratio bucket, the kind and the grade of each
   factor (at most 20), whether a factor follows activity or is shared, and the `gap` from a fixed list;
-- for those lines, the provider, the service and the dimension of the line's key. The provider and the
-  dimension come from fixed lists. The service is the product code that the agent wrote: lower case, 40
-  characters at most, and sent only when the masks for ids and account numbers do not change it. A key that
-  does not match is sent as `other`.
+- for those lines, the provider, the service and the dimension of the line's key. Each one comes from a fixed
+  list. A key with any other word is sent as `other`.
 
 By default this event contains **no content**: no amount, no item, no target, no file path, no source
 reference, no directive and no organization name.

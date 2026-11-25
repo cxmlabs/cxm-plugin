@@ -9,7 +9,7 @@ process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-telemetry-'));
 const { emit, classifyError } = await import('../src/lib/telemetry.js');
 const { computeCostResult } = await import('../src/lib/cost-lines.js');
 // Absent before the change, so each test that uses it fails by itself.
-const { costResultEvent, PROVIDERS, DIMENSIONS } = await import('../src/lib/cost-event.js').catch(() => ({}));
+const { costResultEvent, SERVICES, DIMENSIONS } = await import('../src/lib/cost-event.js').catch(() => ({}));
 
 test('opt-out: CXM_TELEMETRY=0 sends nothing', async () => {
   process.env.CXM_TELEMETRY = '0';
@@ -74,6 +74,8 @@ const COST_INPUT = {
     costLine('five', `aws/amazons3/${secret('dimension')}`, [factor(117.23, 5291.43, 'x/mo', 'D'), factor(1, 1, '$/x')], { tag: 'llm' }),
     costLine('six', 'aws/999988887777/storage', [factor(2.317, 2.317, '$/mo')]),
     costLine('seven', 'aws/amazons3/storage/more', [factor(1.317, 1.317, '$/mo')]),
+    costLine('eight', 'aws/zq-customer-invoices.zq/storage', [factor(1.419, 1.419, '$/mo')]),
+    costLine('nine', 'github/amazons3/storage', [factor(1.531, 1.531, '$/mo')]),
   ],
   coverage: [
     { kind: 'unmeasured', what: secret('what'), why: secret('why'), source: { kind: 'route', ref: secret('ref') }, ...asks('no_access') },
@@ -100,31 +102,32 @@ test('the cost-result event holds no item, target, path, ref, amount or directiv
   const own = Object.fromEntries(Object.entries(payload.properties).filter(([key]) => !base.includes(key)));
   for (const held of leaves(payload)) if (typeof held === 'string') assert.ok(!/zq|AKIA|0123abc|99998888/i.test(held), `the payload holds ${held}`);
   // No number of the input or of the result leaves, as a number or inside a string. The counts of the event are below 10.
-  const amounts = [...leaves(COST_INPUT.lines), ...leaves(result.lines), ...leaves(result.totals), ...leaves(result.headline), ...leaves(result.open)].filter((v) => typeof v === 'number' && Math.abs(v) > 10).concat(0.231, 0.331, 7.613, 2.317, 1.317, 8117);
+  const amounts = [...leaves(COST_INPUT.lines), ...leaves(result.lines), ...leaves(result.totals), ...leaves(result.headline), ...leaves(result.open)].filter((v) => typeof v === 'number' && Math.abs(v) > 10).concat(0.231, 0.331, 7.613, 2.317, 1.317, 1.419, 1.531, 8117);
   for (const held of leaves(own)) {
     for (const value of amounts) assert.ok(!String(held).includes(String(Math.abs(value))), `the payload holds ${value} in ${held}`);
     if (typeof held === 'number') assert.ok(Number.isInteger(held) && held >= 0 && held < 10, `${held} is not a count`);
   }
   const line = (more) => ({ tag: 'direct', direction: 'add', provider: 'other', service: 'other', dimension: 'other', grade: 'B', state: 'estimated', open_reason: null, size: '1_10', ratio: '1_2', factors: ['dataset:B'], activity: false, shared: false, gap: null, ...more });
   assert.deepEqual(own, {
-    ok: true, fault_count: 0, fault_codes: [], line_count: 7, estimated_count: 5, open_count: 1, directive_count: 2, uncovered_targets: 1,
+    ok: true, fault_count: 0, fault_codes: [], line_count: 9, estimated_count: 7, open_count: 1, directive_count: 2, uncovered_targets: 1,
     coverage: { uncovered_target: 1, unmeasured: 1, not_billed: 0, doubt: 0 },
-    // 0.50 + 0.231 + 2.317 + 1.317 less 19.611 to 3.00 + 0.331 + 3.634 less 17.419: -15.24 to -10.45.
-    // Line one weighs 3.00 of 26.58, more than 10 percent, so its C is the grade.
-    headline: { grade: 'C', low_size: '10_100', high_size: '10_100', ratio: '1_2' },
+    // 0.50 + 0.231 + 2.317 + 1.317 + 1.419 + 1.531 = 7.32 less 19.611 to 9.92 less 17.419: -12.30 to -7.50.
+    // Line one weighs 3.00 of 29.53, more than 10 percent, so its C is the grade.
+    headline: { grade: 'C', low_size: '10_100', high_size: '1_10', ratio: '1_2' },
     lines: [
       // 65.885 to 394.62 a thousand at 7.613: 0.50 to 3.00.
       line({ provider: 'aws', service: 'amazons3', dimension: 'write-requests', grade: 'C', ratio: '5_10', factors: ['dataset:C', 'constant', 'dataset:A'], activity: true }),
       line({ tag: 'indirect', provider: 'github', service: 'actions', dimension: 'ci-minutes', grade: 'C', state: 'open', open_reason: 'zero_end', size: 'gte_1000', ratio: 'gt_10', factors: ['dataset:C', 'dataset:B'], shared: true, gap: 'no_caller_split' }),
       line({ size: 'lt_1' }), line({ direction: 'remove', size: '10_100' }),
       line({ tag: 'llm', grade: 'D', state: 'outside', size: 'gte_1000', ratio: 'gt_10', factors: ['assumption:D', 'dataset:B'] }),
-      line(), line(),
+      line(), line(), line(), line(),
     ],
   });
   // The closed lists of the keys are the ones of the skill.
   const keys = readFileSync(new URL('../skills/cxm-cost-of-change/measurement.md', import.meta.url), 'utf8').split('\n## ').find((part) => part.startsWith('Keys'));
   assert.deepEqual([...keys.split('### Services')[0].matchAll(/^- `([^`]+)`: /gm)].map((m) => m[1]).sort(), [...DIMENSIONS].sort());
-  assert.deepEqual([...keys.split('### Services')[1].matchAll(/^- `([^`]+)`: /gm)].map((m) => m[1]).sort(), [...PROVIDERS].sort());
+  const services = [...keys.split('### Services')[1].matchAll(/^- `([^`]+)`: (.+)$/gm)].map((m) => [m[1], [...m[2].matchAll(/`([^`]+)`/g)].map((t) => t[1])]);
+  assert.deepEqual(Object.fromEntries(services), SERVICES);
 });
 
 test('the cost-result event is off with CXM_TELEMETRY=0, and the full mode redacts a planted key', async () => {
