@@ -170,12 +170,15 @@ function checkShared(parts, on) {
   }));
   if (first.size > MAX_SHARED) on('input')(`${first.size} shared texts. At most ${MAX_SHARED}`);
 }
-// The least and the greatest sum over the ends of the shared factors.
 // A text that divides in one line and not in another, or stands twice in a line, has no fixed end: its lines keep their own range.
-function netRange(parts) {
+function fixedTexts(parts) {
   const uses = (text) => parts.map(({ factors }) => factors.filter((f) => f.shared === text));
   const fixed = (text) => !uses(text).some((own) => own.length > 1) && new Set(uses(text).flat().map((f) => Boolean(f.divide))).size === 1;
-  const texts = [...new Set(parts.flatMap(({ factors }) => factors.flatMap((f) => f.shared ?? [])))].filter(fixed);
+  return [...new Set(parts.flatMap(({ factors }) => factors.flatMap((f) => f.shared ?? [])))].filter(fixed);
+}
+// The least and the greatest sum over the ends of the shared factors.
+function netRange(parts) {
+  const texts = fixedTexts(parts);
   const corners = texts.reduce((list, text) => list.flatMap((ends) => ['low', 'high'].map((end) => new Map([...ends, [text, end]]))), [new Map()]);
   const sums = corners.map((ends) => sumRange(parts.map(({ factors, line }) => rangeOf(factors, line.direction, ends))));
   return { low: Math.min(...sums.map((r) => r.low)), high: Math.max(...sums.map((r) => r.high)) };
@@ -293,7 +296,7 @@ function sectionOf(input, result, parts) {
   for (const [tag, name] of [['commitment', 'Commitment fee'], ['indirect', 'Indirect cost']]) if (held.includes(tag)) out.push('', `${name} inside the headline: ${amount(totals[tag])}.`);
   const shares = GRADES.filter((g) => headline.shares[g] > 0).map((g) => `${g} ${(headline.shares[g] * 100).toFixed(1)} %`);
   if (shares.length) out.push('', `Share of the weight by grade: ${shares.join(', ')}.`);
-  const texts = [...new Set(parts.flatMap(({ line, factors }) => (HEADLINE.includes(line.tag) ? factors.flatMap((f) => f.shared ?? []) : [])))];
+  const texts = fixedTexts(parts.filter(({ line }) => HEADLINE.includes(line.tag)));
   if (texts.length) out.push('', `Each part takes one end of each shared factor, so it can be narrower than the sum of its lines: ${texts.map(code).join(', ')}.`);
   if (held.length) out.push('', 'Totals:', '', ...held.map((tag) => `- ${tag}: ${amount(totals[tag])}`));
   const commits = new Set(input.lines.map((l) => l.at.slice(l.at.lastIndexOf('@') + 1)));
@@ -365,16 +368,17 @@ export function computeCostResult(input) {
   const share = (line) => weight(line) / weights;
   const net = sumRange(closed.map((g) => g.range));
   const exact = main.every((line) => line.grade === 'A');
-  // The margin keeps a float residue from hiding a line that holds exactly 10 percent. With no such line, every line counts.
+  // The margin keeps a float residue from hiding a line that holds exactly 10 percent. With no such line, a grade counts when its lines hold 10 percent together.
   const heavy = main.filter((line) => share(line) >= 0.1 - 1e-9);
+  const shares = Object.fromEntries(GRADES.map((g) => [g, total(main.filter((line) => line.grade === g).map(share))]));
   const result = {
     lines,
     totals,
     headline: {
       ...(exact ? net : widen(net)),
       unit: '$/mo',
-      grade: lowest((heavy.length ? heavy : main).map((line) => line.grade)),
-      shares: Object.fromEntries(GRADES.map((g) => [g, total(main.filter((line) => line.grade === g).map(share))])),
+      grade: lowest(heavy.length ? heavy.map((line) => line.grade) : GRADES.filter((g) => shares[g] >= 0.1 - 1e-9)),
+      shares,
       uncovered_targets: input.coverage.filter((entry) => entry.kind === 'uncovered_target').length,
       estimated_lines: idsOf(closed),
       open_lines: idsOf(opened),

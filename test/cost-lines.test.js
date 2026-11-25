@@ -158,6 +158,8 @@ test('the headline grade is the lowest grade of the lines that hold 10 percent o
   const crowd = compute(Array.from({ length: 11 }, (_, i) => dollars(`b${i}`, 5, 5, 'B')));
   assert.equal(crowd.result.headline.grade, 'B', 'no line holds 10 percent');
   assert.doesNotMatch(crowd.section, /grade null/);
+  const tiny = dollars('d', 0.01, 0.02, 'D');
+  assert.equal(grade(...Array.from({ length: 11 }, (_, i) => dollars(`b${i}`, 10, 10, 'B')), tiny), 'B', 'no line holds 10 percent, and a small line does not set the grade');
 });
 
 test('a coverage entry changes no amount and no grade', () => {
@@ -271,7 +273,9 @@ test('lines that share a factor take the same end of it, and the headline is the
 
   // A text that divides in one line and multiplies in another has no fixed end: each line keeps its own range, so the headline is the simple sum, 9 to 18.
   const s = () => shared('rows', factor(1, 2, 'x/y', 'C'));
-  const divided = compute([line('a', [point(12, 'x/mo'), { ...s(), divide: true }, point(1, '$/y')]), line('b', [s(), point(3, 'y/mo'), point(1, '$/x')])]).result;
+  const mixed = compute([line('a', [point(12, 'x/mo'), { ...s(), divide: true }, point(1, '$/y')]), line('b', [s(), point(3, 'y/mo'), point(1, '$/x')])]);
+  const divided = mixed.result;
+  assert.doesNotMatch(mixed.section, /takes one end of each shared factor/);
   range(divided.headline, 9, 18, 'divided');
   range(divided.totals.direct, 9, 18, 'divided');
   // A text that stands twice in one line has no fixed end either: s ÷ s × 5 is 2.5 to 10 with each end free.

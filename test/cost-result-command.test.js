@@ -133,7 +133,10 @@ test('a refused result reaches telemetry as a failure', async () => {
     });
   });
   await new Promise((done) => server.listen(0, '127.0.0.1', done));
-  const env = { ...process.env, CXM_CONFIG_DIR: base(), POSTHOG_HOST: `http://127.0.0.1:${server.address().port}` };
+  const dir = base();
+  // A fresh check date, so the run does not ask the npm registry.
+  writeFileSync(join(dir, 'credentials.json'), JSON.stringify({ latestCheckedAt: Date.now() }));
+  const env = { ...process.env, CXM_CONFIG_DIR: dir, POSTHOG_HOST: `http://127.0.0.1:${server.address().port}` };
   delete env.CXM_TELEMETRY;
   const child = spawn(process.execPath, [bin, 'cost-result'], { env, stdio: ['pipe', 'ignore', 'ignore'] });
   child.stdin.end('not json');
