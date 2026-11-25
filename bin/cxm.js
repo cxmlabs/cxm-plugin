@@ -74,7 +74,7 @@ Everything else
   mcp <tool> '<json>'                           Call one tool, for a question that needs thinking
   --version, -v                                 Print the CLI version
 
-The datasets and the REST API are the interface. This command only carries your session.`;
+The datasets, the REST API and the hosted MCP are the interface. This command only carries your session.`;
 
 // `analytics query '<json>'` takes the query as the first argument. `--query <json>` also works,
 // so the pre-rename call sites keep running.

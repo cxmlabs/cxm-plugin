@@ -19,9 +19,6 @@ holds everything a second caller would need. ESM, and the standard library only 
   are the only files allowed a hostname, and `test/structure.test.js` holds the line.
 - The only HTTP client: `lib/http.js`. It carries the auth-header shape and the CubeJS
   "Continue wait" re-poll, so a second `fetch` call elsewhere gets both wrong.
-- The call to the hosted CxM MCP: `mcpRequest` in `lib/http.js`, behind `commands/mcp.js`. It sends the
-  bearer token and no cookie, follows no redirect and sends a tool call once. A failure never becomes an
-  empty result. Telemetry gets the command name and an error class, and no message.
 - Anonymous command telemetry: `lib/telemetry.js`. `CXM_TELEMETRY=0` opts out.
 - The IaC and AWS CLI scanners the hooks run: `lib/tf-scan.js`, `lib/cfn-scan.js`,
   `lib/aws-scan.js`. Pure functions over text, no network — that is what keeps a hook fast.
@@ -80,3 +77,9 @@ Do not copy either shape into new code, and do not grow them.
 - `lib/viz.js` is not a third compute exception. Its totals, shares and net figures show the rows
   of one block only. It fetches nothing and publishes no figure. When a `cube-chart` query returns
   `limit` rows, every total and net says `of top N`, because the platform can hold more rows.
+
+## The hosted CxM MCP
+
+The call to the hosted CxM MCP: `mcpRequest` in `lib/http.js`, behind `commands/mcp.js`. It sends the
+bearer token and no cookie, follows no redirect and sends a tool call once. A failure never becomes an
+empty result. Telemetry gets the command name and an error class, and no message.

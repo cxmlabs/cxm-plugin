@@ -19,7 +19,7 @@ function readArguments(json) {
     value = null;
   }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error("The arguments are not one JSON object. Example: cxm mcp <tool> '{\"limit\": 3}'");
+    throw new Error("cxm mcp requires its arguments as one JSON object. Example: cxm mcp <tool> '{\"limit\": 3}'");
   }
   return value;
 }

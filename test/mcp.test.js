@@ -124,7 +124,7 @@ test('each call carries the user agent and the bearer token, and no cookie', asy
 
 const LOGIN = /^Error: .*Run: cxm login$/m;
 const NOT_RPC = /^Error: The CxM MCP gave an answer that is not JSON-RPC \(HTTP \d+\)\.$/m;
-const NO_MCP = /^Error: No CxM MCP on this deployment \((HTTP 404|no host)\)\.$/m;
+const NO_MCP = /^Error: No CxM MCP on this deployment \((HTTP 404\)\.|no host\), or this machine cannot resolve the host\. Check the network\.)$/m;
 const call = ['top_costs', '{}'];
 const asList = (then) => (req, res) => (req.rpc.method === 'tools/list' ? rpc({ tools: [...TOOLS, { name: 'other_tool' }] }) : then)(req, res);
 const fakeFetch = (code) => `globalThis.fetch = async () => { throw Object.assign(new TypeError('fetch failed'), { cause: { code: '${code}' } }) }`;
@@ -149,8 +149,8 @@ test('each failure prints one text, exits with 1 and prints no result', async ()
     ['no content', call, rpc({ content: [] }), /^Error: The tool gave no text and no structured content\.$/m],
     ['a list with no tools field', [], rpc({}), NOT_RPC],
     ['a list in parts', [], rpc({ tools: TOOLS, nextCursor: 'x' }), /^Error: The CxM MCP lists its tools in parts, and this command reads one\. Update the plugin\.$/m],
-    ['bad JSON', ['top_costs', '{bad'], rpc(rows), /^Error: The arguments are not one JSON object/m],
-    ['JSON that is not an object', ['top_costs', '[1]'], rpc(rows), /^Error: The arguments are not one JSON object/m],
+    ['bad JSON', ['top_costs', '{bad'], rpc(rows), /^Error: cxm mcp requires its arguments as one JSON object/m],
+    ['JSON that is not an object', ['top_costs', '[1]'], rpc(rows), /^Error: cxm mcp requires its arguments as one JSON object/m],
     ['one argument too many', ['top_costs', '{}', 'org-b'], rpc(rows), /^Error: cxm mcp takes one tool and one JSON object/m],
     ['HTML with 200', call, reply(200, { 'content-type': 'text/html' }, '<html></html>'), NOT_RPC],
     ['an empty 202', call, reply(202, {}, ''), NOT_RPC],
@@ -169,8 +169,8 @@ test('each failure prints one text, exits with 1 and prints no result', async ()
   ];
   // The preload makes the 90 seconds of the command short. Another value would not time out here.
   const short = 'const real = AbortSignal.timeout; AbortSignal.timeout = (ms) => real.call(AbortSignal, ms === 90000 ? 300 : 60000)';
-  cases.push(['no answer', call, () => {}, /^Error: The CxM MCP did not answer in 90 seconds\.$/m, { preload: short }]);
-  cases.push(['a stream with no end', call, (req, res) => res.writeHead(200, SSE_TYPE).write(': wait\n\n'), /^Error: The CxM MCP did not answer in 90 seconds\.$/m, { preload: short }]);
+  cases.push(['no answer', call, () => {}, /^Error: The CxM MCP timed out after 90 seconds\.$/m, { preload: short }]);
+  cases.push(['a stream with no end', call, (req, res) => res.writeHead(200, SSE_TYPE).write(': wait\n\n'), /^Error: The CxM MCP timed out after 90 seconds\.$/m, { preload: short }]);
   for (const [name, argv, handler, text, options] of cases) {
     const out = await run(argv, handler, options);
     failed(out, text, name);

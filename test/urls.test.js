@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { deriveHosts } from '../src/lib/urls.js';
+import { parseHostFlags } from '../src/lib/host-flags.js';
 
 // The derivation tests must ignore any CXM_*_URL overrides present in the ambient shell.
 for (const key of ['CXM_WEBSITE_URL', 'CXM_TENANT_API_URL', 'CXM_ORG_API_URL', 'CXM_CUBE_URL', 'CXM_MCP_URL']) {
@@ -59,4 +60,8 @@ test('derives the MCP host, and an override wins', () => {
   } finally {
     delete process.env.CXM_MCP_URL;
   }
+});
+
+test('--mcp-url is stored as the mcp host override', () => {
+  assert.deepEqual(parseHostFlags(['--mcp-url', 'https://mcp.x/mcp']).hosts, { mcp: 'https://mcp.x/mcp' });
 });

@@ -191,10 +191,10 @@ export async function mcpRequest(config, method, params = {}) {
     if (!answer || !res.ok) throw mcpShapeError(res.status);
     return answer.result;
   } catch (err) {
-    if (err?.name === 'TimeoutError') throw new Error(`The CxM MCP did not answer in ${MCP_WAIT_MS / 1000} seconds.`);
+    if (err?.name === 'TimeoutError') throw new Error(`The CxM MCP timed out after ${MCP_WAIT_MS / 1000} seconds.`);
     // Only a network fault of `fetch` has a cause.
     if (!err?.cause) throw err;
-    if (err.cause.code === 'ENOTFOUND') throw new Error('No CxM MCP on this deployment (no host).');
+    if (err.cause.code === 'ENOTFOUND') throw new Error('No CxM MCP on this deployment (no host), or this machine cannot resolve the host. Check the network.');
     throw new Error(`The CxM MCP did not answer: network fault (${err.cause.code ?? 'no code'}).`);
   }
 }

@@ -125,12 +125,13 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
   const spans = [...toolUses.entries()].map(([id, t]) => {
     const r = results.get(id);
     const command = t.name === 'Bash' ? t.input?.command : null;
+    const cxm = command ? cxmCommand(command) : null;
     return {
       id,
       tool: toolName(t.name),
       skill: t.name === 'Skill' ? cxmSkill(t.input, ours) : skillRead(t.name, t.input, ours),
-      cxm: command ? cxmCommand(command) : null,
-      aws: command ? awsCall(command) : null,
+      cxm,
+      aws: command && !cxm ? awsCall(command) : null,
       isError: r?.isError ?? false,
       latency: ms(t.at, r?.at),
       at: t.at,
