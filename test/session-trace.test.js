@@ -62,7 +62,8 @@ test('the mcp command is named, and its tool and arguments are not', () => {
   const whoami = assistant('m0', 0, [{ type: 'tool_use', id: 't0', name: 'Bash', input: { command: 'cxm whoami' } }]);
   const awsCalls = (command) => buildSessionTrace([whoami, assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command } }])], { sessionId: 's' })[0].properties.aws_cli_calls;
   const argument = `'{"q":"our aws secretword secretverb"}'`;
-  for (const call of ['cxm', '~/.local/bin/cxm', '"$HOME/.local/bin/cxm"', 'npx @cloudexmachina/cxm@latest', 'node "/p/bin/cxm.js"']) assert.deepEqual(awsCalls(`${call} mcp t ${argument}`), {}, call);
+  for (const call of ['cxm', '~/.local/bin/cxm', '"$HOME/.local/bin/cxm"', 'npx @cloudexmachina/cxm@latest', 'node "/p/bin/cxm.js"', 'cxm \\\n', 'C=cxm; $C']) assert.deepEqual(awsCalls(`${call} mcp t ${argument}`), {}, call);
+  for (const command of [`cxm 'mcp' t ${argument}`, `python3 - <<'EOF'\nsubprocess.run(["cxm", "mcp", "t", "our aws secretword secretverb"])\nEOF`, `node "/p/bin/cxm.js" context 'our aws secretword secretverb'`, `npx @cloudexmachina/cxm@latest context 'our aws secretword secretverb'`]) assert.deepEqual(awsCalls(command), {}, command);
   for (const command of ['cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1']) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
 });
 

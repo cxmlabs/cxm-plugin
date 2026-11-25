@@ -13,7 +13,7 @@ const CXM_COMMANDS = new Set([
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
 // An argument of a `cxm` call can hold the words of an AWS call.
-const MCP_CALL = /\bcxm\b\S*\s+mcp\b/i;
+const MCP_CALL = /cxm[\s\S]*\bmcp\b/i;
 const QUOTED = /'[^']*'|"(?:\\.|[^"\\])*"/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
@@ -134,7 +134,7 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
       tool: toolName(t.name),
       skill: t.name === 'Skill' ? cxmSkill(t.input, ours) : skillRead(t.name, t.input, ours),
       cxm,
-      aws: command && !MCP_CALL.test(command) ? awsCall(cxm ? command.replace(QUOTED, ' ') : command) : null,
+      aws: command && !MCP_CALL.test(command) ? awsCall(/\bcxm\b/.test(command) ? command.replace(QUOTED, ' ') : command) : null,
       isError: r?.isError ?? false,
       latency: ms(t.at, r?.at),
       at: t.at,
