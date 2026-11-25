@@ -311,7 +311,7 @@ function sectionOf(input, result, parts) {
   const asked = counted + open.lines.length;
   const share = `Estimated lines: ${counted} of ${asked} headline lines. `;
   if (counted) out.push(`**${amount(headline)}**, grade ${headline.grade}. ${share}${uncovered}`);
-  else if (asked || input.coverage.some((c) => c.kind === 'unmeasured' || c.kind === 'uncovered_target')) out.push(`No line can be estimated yet. ${asked ? share : ''}${uncovered}`);
+  else if (asked || input.coverage.some((c) => c.kind === 'unmeasured' || c.kind === 'uncovered_target')) out.push(`No headline line can be estimated yet. ${asked ? share : ''}${uncovered}`);
   else if (lines.length) out.push(`No headline line. The other lines are in the totals. ${uncovered}`);
   else out.push(`No billed line moves. ${uncovered}`);
   const rows = splitRows(input, result);

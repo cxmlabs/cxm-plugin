@@ -448,19 +448,19 @@ Each file is at commit`), section);
 
   const none = compute([open('o', 0, 50)]);
   assert.deepEqual([none.result.headline.low, none.result.headline.high, none.result.headline.grade, none.result.headline.shares], [0, 0, null, { A: 0, B: 0, C: 0, D: 0 }]);
-  assert.ok(none.section.startsWith('### Cost of this change\n\nNo line can be estimated yet. Estimated lines: 0 of 1 headline lines. Uncovered targets: 0.\n\nNot estimated yet: between $0.00 and $50.00 per month, 1 line.\n'), none.section);
+  assert.ok(none.section.startsWith('### Cost of this change\n\nNo headline line can be estimated yet. Estimated lines: 0 of 1 headline lines. Uncovered targets: 0.\n\nNot estimated yet: between $0.00 and $50.00 per month, 1 line.\n'), none.section);
   assert.doesNotMatch(none.section, /Totals:/);
   // No headline line: another line or an unmeasured entry still says that there is something to estimate.
   for (const [lines, coverage] of [[[], [entry('unmeasured', { directive: 'ask z' })]], [[dollars('a', 5, 5, 'B', { tag: 'llm' })], [entry('unmeasured', { directive: 'ask z' })]]]) {
     const { section: text } = compute(lines, coverage);
-    assert.ok(text.startsWith('### Cost of this change\n\nNo line can be estimated yet. Uncovered targets: 0.\n'), text);
+    assert.ok(text.startsWith('### Cost of this change\n\nNo headline line can be estimated yet. Uncovered targets: 0.\n'), text);
     assert.doesNotMatch(text, /\$0\.00 per month|0 of 0|No billed line moves/);
   }
   const lone = compute([], [entry('uncovered_target')]).section;
-  assert.ok(lone.startsWith('### Cost of this change\n\nNo line can be estimated yet. Uncovered targets: 1.\n'), lone);
+  assert.ok(lone.startsWith('### Cost of this change\n\nNo headline line can be estimated yet. Uncovered targets: 1.\n'), lone);
   const other = compute([dollars('a', 5, 5, 'B', { tag: 'llm' })]).section;
   assert.ok(other.startsWith('### Cost of this change\n\nNo headline line. The other lines are in the totals. Uncovered targets: 0.\n'), other);
-  assert.doesNotMatch(other, /No line can be estimated yet/);
+  assert.doesNotMatch(other, /can be estimated yet/);
   assert.doesNotMatch(compute([dollars('a', 1, 2)]).section, /Not estimated yet/);
 });
 
