@@ -84,6 +84,11 @@ test('a heredoc body never reaches the command name or the aws call', () => {
   assert.equal(span.properties.cxm_command, 'cost-result');
   assert.equal(span.properties.aws_service, null);
   assert.ok(!JSON.stringify(events).includes('payroll-nightly'));
+  const spanOf = (command) => buildSessionTrace([assistant('m0', 0, [{ type: 'tool_use', id: 't0', name: 'Bash', input: { command: 'cxm price x' } }]), assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command } }])], { sessionId: 's' })[0].properties;
+  for (const opener of ["<<'END-JSON'", '<<\\END-JSON', '<<"END-JSON"', '<<-END-JSON']) assert.deepEqual(spanOf(`cxm cost-result ${opener}\nthe aws batch payroll-x\nEND-JSON\naws s3 ls`).aws_cli_calls, { 's3 ls': 1 }, opener);
+  // Text that opens no heredoc, and an empty heredoc, hide no later call.
+  for (const before of ['jq . <<<"abc"', 'echo $((1<<20))', "grep -n '<<<<<<< HEAD' a.py", 'cat > /tmp/e <<EOF\nEOF']) assert.deepEqual(spanOf(`${before}\ncxm whoami`).cxm_commands, { price: 1, whoami: 1 }, before);
+  assert.doesNotThrow(() => spanOf(['cxm', 'whoami']));
 });
 
 test('a skill loaded by reading its file counts, and one with no successful command is unused', () => {

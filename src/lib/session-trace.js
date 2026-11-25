@@ -12,7 +12,7 @@ const CXM_COMMANDS = new Set([
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
-const HEREDOC = /(<<-?\s*(['"]?)(\w+)\2[^\n]*)\n[\s\S]*?(?:\n\s*\3(?=\n|$)|$)/g;
+const HEREDOC = /((?<!<)<<-?[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([A-Za-z_][\w.-]*))[^\n]*)[\s\S]*?(?:\n\t*\2\3\4(?=\n|$)|$)/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
 const MAX_CHARS = 4000;
@@ -125,8 +125,8 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
 
   const spans = [...toolUses.entries()].map(([id, t]) => {
     const r = results.get(id);
-    // A heredoc body holds free text, so neither read sees it.
-    const command = t.name === 'Bash' ? t.input?.command?.replace(HEREDOC, '$1') : null;
+    // A heredoc body holds free text, so the command name and the aws call are read without it.
+    const command = t.name === 'Bash' && t.input?.command ? String(t.input.command).replace(HEREDOC, '$1') : null;
     return {
       id,
       tool: toolName(t.name),
