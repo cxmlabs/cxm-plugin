@@ -9,7 +9,7 @@ process.env.CXM_CONFIG_DIR = mkdtempSync(join(tmpdir(), 'cxm-telemetry-'));
 const { emit, classifyError } = await import('../src/lib/telemetry.js');
 const { computeCostResult } = await import('../src/lib/cost-lines.js');
 // Absent before the change, so each test that uses it fails by itself.
-const { costResultEvent, SERVICES, DIMENSIONS } = await import('../src/lib/cost-event.js').catch(() => ({}));
+const { costResultEvent, SERVICES, DIMENSIONS, OTHER_SERVICES } = await import('../src/lib/cost-event.js').catch(() => ({}));
 
 test('opt-out: CXM_TELEMETRY=0 sends nothing', async () => {
   process.env.CXM_TELEMETRY = '0';
@@ -111,6 +111,7 @@ test('the cost-result event holds no item, target, path, ref, amount or directiv
   assert.deepEqual(own, {
     ok: true, fault_count: 0, fault_codes: [], line_count: 9, estimated_count: 7, open_count: 1, directive_count: 2, uncovered_targets: 1,
     coverage: { uncovered_target: 1, unmeasured: 1, not_billed: 0, doubt: 0 },
+    unmeasured_gaps: ['no_access'],
     // 0.50 + 0.231 + 2.317 + 1.317 + 1.419 + 1.531 = 7.32 less 19.611 to 9.92 less 17.419: -12.30 to -7.50.
     // Line one weighs 3.00 of 29.53, more than 10 percent, so its C is the grade.
     headline: { grade: 'C', low_size: '10_100', high_size: '1_10', ratio: '1_2' },
@@ -118,9 +119,9 @@ test('the cost-result event holds no item, target, path, ref, amount or directiv
       // 65.885 to 394.62 a thousand at 7.613: 0.50 to 3.00.
       line({ provider: 'aws', service: 'amazons3', dimension: 'write-requests', grade: 'C', ratio: '5_10', factors: ['dataset:C', 'constant', 'dataset:A'], activity: true }),
       line({ tag: 'indirect', provider: 'github', service: 'actions', dimension: 'ci-minutes', grade: 'C', state: 'open', open_reason: 'zero_end', size: 'gte_1000', ratio: 'gt_10', factors: ['dataset:C', 'dataset:B'], shared: true, gap: 'no_caller_split' }),
-      line({ size: 'lt_1' }), line({ direction: 'remove', size: '10_100' }),
-      line({ tag: 'llm', grade: 'D', state: 'outside', size: 'gte_1000', ratio: 'gt_10', factors: ['assumption:D', 'dataset:B'] }),
-      line(), line(), line(), line(),
+      line({ provider: 'aws', dimension: 'storage', size: 'lt_1' }), line({ direction: 'remove', dimension: 'storage', size: '10_100' }),
+      line({ tag: 'llm', provider: 'aws', service: 'amazons3', grade: 'D', state: 'outside', size: 'gte_1000', ratio: 'gt_10', factors: ['assumption:D', 'dataset:B'] }),
+      line({ provider: 'aws', dimension: 'storage' }), line(), line({ provider: 'aws', dimension: 'storage' }), line({ provider: 'github', dimension: 'storage' }),
     ],
   });
   // The closed lists of the keys are the ones of the skill.
@@ -128,6 +129,7 @@ test('the cost-result event holds no item, target, path, ref, amount or directiv
   assert.deepEqual([...keys.split('### Services')[0].matchAll(/^- `([^`]+)`: /gm)].map((m) => m[1]).sort(), [...DIMENSIONS].sort());
   const services = [...keys.split('### Services')[1].matchAll(/^- `([^`]+)`: (.+)$/gm)].map((m) => [m[1], [...m[2].matchAll(/`([^`]+)`/g)].map((t) => t[1])]);
   assert.deepEqual(Object.fromEntries(services), SERVICES);
+  assert.deepEqual([...keys.match(/^- each other provider: (.+)$/m)[1].matchAll(/`([^`]+)`/g)].map((t) => t[1]), OTHER_SERVICES);
 });
 
 test('the cost-result event is off with CXM_TELEMETRY=0, and the full mode redacts a planted key', async () => {
@@ -173,6 +175,24 @@ test('a fault run sends closed codes only, and the buckets, the open reasons and
   const pair = { ...COST_INPUT, coverage: [], lines: [costLine('p', 'aws/amazons3/storage', [v(), factor(1, 4, '$/GB')], asks('other')), costLine('q', 'aws/amazons3/storage', [v(), factor(2, 2, '$/GB')], { direction: 'remove', ...asks('other') })] };
   assert.deepEqual(costResultEvent(pair, computeCostResult(pair)).lines.map((l) => [l.open_reason, l.ratio]), [['opposite_signs', 'gt_10'], ['opposite_signs', '2_5']]);
   assert.equal(line(1, 20, { tag: 'direct', ...asks('other') }).open_reason, 'ratio');
+  // A float residue at a zero end is a zero end.
+  const w = () => factor(1, 3, 'GB/mo', 'B', { shared: 'w' });
+  const residue = { ...COST_INPUT, coverage: [], lines: [costLine('p', 'aws/amazons3/storage', [w(), factor(0.3, 5, '$/GB')], asks('other')), costLine('q', 'aws/amazons3/storage', [w(), factor(3 * 0.1, 3 * 0.1, '$/GB')], { direction: 'remove', ...asks('other') })] };
+  assert.deepEqual(costResultEvent(residue, computeCostResult(residue)).lines.map((l) => l.open_reason), ['zero_end', 'zero_end']);
+  // A float residue at an edge of a bucket stays on the side of the result.
+  const eventOf = (key, factors) => { const input = { ...COST_INPUT, coverage: [], lines: [costLine('b', key, factors, { tag: 'direct' })] }; return costResultEvent(input, computeCostResult(input)).lines[0]; };
+  const ratio = eventOf('aws/amazons3/storage', [factor(3, 30, 'x/mo'), factor(0.35, 0.35, '$/x')]);
+  assert.deepEqual([ratio.state, ratio.ratio], ['estimated', '5_10']);
+  assert.equal(eventOf('aws/amazons3/storage', [factor(1.1, 5.5, 'x/mo'), factor(0.07, 0.07, '$/x')]).ratio, '5_10');
+  assert.equal(eventOf('aws/amazons3/storage', [factor(3 * 0.1, 0.6, '$/mo')]).ratio, '2_5');
+  const net = { ...COST_INPUT, coverage: [], lines: [costLine('a', 'aws/amazons3/storage', [factor(300, 900, '$/mo')]), costLine('r', 'aws/amazons3/storage', [factor(3 * 0.1 * 1000, 3 * 0.1 * 1000, '$/mo')], { direction: 'remove' })] };
+  assert.equal(costResultEvent(net, computeCostResult(net)).headline.ratio, 'gt_10');
+  assert.equal(eventOf('aws/amazons3/storage', [factor(200000, 200000, 'x/mo'), { constant: 'million', of: 'x' }, factor(5, 5, '$/Mx')]).size, '1_10');
+  // A key is read one part at a time: a word of a closed list stays, any other word is `other`.
+  const keyOf = (key) => { const { provider, service, dimension } = eventOf(key, [factor(1, 1, '$/mo')]); return [provider, service, dimension]; };
+  assert.deepEqual(keyOf('aws/other/api-requests'), ['aws', 'other', 'api-requests']);
+  assert.deepEqual(keyOf('openai/model-api/tokens'), ['other', 'model-api', 'tokens']);
+  assert.deepEqual(keyOf('aws/amazons3/storage/more'), ['other', 'other', 'other']);
   assert.equal(costResultEvent(one(1, 2), computeCostResult(one(1, 2))).headline, null, 'no estimated line');
   assert.deepEqual(['added-runtime', 'indirect', 'flag-gated'].map((tag) => line(1, 2, { tag }).state), ['estimated', 'estimated', 'outside']);
   const many = { ...COST_INPUT, coverage: [], lines: Array.from({ length: 61 }, (_, i) => costLine(`m${i}`, 'aws/amazons3/storage', [factor(1, 1, '$/mo'), ...Array.from({ length: 30 }, () => factor(1, 1, '1'))])) };

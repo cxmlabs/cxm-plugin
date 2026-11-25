@@ -7,6 +7,7 @@ export const SERVICES = {
   aws: ['amazons3', 'amazonathena', 'awsglue', 'amazoncloudwatch', 'amazonecs', 'amazonecr', 'amazonec2', 'amazoneks', 'awslambda', 'awskms', 'awsqueueservice', 'amazonsns', 'awsevents', 'amazonstates', 'amazonrds', 'amazondynamodb', 'amazonelasticache', 'amazonredshift', 'amazonefs', 'amazonkinesis', 'amazonkinesisfirehose', 'amazonapigateway', 'amazoncloudfront', 'amazonroute53', 'amazonvpc', 'awselb', 'awsdatatransfer', 'awscloudtrail', 'awsxray', 'awssecretsmanager', 'amazonbedrock', 'computesavingsplans'],
   github: ['actions', 'github_actions', 'packages', 'git-lfs', 'copilot'],
 };
+export const OTHER_SERVICES = ['model-api', 'object-storage', 'database', 'data-warehouse', 'compute', 'observability', 'messaging', 'ci', 'other'];
 export const DIMENSIONS = ['write-requests', 'read-requests', 'api-requests', 'data-scanned', 'data-transfer', 'data-processed', 'ingestion', 'storage', 'compute-time', 'asset-time', 'ci-minutes', 'commitment-fee', 'tokens', 'events'];
 const MAX_ITEMS = 60;
 const MAX_FACTORS = 20;
@@ -30,18 +31,24 @@ const faultCode = (fault) => {
   return FAULT_CODES.find(([, pattern]) => pattern.test(reason))?.[0] ?? 'other';
 };
 
-const sizeBucket = (value) => ['lt_1', '1_10', '10_100', '100_1000', 'gte_1000'][[1, 10, 100, 1000].filter((edge) => Math.abs(value) >= edge).length];
-function ratioBucket({ low, high }) {
+const sizeBucket = (value) => ['lt_1', '1_10', '10_100', '100_1000', 'gte_1000'][[1, 10, 100, 1000].filter((edge) => Math.abs(value) >= edge * (1 - 1e-9)).length];
+function ratioBucket(range) {
+  const [low, high] = [range.low, range.high].map((end) => (Math.abs(end) <= 1e-9 * Math.max(Math.abs(range.low), Math.abs(range.high)) ? 0 : end));
   if (low < 0 && high > 0) return 'crosses_zero';
   const [smaller, larger] = [Math.abs(low), Math.abs(high)].sort((a, b) => a - b);
   if (larger === smaller) return '1_2';
-  return larger > 10 * smaller ? 'gt_10' : larger >= 5 * smaller ? '5_10' : larger >= 2 * smaller ? '2_5' : '1_2';
+  return larger > 10 * smaller * (1 + 1e-9) ? 'gt_10' : larger >= 5 * smaller * (1 - 1e-9) ? '5_10' : larger >= 2 * smaller * (1 - 1e-9) ? '2_5' : '1_2';
 }
-// Each part is a word of a closed list, or the key is `other`.
+// Each part is a word of a closed list, else `other`. A key with a fourth part is all `other`.
 function keyParts(key) {
   const [provider, service, dimension, more] = key.split('/');
-  const known = more === undefined && Object.hasOwn(SERVICES, provider) && SERVICES[provider].includes(service) && DIMENSIONS.includes(dimension);
-  return known ? { provider, service, dimension } : { provider: 'other', service: 'other', dimension: 'other' };
+  if (more !== undefined) return { provider: 'other', service: 'other', dimension: 'other' };
+  const known = Object.hasOwn(SERVICES, provider);
+  return {
+    provider: known ? provider : 'other',
+    service: (known ? SERVICES[provider] : OTHER_SERVICES).includes(service) ? service : 'other',
+    dimension: DIMENSIONS.includes(dimension) ? dimension : 'other',
+  };
 }
 
 // `input` is sound when `faults` is empty: each tag, direction, grade, kind and gap is then a word of a closed list.
@@ -59,6 +66,7 @@ export function costResultEvent(input, { faults = [], result }, { full = false }
     directive_count: asked.length,
     uncovered_targets: headline.uncovered_targets,
     coverage: Object.fromEntries(['uncovered_target', 'unmeasured', 'not_billed', 'doubt'].map((kind) => [kind, input.coverage.filter((entry) => entry.kind === kind).length])),
+    unmeasured_gaps: input.coverage.filter((entry) => entry.kind === 'unmeasured').slice(0, MAX_ITEMS).map((entry) => entry.gap),
     headline: headline.estimated_lines.length
       ? { grade: headline.grade, low_size: sizeBucket(headline.low), high_size: sizeBucket(headline.high), ratio: ratioBucket(headline) }
       : null,

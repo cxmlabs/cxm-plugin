@@ -17,25 +17,26 @@ or the agent wrote; it does not send your cloud data anywhere else.
 *Command events*, one per `cxm` command. Each carries:
 
 - the command name, whether it succeeded or failed, its duration, and on failure an error class and the error message with ARNs, account ids, ids, emails, URLs, local paths and secrets masked (200 characters at most);
-- `plugin_version`, `node_version`, `os`, `platform`, `arch`, whether it ran in CI, and whether a
+- `plugin_version`, `node_version`, `os`, `os_release`, `platform`, `arch`, `term_program`, whether it ran in CI, and whether a
   person or an agent ran it;
+- `session_id`, a random id made at each login, so the events of one login are joined;
 - an anonymous per-machine id (`distinct_id` / `machine_id`), generated locally;
 - your `organization_id` (so the data is pseudonymous, not anonymous — it is tied to your org, not to you personally);
 - for an analytics query: which datasets it named and the query's shape (counts of measures, dimensions,
   filters, and whether it returned rows) — **never** a filter value, a row, a result, or a resource id.
 
-*A cost-result event*, one per run of `cxm cost-result`. It carries the machine, version and
-`organization_id` fields of a command event, and the shape of the result:
+*A cost-result event*, one per run of `cxm cost-result`. It carries the fields that each event carries: version, system, CI, person or agent, machine id, login session id and
+`organization_id`, and the shape of the result:
 
 - whether the run passed, how many faults it had, and their codes from a fixed list, never their text;
 - how many lines, estimated lines, open lines, directives and uncovered targets the result holds, and how
-  many coverage entries of each kind;
+  many coverage entries of each kind, and the `gap`, from a fixed list, of at most 60 unmeasured entries;
 - for the estimate: its grade, and a bucket for each end and for their ratio, never an amount;
 - for at most 60 lines: the tag, the direction, the grade, whether the line is estimated, open or outside the
   estimate, the fixed reason that it is open, a size bucket and a ratio bucket, the kind and the grade of each
   factor (at most 20), whether a factor follows activity or is shared, and the `gap` from a fixed list;
 - for those lines, the provider, the service and the dimension of the line's key. Each one comes from a fixed
-  list. A key with any other word is sent as `other`.
+  list. Any other word is sent as `other`.
 
 By default this event contains **no content**: no amount, no item, no target, no file path, no source
 reference, no directive and no organization name.
