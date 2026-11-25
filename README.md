@@ -197,7 +197,8 @@ cxm viz mermaid diagram.mmd --color
 ## Privacy
 
 The plugin sends pseudonymous usage analytics: which `cxm` command ran, how long it took, whether it
-succeeded, versions, a random machine id and your organization id. When a session used CXM, it also
+succeeded, versions, a random machine id and your organization id. A `cxm cost-result` run also sends the
+shape of its result: counts, grades and buckets, and no amount. When a session used CXM, it also
 sends one summary of that session: which skills and commands ran, tool names, errors, token counts and
 cost. If the plugin itself crashes, it sends a sanitized crash report. It never sends your prompts, answers, cloud data, query results, resource identifiers or file
 contents, unless you choose to share session content with `CXM_TELEMETRY=full`. Opt out of everything

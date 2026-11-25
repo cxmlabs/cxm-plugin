@@ -1,6 +1,8 @@
 // `cxm cost-result`: reads tagged lines on stdin and prints the cost section. It needs no session.
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { costResultEvent } from '../lib/cost-event.js';
 import { computeCostResult } from '../lib/cost-lines.js';
+import { emit, shareContent } from '../lib/telemetry.js';
 
 // A rename, so a reader never sees a half file. The fault names no path.
 function writeBlock(file, block) {
@@ -19,6 +21,15 @@ function writeBlock(file, block) {
   }
 }
 
+// After the print and with no wait: telemetry never changes the output, the exit code or the order of a run.
+function report(input, faults, result) {
+  try {
+    emit('plugin.cost_result', costResultEvent(input, { faults, result }, { full: shareContent() })).catch(() => {});
+  } catch {
+    // The event is best-effort.
+  }
+}
+
 export function costResult() {
   let input;
   // A parse error quotes the input, and a thrown error goes to telemetry.
@@ -33,7 +44,6 @@ export function costResult() {
   if (refused.length) {
     console.error(refused.join('\n'));
     process.exitCode = 1;
-    return;
-  }
-  process.stdout.write(section);
+  } else process.stdout.write(section);
+  report(input, refused, result);
 }

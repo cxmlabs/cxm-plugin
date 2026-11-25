@@ -290,6 +290,13 @@ function sectionOf(input, result, parts) {
   return `${out.join('\n')}\n`;
 }
 
+// Why each open line is open, by id. `input` is one that computeCostResult takes with no fault.
+export function openReasons(input) {
+  const parts = input.lines.filter((line) => HEADLINE.includes(line.tag)).map((line) => computeLine(line, () => {}));
+  const reason = ({ low, high }) => (low < 0 && high > 0 ? 'opposite_signs' : low === 0 || high === 0 ? 'zero_end' : 'ratio');
+  return new Map(linked(parts).filter((g) => isOpen(g.range)).flatMap((g) => g.parts.map((part) => [part.line.id, reason(g.range)])));
+}
+
 export function computeCostResult(input) {
   if (!isObject(input)) return { faults: ['input: it is not a JSON object'] };
   const faults = [];

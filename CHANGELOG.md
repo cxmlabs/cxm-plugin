@@ -9,6 +9,7 @@ fixes, including security fixes.
 - `cxm cost-result`: computes the amounts, totals and grades of a cost-of-change result from its tagged lines.
   `CXM_COST_RESULT_FILE=<file>` also writes its JSON block to that file.
 - `cxm-cost-of-change`: lists the lines of a code change first, then gives one range in dollars per month, with each amount from `cxm cost-result`.
+- Telemetry: each `cxm cost-result` run sends one event with the shape of the result and no content. `docs/privacy.md` lists its fields.
 
 - Auto-update: the installer asks once whether to keep the plugin up to date. On yes, Claude Code's
   plugin auto-update is on for the CXM marketplace and Codex is refreshed at a session start, once a
