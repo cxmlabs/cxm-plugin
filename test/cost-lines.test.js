@@ -381,6 +381,8 @@ test('the headline holds the estimated lines only, and the open part stands besi
 
 Not estimated yet: between -$3.00 and $70.00 per month, 3 lines.
 
+The estimate is at least ±10 % around its midpoint.
+
 Indirect cost inside the headline: $1.00 to $2.00 per month.
 
 Share of the weight by grade: A 75.0 %, B 25.0 %.
@@ -457,6 +459,47 @@ test('the headline holds the added runtime, with the rules of the other headline
   // It links with a direct line. v x (3 - 2) with v 10 to 20: 10 to 20.
   const v = () => shared('v', factor(10, 20, 'GB/mo'));
   range(compute([line('p', [v(), point(3, '$/GB')]), line('q', [v(), point(2, '$/GB')], { direction: 'remove', tag: 'added-runtime' })]).result.headline, 10, 20, 'linked');
+});
+
+test('the estimate is at least 10 percent of its midpoint on each side, unless each factor is grade A', () => {
+  const said = /^The estimate is at least ±10 % around its midpoint\.$/m;
+  const check = (lines, low, high, words, name) => {
+    const { result, section } = compute(lines);
+    range(result.headline, low, high, name);
+    assert.equal(said.test(section), words, name);
+    return { result, section };
+  };
+  // 100 at grade B: 100 - 10 = 90 to 110. The row and the total keep 100.
+  const point100 = check([dollars('a', 100, 100, 'B')], 90, 110, true, 'a point');
+  range(point100.result.lines[0], 100, 100, 'the line');
+  range(point100.result.totals.direct, 100, 100, 'the total');
+  assert.match(point100.section, /^\*\*\$90\.00 to \$110\.00 per month\*\*, grade B\./m);
+  assert.match(point100.section, /^\| 1 \| .* \| \$100\.00 \| B \|/m);
+  // 98 to 102: midpoint 100, so 90 to 110. 89 to 111 is wider and stays. 89 to 101: midpoint 95, 85.5 to 104.5.
+  check([dollars('a', 98, 102, 'B')], 90, 110, true, 'narrow');
+  check([dollars('a', 89, 111, 'B')], 89, 111, true, 'wide');
+  check([dollars('a', 89, 101, 'B')], 85.5, 104.5, true, 'the midpoint is not the larger end');
+  // A removal of 100: -110 to -90.
+  check([dollars('a', 100, 100, 'B', { direction: 'remove' })], -110, -90, true, 'negative');
+  // A net of 60 - 40 = 20 at B: 18 to 22. The spread is of the net, and not of each line.
+  check([dollars('a', 60, 60, 'B'), dollars('b', 40, 40, 'A', { direction: 'remove' })], 18, 22, true, 'a net');
+  // Midpoint 0: 1 to 3 less 2 is -1 to 1, and 5 less 5 is 0.
+  check([dollars('a', 1, 3, 'B'), dollars('b', 2, 2, 'B', { direction: 'remove' })], -1, 1, false, 'midpoint 0');
+  check([dollars('a', 5, 5, 'B'), dollars('b', 5, 5, 'B', { direction: 'remove' })], 0, 0, false, 'zero');
+  // Each factor of each estimated line is A: no spread. One B factor brings it back.
+  check([dollars('a', 100, 100, 'A'), dollars('b', 4, 4, 'A')], 104, 104, false, 'all A');
+  check([line('a', [point(100, 'x/day', 'A'), { constant: 'day_per_mo' }, point(0.01, '$/x', 'A')])], 30.4375, 30.4375, false, 'a constant has no grade');
+  check([dollars('a', 100, 100, 'A'), dollars('b', 4, 4, 'B')], 93.6, 114.4, true, 'one B line of little weight');
+  // A line outside the estimate does not count: an open B line and a D llm line leave the A estimate as it is.
+  const mixed = check([dollars('a', 100, 100, 'A'), open('o', 0, 50), dollars('l', 1, 2, 'D', { tag: 'llm' })], 100, 100, false, 'outside the estimate');
+  assert.deepEqual([mixed.result.open.low, mixed.result.open.high], [0, 50], 'the open range keeps its ends');
+  const none = check([open('o', 0, 50)], 0, 0, false, 'no estimated line');
+  assert.deepEqual([none.result.open.low, none.result.open.high], [0, 50]);
+  // The block computes to the same result, and the spread is not added twice.
+  const given = input([dollars('a', 98, 102, 'B'), dollars('b', 3, 3, 'A')]);
+  const first = computeCostResult(given);
+  assert.deepEqual(computeCostResult(JSON.parse(JSON.stringify({ ...given, result: first.result }))), first);
+  range(first.result.headline, 92.7, 113.3, 'the block');
 });
 
 test('a gap stands beside each directive, is one of the closed list, and stands nowhere else', () => {
