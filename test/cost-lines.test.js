@@ -115,7 +115,7 @@ test('a line that does not reproduce is refused with its id and its reason', () 
 });
 
 test('the headline holds the direct lines and the commitment fee, and each other tag has its own total', () => {
-  const others = ['flag-gated', 'added-runtime', 'llm', 'indirect', 'one-off'];
+  const others = ['flag-gated', 'added-runtime', 'llm', 'one-off'];
   const { result, section } = compute([
     dollars('fee', 2, 2, 'B', { tag: 'commitment' }),
     dollars('add', 1, 3),
@@ -125,15 +125,15 @@ test('the headline holds the direct lines and the commitment fee, and each other
   range(result.headline, -17, -5, 'negative headline');
   range(result.totals.direct, -19, -7, 'direct');
   range(result.totals.commitment, 2, 2, 'commitment');
-  others.slice(0, 4).forEach((tag, i) => range(result.totals[tag], 100 + i, 200 + i, tag));
+  others.slice(0, 3).forEach((tag, i) => range(result.totals[tag], 100 + i, 200 + i, tag));
   assert.deepEqual(result.totals['one-off'], { low: 100, high: 100, unit: '$' });
   assert.match(section, /^\*\*-\$17\.00 to -\$5\.00 per month\*\*, grade B\. Uncovered targets: 0\.$/m);
   assert.match(section, /^Commitment fee inside the headline: \$2\.00 per month\.$/m);
 
   const crossing = compute([dollars('add', 1, 3), dollars('cut', 2, 2, 'B', { direction: 'remove' })]);
   range(crossing.result.headline, -1, 1, 'range that crosses 0');
-  assert.match(crossing.section, /-\$1\.00 to \$1\.00 per month/);
-  const none = compute([dollars('a', 5, 5, 'B', { tag: 'indirect' })]);
+  assert.match(crossing.section, /between -\$1\.00 and \$1\.00 per month/);
+  const none = compute([dollars('a', 5, 5, 'B', { tag: 'llm' })]);
   assert.deepEqual([none.result.headline.low, none.result.headline.high, none.result.headline.grade], [0, 0, null]);
   assert.match(compute([dollars('a', 0.1, 0.1), dollars('b', 0.2, 0.2), dollars('c', 0.3, 0.3, 'B', { direction: 'remove' })]).section, /\*\*\$0\.00 per month\*\*/);
 });
@@ -144,7 +144,7 @@ test('the headline grade is the lowest grade of the lines that hold 10 percent o
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 0.5, 0.99, 'D')), 'A', 'the same line below 10 percent');
   assert.equal(grade(dollars('a', 0.63, 0.63, 'A'), line('d', [factor(0.1, 0.7, 'x/mo', 'D'), point(0.1, '$/x', 'A')])), 'D', '10 percent with a float residue');
   assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 0.5, 1, 'D', { direction: 'remove' })), 'D', 'the weight of a removal is its larger absolute bound');
-  assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 50, 100, 'D', { tag: 'indirect' })), 'A', 'a line outside the headline has no weight');
+  assert.equal(grade(dollars('a', 9, 9, 'A'), dollars('d', 50, 100, 'D', { tag: 'llm' })), 'A', 'a line outside the headline has no weight');
   // The net is 0, so a share of the net would give D. The weight is 11 and D holds 1 of it.
   const cancel = [dollars('a', 5, 5, 'A'), dollars('b', 5, 5, 'B', { direction: 'remove' }), dollars('d', 0.5, 1, 'D')];
   assert.equal(grade(...cancel), 'B', 'an add and a remove that cancel');
@@ -210,6 +210,121 @@ test('the section prints each factor of each line under its line, and a unit can
   ]) assert.match(section, new RegExp(`\`${id}\`.*\\n  = \`${formula.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}\`\\n`), id);
   assert.ok(!section.includes('synthetic'), 'no ref: it stays in the block');
   for (const unit of ['x`y/mo', 'x\ny/mo', 'x y/mo']) assert.ok(computeCostResult(input([line('a', [point(1, unit), point(1, '$/x')])])).faults, unit);
+});
+
+test('the headline holds the indirect lines, and the section prints their share of it', () => {
+  // direct 1 to 3, commitment 2, indirect 10 to 20 less 4: the headline is 1 + 2 + 6 = 9 to 3 + 2 + 16 = 21.
+  const { result, section } = compute([
+    dollars('a', 1, 3, 'A'), dollars('fee', 2, 2, 'A', { tag: 'commitment' }), dollars('i', 10, 20, 'C', { tag: 'indirect' }),
+    dollars('j', 4, 4, 'A', { tag: 'indirect', direction: 'remove' }), ...['flag-gated', 'added-runtime', 'llm'].map((tag) => dollars(tag, 50, 60, 'D', { tag })),
+  ]);
+  range(result.headline, 9, 21, 'headline');
+  range(result.totals.indirect, 6, 16, 'indirect');
+  assert.equal(result.headline.grade, 'C', 'an indirect line has a weight');
+  assert.match(section, /^Indirect cost inside the headline: \$6\.00 to \$16\.00 per month\.$/m);
+  assert.doesNotMatch(compute([dollars('a', 1, 3)]).section, /Indirect cost/);
+});
+
+const shared = (text, f) => ({ ...f, shared: text });
+test('lines that share a factor take the same end of it, and the headline is the range of the sums', () => {
+  const volume = () => shared('daily volume', factor(10, 20, 'GB/mo', 'C'));
+  // add 10 to 20 GB at $3 to $4, remove the same GB at $2.
+  // Volume 10: 30 - 20 = 10 to 40 - 20 = 20. Volume 20: 60 - 40 = 20 to 80 - 40 = 40. The headline is 10 to 40.
+  const pair = [line('add', [volume(), factor(3, 4, '$/GB')]), line('cut', [volume(), point(2, '$/GB')], { direction: 'remove' })];
+  const { result, section } = compute(pair);
+  range(result.headline, 10, 40, 'headline');
+  range(result.lines[0], 30, 80, 'the line keeps its own range');
+  range(result.lines[1], -40, -20, 'the line keeps its own range');
+  // The simple sum: 30 - 40 = -10 to 80 - 20 = 60.
+  range(result.totals.direct, -10, 60, 'the total of the tag is the simple sum');
+  assert.match(section, /^The headline takes one end of each shared factor, so it can be narrower than the sum of the totals: `daily volume`\.$/m);
+  assert.ok(section.includes('10–20 GB/mo [C, dataset, shared: daily volume]'), section);
+
+  // A divided factor: 12 ÷ s plus 3 × s. s = 1: 12 + 3 = 15. s = 2: 6 + 6 = 12. The headline is 12 to 15, and the simple sum is 9 to 18.
+  const s = () => shared('rows', factor(1, 2, 'x/y', 'C'));
+  const divided = compute([line('a', [point(12, 'x/mo'), { ...s(), divide: true }, point(1, '$/y')]), line('b', [s(), point(3, 'y/mo'), point(1, '$/x')])]).result;
+  range(divided.headline, 12, 15, 'divided');
+  range(divided.totals.direct, 9, 18, 'divided');
+
+  // Two texts move alone: u in 1 to 2 and v in 10 to 20. (u - v) at $1 is 1 - 20 = -19 to 2 - 10 = -8, as without a share.
+  const two = compute([line('u', [shared('u', factor(1, 2, 'x/mo')), point(1, '$/x')]), line('v', [shared('v', factor(10, 20, 'x/mo')), point(1, '$/x')], { direction: 'remove' })]).result;
+  range(two.headline, -19, -8, 'two texts');
+  // A line outside the headline does not move it.
+  range(compute([pair[0], { ...pair[1], tag: 'llm' }]).result.headline, 30, 80, 'one line of the pair');
+
+  const texts = (n) => Array.from({ length: n }, (_, i) => line(`l${i}`, [shared(`t${i}`, factor(1, 2, 'x/mo')), point(1, '$/x')]));
+  range(compute(texts(4)).result.headline, 4, 8, 'four texts');
+  assert.deepEqual(computeCostResult(input(texts(5))).faults, ['input: 5 shared texts. At most 4']);
+  for (const [name, other] of [['low', factor(11, 20, 'GB/mo', 'C')], ['high', factor(10, 21, 'GB/mo', 'C')], ['grade', factor(10, 20, 'GB/mo', 'B')], ['unit', factor(10, 20, 'GB/day', 'C')]]) {
+    const tail = name === 'unit' ? [{ constant: 'day_per_mo' }] : [];
+    const bad = computeCostResult(input([pair[0], line('b', [shared(' daily  volume', other), ...tail, point(1, '$/GB')])]));
+    assert.deepEqual(bad.faults, ['line "b": factor 1: shared "daily volume" needs the same low, high, unit and grade in each line'], name);
+  }
+  assert.match(computeCostResult(input([line('a', [shared(' ', factor(1, 2, 'x/mo')), point(1, '$/x')])])).faults[0], /factor 1: shared is not a text/);
+  assert.match(computeCostResult(input([line('a', [point(1, 'x/mo'), { constant: 'million', of: 'x', shared: 'm' }, point(1, '$/Mx')])])).faults[0], /factor 2: unknown field "shared"/);
+});
+
+test('an activity factor takes half of its low and twice its high, and the section says so', () => {
+  const active = (f) => ({ ...f, activity: true });
+  // 40 runs at $2: 20 x 2 = 40 to 80 x 2 = 160.
+  const { result, section } = compute([line('a', [active(point(40, 'run/mo')), point(2, '$/run')])]);
+  range(result.lines[0], 40, 160, 'one value');
+  range(result.headline, 40, 160, 'headline');
+  assert.ok(section.includes('40 run/mo [B, dataset, activity: 20–80] × 2 $/run'), section);
+  // 10 to 30 runs at $2: 5 x 2 = 10 to 60 x 2 = 120.
+  range(compute([line('a', [active(factor(10, 30, 'run/mo')), point(2, '$/run')])]).result.lines[0], 10, 120, 'a range');
+  // 800 rows ÷ 10 rows in a request: 800 / 20 = 40 to 800 / 5 = 160.
+  range(compute([line('a', [point(800, 'row/mo'), { ...active(point(10, 'row/request')), divide: true }, point(1, '$/request')])]).result.lines[0], 40, 160, 'divided');
+  // A shared activity factor of 10 moves in 5 to 20. (3 - 2) x 5 = 5 to (3 - 2) x 20 = 20.
+  const both = () => shared('runs', active(point(10, 'run/mo')));
+  range(compute([line('a', [both(), point(3, '$/run')]), line('b', [both(), point(2, '$/run')], { direction: 'remove' })]).result.headline, 5, 20, 'shared');
+  const fault = (factors) => computeCostResult(input([line('a', factors)])).faults[0];
+  assert.match(fault([active(point(1, 'x/mo')), active(point(1, 'y/x')), point(1, '$/y')]), /^line "a": more than one activity factor$/);
+  assert.match(fault([point(1, 'x/mo'), active(point(1, '$/x'))]), /factor 2: a \$ factor takes no activity$/);
+  assert.match(fault([point(1, 'x/mo'), { constant: 'million', of: 'x', activity: true }, point(1, '$/Mx')]), /factor 2: unknown field "activity"/);
+  assert.match(fault([{ ...point(1, 'x/mo'), activity: 'yes' }, point(1, '$/x')]), /factor 1: activity is not true or false$/);
+  assert.match(computeCostResult(input([line('a', [both(), point(3, '$/run')]), line('b', [shared('runs', point(10, 'run/mo')), point(2, '$/run')])])).faults[0], /shared "runs" needs the same/, 'the band is part of the value');
+});
+
+test('the headline says that it cannot estimate on each side of the limits', () => {
+  // Each pair of ends is an add of 0 to the high and a remove of 0 to the low, or one line when both ends have one sign.
+  const ends = (low, high) => {
+    if (low >= 0) return [dollars('a', low, high)];
+    if (high <= 0) return [dollars('a', -high, -low, 'B', { direction: 'remove' })];
+    return [dollars('a', 0, high), dollars('b', 0, -low, 'B', { direction: 'remove' })];
+  };
+  for (const [low, high, status] of [
+    [1, 10, 'estimate'], [1, 10.01, 'cannot_estimate'], [0.3, 3, 'estimate'], [-10, -1, 'estimate'], [-10.01, -1, 'cannot_estimate'],
+    [0.05, 0.99, 'estimate'], [0.05, 1, 'cannot_estimate'],
+    [0, 0.99, 'estimate'], [0, 1, 'cannot_estimate'], [-0.99, 0, 'estimate'], [-1, 0, 'cannot_estimate'],
+    [-1, 1, 'cannot_estimate'], [-0.99, 5, 'estimate'], [-5, 0.99, 'estimate'], [-5, 1, 'cannot_estimate'], [-1, 100, 'cannot_estimate'],
+    [5, 5, 'estimate'],
+  ]) {
+    const { result, section } = compute(ends(low, high));
+    range(result.headline, low, high, `${low} to ${high}`);
+    assert.equal(result.headline.status, status, `${low} to ${high}`);
+    assert.equal(section.includes('Cannot estimate'), status === 'cannot_estimate', `${low} to ${high}`);
+  }
+  assert.equal(compute([]).result.headline.status, 'estimate');
+  assert.equal(compute([dollars('a', 0, 50, 'B', { tag: 'llm' })]).result.headline.status, 'estimate', 'a line outside the headline');
+  // 0.3 - 0.1 - 0.2 leaves -2.8e-17. It is 0, so the range is one end 0 and not a range that crosses 0.
+  const residue = compute([dollars('a', 0.3, 5), dollars('b', 0.1, 0.1, 'B', { direction: 'remove' }), dollars('c', 0.2, 0.2, 'B', { direction: 'remove' })]).result.headline;
+  assert.ok(residue.low < 0 && residue.low > -1e-9);
+  assert.equal(residue.status, 'cannot_estimate');
+
+  // Widths 5, 50 and 20, and a line of width 900 outside the headline.
+  const { result, section } = compute([dollars('a', 0, 5), dollars('b', 0, 50, 'B', { item: 'i-b' }), dollars('c', 0, 20, 'B', { tag: 'indirect' }), dollars('d', 0, 900, 'B', { tag: 'llm' })]);
+  assert.ok(section.startsWith('### Cost of this change\n\n**Cannot estimate: between $0.00 and $75.00 per month**, grade B. Uncovered targets: 0.\n\nThe widest lines: `b` (`i-b`), `c` (`S3 PUT`).\n'), section);
+  assert.deepEqual([result.headline.low, result.headline.high], [0, 75], 'the ends stay');
+});
+
+test('a result with a shared factor, an activity factor and a status computes again to the same result', () => {
+  const both = () => shared('runs', { ...point(10, 'run/mo'), activity: true });
+  const given = input([line('a', [both(), factor(0, 3, '$/run')]), line('b', [both(), point(2, '$/run')], { direction: 'remove', tag: 'indirect' })]);
+  const first = computeCostResult(given);
+  assert.deepEqual(first.faults, undefined);
+  assert.equal(first.result.headline.status, 'cannot_estimate');
+  assert.deepEqual(computeCostResult(JSON.parse(JSON.stringify({ ...given, result: first.result }))), first);
 });
 
 test('the function imports nothing and the written block computes to the same result', () => {
