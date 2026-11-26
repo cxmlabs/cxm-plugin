@@ -70,6 +70,10 @@ test('the skill calls both pricing routes and never reads the commitment-fee dat
   assert.ok(!skill.includes('commitment_edp_monthly'), 'commitment_edp_monthly covers commitment fees only');
 });
 
+test('measurement.md holds no relative date range', () => {
+  assert.ok(!measurement.includes('days ago'));
+});
+
 test('the no-diff path reads measurement.md, and each section that Price a resource quotes is a heading', () => {
   assert.match(skillOnly.split('\n').find((line) => line.includes('For a resource with no diff')), /measurement\.md/);
   const headings = `${skillOnly}\n${measurement}`.split('\n').filter((line) => line.startsWith('## ')).map((line) => line.slice(3));
@@ -79,6 +83,7 @@ test('the no-diff path reads measurement.md, and each section that Price a resou
 test('the shared rules name a structured result, not a pull request body', () => {
   const shared = readFileSync(new URL('../skills/cxm-shared-rules.md', import.meta.url), 'utf8');
   assert.ok(shared.includes('Exception for a structured result or a document that a caller publishes'));
+  assert.ok(shared.includes('A cost-of-change result'));
   assert.ok(!shared.includes('pull request body'));
 });
 

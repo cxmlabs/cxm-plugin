@@ -166,5 +166,5 @@ Each entry holds `kind`, `what`, `why` and `source`.
 ### 6. Answer
 
 1. Write one sentence that names CloudExMachina, the organization and the window of step 4.
-2. Print the section of step 5 after it, complete and unchanged. Add no figure, no chart and no second summary. The section, with its two tables, is the end of the answer. The caller decides where the result goes, and can fold the second table. It may name datasets, routes and error codes.
+2. Print the section of step 5 after it, complete and unchanged. Add no figure, no chart and no second summary. The section, with its two tables, is the end of the answer. The caller decides where the result goes, and can fold the second table.
 3. The section holds the counts, the rates and the source kinds. Answer a question about units, counts or rates with the section. Write no table and no total of your own. A total over several tags is a figure that code did not compute: never write one.

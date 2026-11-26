@@ -12,14 +12,14 @@ const CXM_COMMANDS = new Set([
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
-const HEREDOC_OPENER = /(?<!<)<<-?[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([A-Za-z_][\w.-]*))/g;
+const HEREDOC_OPENER = /(?<!<)<<(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|(\\)?([A-Za-z_][\w.-]*))/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
 const MAX_CHARS = 4000;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const SECRET = /\b(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|phc_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b|((?:secret|token|password|passwd|api[_-]?key)["'\s:=]+)[^\s"',}]{8,}/gi;
 
-// Drop each heredoc body, through its terminator line. An opener with no terminator drops nothing.
+// Drop each heredoc body, through its terminator line. A quoted opener with no terminator drops all later lines.
 function stripHeredocs(command) {
   const lines = command.split('\n');
   const kept = [];
@@ -27,8 +27,11 @@ function stripHeredocs(command) {
     kept.push(lines[i]);
     let at = i;
     for (const m of lines[i].matchAll(HEREDOC_OPENER)) {
-      const end = lines.findIndex((l, j) => j > at && l.replace(/^\t+/, '') === (m[1] ?? m[2] ?? m[3]));
-      if (end > 0) at = end;
+      const quoted = m[2] !== undefined || m[3] !== undefined || m[4] !== undefined;
+      const word = m[2] ?? m[3] ?? m[5];
+      const end = lines.findIndex((l, j) => j > at && (m[1] ? l.replace(/^\t+/, '') : l) === word);
+      if (end > at) at = end;
+      else if (quoted) at = lines.length;
     }
     i = at;
   }
