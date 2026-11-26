@@ -79,7 +79,7 @@ empty, and you then settled for a shallower answer than you'd have written from 
   to stop early or hedge. You still have the repo you've already read in full, plus live data.
 
 Then ADD what only the plugin can, on top: the live deployed reality (`assets` filtered by
-`resource_id` → `resource_type`, count, accounts/regions, cost; `lambda_functions` /
+`asset_id` → `asset_type`, count, accounts/regions, cost; `lambda_functions` /
 `_ecs_clusters` / `_cloudwatch` for type detail and whether it's actually active), real owners, real $$.
 Base answer at full depth, then plugin data on top — that ordering is what puts you *ahead*, never level.
 

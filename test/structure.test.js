@@ -130,6 +130,14 @@ test('no tracked file names an internal dataset', () => {
   assert.deepEqual(offenders, [], 'query the dataset by its published name (cxm analytics schema), not the cube behind it');
 });
 
+// The platform removed these three names, so a query that sends one gets no rows, only an error.
+test('no shipped text names a dataset or a field that the asset rename removed', () => {
+  const offenders = tracked('*')
+    .filter((p) => /^(bin|src|skills|hooks|commands)\//.test(p))
+    .filter((p) => words(read(p)).some((w) => w === 'resource_map' || w === 'resource_id') || /\bopportunities\.resource_type\b/.test(read(p)));
+  assert.deepEqual(offenders, [], 'send asset_map, asset_id and opportunities.asset_type');
+});
+
 // The Node floor is declared twice — package.json "engines" and the startup guard — and they must
 // agree, or the guard waves through a version the code cannot run, or blocks one it can.
 test('the Node guard threshold matches package.json engines', () => {

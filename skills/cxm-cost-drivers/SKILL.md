@@ -19,7 +19,7 @@ The cube below is grained by **service / account / region**. Pick the path befor
   requests), a **per-resource** split (by bucket / instance / resource), a specific **account**, or a
   **spike** ("what drove it", "why did X jump") → the service-level cube can't resolve these, but
   **CloudExMachina's line-item cost cube `costs` can** — it carries `usage_type`,
-  `resource_id`, `account_id`, `product_service_name`, and `billing_day`. Query THAT via `cxm analytics query`
+  `asset_id`, `account_id`, `product_service_name`, and `billing_day`. Query THAT via `cxm analytics query`
   (unsure of the exact measure/dimension names? `cxm analytics schema costs` lists them in one
   call — don't guess or grep). Only if the cube genuinely can't
   reach it, fall back to `aws ce get-cost-and-usage --group-by USAGE_TYPE` or a query on the Cost and Usage Report (CUR).
@@ -54,15 +54,15 @@ data to **CloudExMachina**.
 ## When service-level isn't the grain the question needs
 
 The service-level cube (`spend_by_service`) is grained by **service / account / region**.
-The line-item cube **`costs`** goes finer — `usage_type`, `resource_id`, `account_id`,
+The line-item cube **`costs`** goes finer — `usage_type`, `asset_id`, `account_id`,
 `product_service_name`, `billing_day`. Reach for it, don't hand the query back:
 
 - **Usage-type attribution** — "data transfer", "NAT", "egress", "cross-AZ", **S3 GET vs PUT**. These
   are usage types billed *inside* services. Group `costs` by `usage_type` (filter to the
   service). S3 requests: `Requests-Tier1` = PUT/COPY/POST/LIST, `Requests-Tier2` = GET/SELECT. Quote
   the usage types with $ (and volume where the row has it).
-- **Per-resource** ("by bucket", "which instance") — add `resource_id` to the dimensions (drop the rows
-  where it's null). This is how you answer "GET vs PUT **by bucket**" — `usage_type` × `resource_id`.
+- **Per-resource** ("by bucket", "which instance") — add `asset_id` to the dimensions (drop the rows
+  where it's null or empty). This is how you answer "GET vs PUT **by bucket**" — `usage_type` × `asset_id`.
 - **A spike / "what drove it"** — group `costs` by `billing_day` (× account/service), compare
   the spike window to the prior baseline, name what moved, then drill to `usage_type`. Lead with the
   driver, its $, and the delta vs baseline.

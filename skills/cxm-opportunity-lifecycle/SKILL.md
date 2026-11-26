@@ -13,7 +13,7 @@ user has direct access), and move its status — never expanding what the opport
 
 1. List the open opportunities (id + lifecycle stage + resource):
    ```bash
-   cxm analytics query '{"dimensions":["opportunities.opportunity_id","opportunities.hri_name","opportunities.lifecycle_stage","opportunities.resource_type","opportunities.account_id","opportunities.region"],"segments":["opportunities.not_dismissed"],"filters":[{"member":"opportunities.published_at","operator":"set"}],"order":{"opportunities.sum_annual_savings":"desc"},"limit":50}'
+   cxm analytics query '{"dimensions":["opportunities.opportunity_id","opportunities.hri_name","opportunities.lifecycle_stage","opportunities.asset_type","opportunities.account_id","opportunities.region"],"segments":["opportunities.not_dismissed"],"filters":[{"member":"opportunities.published_at","operator":"set"}],"order":{"opportunities.sum_annual_savings":"desc"},"limit":50}'
    ```
    For an opportunity's ARNs/detail: `cxm api GET /acxm/opportunities/<id>`.
    When the user points at an item of a list you already showed ("the biggest one"), act on that

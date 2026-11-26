@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-const { buildResolution } = await import('../src/commands/resolve.js');
+const { buildResolution, costFilters } = await import('../src/commands/resolve.js');
 
-const A = 'resource_map';
+const A = 'asset_map';
 const C = 'costs';
 
 test('buildResolution merges arn-source-map + summed cost + opportunities', () => {
@@ -32,4 +32,11 @@ test('buildResolution tolerates missing rows / {items} opportunity shape', () =>
   assert.equal(r.monthly_cost_usd, 0);
   assert.equal(r.repo, null);
   assert.equal(r.open_opportunities.length, 1);
+});
+
+test('the cost filter matches the asset ARN and the bill spelling', () => {
+  const arn = 'arn:aws:s3:::app-bucket';
+  assert.deepEqual(costFilters(arn), [
+    { or: ['costs.asset_arn', 'costs.container_asset_arn', 'costs.asset_id'].map((member) => ({ member, operator: 'equals', values: [arn] })) },
+  ]);
 });
