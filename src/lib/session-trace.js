@@ -8,10 +8,13 @@ import { draw, needsRows, splitReply } from './viz.js';
 // `cxm` sub-commands we may name. Anything else is reported as `other`, so an argument can never leak.
 const CXM_COMMANDS = new Set([
   'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'cost-result', 'api',
-  'analytics query', 'analytics schema', 'cube', 'wiki', 'viz', 'viz chart', 'viz cube-chart', 'viz row', 'viz mermaid',
+  'analytics query', 'analytics schema', 'cube', 'wiki', 'viz', 'viz chart', 'viz cube-chart', 'viz row', 'viz mermaid', 'mcp',
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
+// An argument of a `cxm` call can hold the words of an AWS call.
+const MCP_CALL = /cxm[\s\S]*\bmcp\b/i;
+const QUOTED = /'[^']*'(?:\\''[^']*')*|"(?:\\[\s\S]|[^"\\])*"|(?<!\S)#.*/g;
 const HEREDOC_OPENER = /(?<!<)<<(-?)[ \t]*((?:[^\s;&|<>()'"\\]|\\.|'[^'\n]*'|"[^"\n]*")+)/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
@@ -73,7 +76,10 @@ export function cxmCommand(command) {
 }
 
 export function awsCall(command) {
-  const m = AWS_CALL.exec(command ?? '');
+  if (!command || MCP_CALL.test(command)) return null;
+  const body = stripHeredocs(command);
+  const text = /\bcxm\b/.test(body) ? body.replace(QUOTED, "''") : body;
+  const m = AWS_CALL.exec(text);
   return m ? { service: m[1], operation: m[2] } : null;
 }
 
@@ -159,13 +165,15 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
   const spans = [...toolUses.entries()].map(([id, t]) => {
     const r = results.get(id);
     // A heredoc body holds free text, so the command name and the aws call are read without it.
-    const command = t.name === 'Bash' && t.input?.command ? stripHeredocs(String(t.input.command)) : null;
+    const raw = t.name === 'Bash' && t.input?.command ? String(t.input.command) : null;
+    const command = raw ? stripHeredocs(raw) : null;
+    const cxm = command ? cxmCommand(command) : null;
     return {
       id,
       tool: toolName(t.name),
       skill: t.name === 'Skill' ? cxmSkill(t.input, ours) : skillRead(t.name, t.input, ours),
-      cxm: command ? cxmCommand(command) : null,
-      aws: command ? awsCall(command) : null,
+      cxm,
+      aws: raw ? awsCall(raw) : null,
       isError: r?.isError ?? false,
       latency: ms(t.at, r?.at),
       at: t.at,

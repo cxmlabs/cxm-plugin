@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { deriveHosts } from '../src/lib/urls.js';
+import { parseHostFlags } from '../src/lib/host-flags.js';
 
 // The derivation tests must ignore any CXM_*_URL overrides present in the ambient shell.
-for (const key of ['CXM_WEBSITE_URL', 'CXM_TENANT_API_URL', 'CXM_ORG_API_URL', 'CXM_CUBE_URL']) {
+for (const key of ['CXM_WEBSITE_URL', 'CXM_TENANT_API_URL', 'CXM_ORG_API_URL', 'CXM_CUBE_URL', 'CXM_MCP_URL']) {
   delete process.env[key];
 }
 
@@ -48,4 +49,19 @@ test('env vars override individual derived hosts', () => {
     delete process.env.CXM_TENANT_API_URL;
     delete process.env.CXM_CUBE_URL;
   }
+});
+
+test('derives the MCP host, and an override wins', () => {
+  assert.equal(deriveHosts({ baseUrl: 'https://staging.cxm.dev' }).mcp, 'https://mcp.staging.cxm.dev/mcp');
+  process.env.CXM_MCP_URL = 'https://mcp.env.cxm.dev/mcp';
+  try {
+    assert.equal(deriveHosts({ baseUrl: 'https://staging.cxm.dev' }).mcp, 'https://mcp.env.cxm.dev/mcp');
+    assert.equal(deriveHosts({ baseUrl: 'https://staging.cxm.dev', hosts: { mcp: 'https://mcp.config.cxm.dev/mcp' } }).mcp, 'https://mcp.config.cxm.dev/mcp');
+  } finally {
+    delete process.env.CXM_MCP_URL;
+  }
+});
+
+test('--mcp-url is stored as the mcp host override', () => {
+  assert.deepEqual(parseHostFlags(['--mcp-url', 'https://mcp.x/mcp']).hosts, { mcp: 'https://mcp.x/mcp' });
 });

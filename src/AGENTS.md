@@ -80,3 +80,9 @@ Do not copy either shape into new code, and do not grow them.
 - `lib/cost-lines.js` is not a third compute exception. The function uses the lines of one input
   only. It fetches nothing and publishes no figure.
   `commands/cost-result.js` writes only the file that the caller names in `CXM_COST_RESULT_FILE`.
+
+## The hosted CxM MCP
+
+The call to the hosted CxM MCP: `mcpRequest` in `lib/http.js`, behind `commands/mcp.js`. It sends the
+bearer token and no cookie, follows no redirect and sends a tool call once. A failure never becomes an
+empty result. Telemetry gets the command name and an error class, and no message.

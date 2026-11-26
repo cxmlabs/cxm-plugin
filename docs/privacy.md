@@ -6,17 +6,17 @@ this repository.
 
 ## What leaves your machine
 
-**1. Your queries go to your own Cloud ex Machina environment.** `cxm` authenticates to the CXM API
-and analytics endpoints you configured at setup (your `--url`, e.g. `app.cloudexmachina.io`) and
+**1. Your queries go to your own Cloud ex Machina environment.** `cxm` authenticates to the CXM API,
+analytics and MCP endpoints you configured at setup (your `--url`, e.g. `app.cloudexmachina.io`) and
 sends your query there. This is the plugin's purpose. It carries your access token and the query you
-or the agent wrote; it does not send your cloud data anywhere else.
+or the agent wrote; `cxm mcp` sends the tool name and the JSON arguments there. It does not send your cloud data anywhere else.
 
 **2. Product-usage telemetry goes to our analytics provider.** Usage events go to PostHog EU
 (`https://eu.i.posthog.com`) with a write-only ingest key. There are two kinds.
 
 *Command events*, one per `cxm` command. Each carries:
 
-- the command name, whether it succeeded or failed, its duration, and on failure an error class and the error message with ARNs, account ids, ids, emails, URLs, local paths and secrets masked (200 characters at most); a refused `cxm cost-result` sends the failure only, with no error class or message;
+- the command name, whether it succeeded or failed, its duration, and on failure an error class and the error message with ARNs, account ids, ids, emails, URLs, local paths and secrets masked (200 characters at most). A failed `cxm mcp` sends no error message and no crash report; A refused `cxm cost-result` sends the failure only, with no error class or message.
 - `plugin_version`, `node_version`, `os`, `platform`, `arch`, whether it ran in CI, and whether a
   person or an agent ran it;
 - an anonymous per-machine id (`distinct_id` / `machine_id`), generated locally;

@@ -39,6 +39,8 @@ test('classifyError buckets errors into low-cardinality classes', () => {
   assert.equal(classifyError(new Error('CubeJS error: Some cube failure')), 'cube_query');
   assert.equal(classifyError(new Error('Org API GET /x failed: 503. upstream')), 'http_5xx');
   assert.equal(classifyError(new Error('Org API GET /x failed: 404. missing')), 'http_4xx');
+  assert.equal(classifyError(new Error('The CxM MCP timed out after 90 seconds.')), 'timeout');
+  assert.equal(classifyError(new Error('cxm mcp requires its arguments as one JSON object.')), 'bad_input');
   assert.equal(classifyError(new TypeError('fetch failed')), 'network');
   assert.equal(classifyError(new Error("cube requires --query '<cubejs-json>'")), 'bad_input');
   assert.equal(classifyError(new Error('something odd happened')), 'other');

@@ -162,8 +162,8 @@ A pre-existing file there that CXM did not install makes setup fail rather than 
 
 ## The CLI is for the agent, not for you
 
-After setup and `cxm login`, a skill runs every command. The datasets and the REST API are the
-interface; the CLI carries your session and prints the answer. It does not compute — joins,
+After setup and `cxm login`, a skill runs every command. The datasets, the REST API and the hosted MCP
+are the interface; the CLI carries your session and prints the answer. It does not compute — joins,
 aggregation and derived figures stay in the platform.
 
 ```bash
@@ -171,6 +171,7 @@ cxm whoami                             # did the login work?
 cxm analytics schema                   # which datasets exist
 cxm analytics schema <dataset>         # the fields of one dataset
 cxm analytics query '<cubejs-json>'    # the agent writes this
+cxm mcp                                # the tools of the hosted MCP
 ```
 
 ## Charts and diagrams
