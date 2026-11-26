@@ -33,6 +33,14 @@
             "command": "node \"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/bin/cxm.js\" hook aws-cost"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT:-$PLUGIN_ROOT}/scripts/commitment-nudge.sh\""
+          }
+        ]
       }
     ],
     "SessionEnd": [
