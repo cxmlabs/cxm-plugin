@@ -6,6 +6,7 @@ const HOST_FLAGS = {
   '--tenant-api-url': 'tenantApi',
   '--org-api-url': 'orgApi',
   '--cube-url': 'cube',
+  '--mcp-url': 'mcp',
 };
 
 export function parseHostFlags(argv) {

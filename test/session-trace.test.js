@@ -52,6 +52,24 @@ test('a CXM session becomes one metadata-only trace with no content, arguments o
   }
 });
 
+test('the mcp command is named, and its tool and arguments are not', () => {
+  for (const command of ['cxm mcp', 'cxm mcp secret-tool', "cxm mcp secret_tool '{\"secret\":1}'"]) assert.equal(cxmCommand(command), 'mcp', command);
+  const calls = [assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: `cxm mcp secret-tool '{"secret-argument":"our aws secretword secretverb"}'` } }]), result('t1', 2, 'secret-result')];
+  const events = buildSessionTrace(calls, { sessionId: 's' });
+  assert.deepEqual(events[0].properties.cxm_commands, { mcp: 1 });
+  assert.deepEqual(events[0].properties.aws_cli_calls, {});
+  assert.ok(!JSON.stringify(events).includes('secret'));
+  const whoami = assistant('m0', 0, [{ type: 'tool_use', id: 't0', name: 'Bash', input: { command: 'cxm whoami' } }]);
+  const awsCalls = (command) => buildSessionTrace([whoami, assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command } }])], { sessionId: 's' })[0].properties.aws_cli_calls;
+  const argument = `'{"q":"our aws secretword secretverb"}'`;
+  for (const call of ['cxm', '~/.local/bin/cxm', '"$HOME/.local/bin/cxm"', 'npx @cloudexmachina/cxm@latest', 'node "/p/bin/cxm.js"', 'cxm \\\n', 'C=cxm; $C']) assert.deepEqual(awsCalls(`${call} mcp t ${argument}`), {}, call);
+  for (const command of [`cxm 'mcp' t ${argument}`, `python3 - <<'EOF'\nsubprocess.run(["cxm", "mcp", "t", "our aws secretword secretverb"])\nEOF`, `node "/p/bin/cxm.js" context 'our aws secretword secretverb'`, `npx @cloudexmachina/cxm@latest context 'our aws secretword secretverb'`]) assert.deepEqual(awsCalls(command), {}, command);
+  // A quoted word is a boundary: the words on its two sides never join.
+  for (const command of ['aws "s3" ls my-bucket --profile cxm', 'aws --profile "cxm-prod" sts get-caller-identity']) assert.deepEqual(awsCalls(command), {}, command);
+  for (const command of ['cxm context - <<EOF\nour aws secretword secretverb\nEOF', "cxm context 'it'\\''s aws secretword secretverb'"]) assert.deepEqual(awsCalls(command), {}, command);
+  for (const command of ["cxm whoami # don't\naws s3 ls\n# don't", 'cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1']) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
+});
+
 test('a session that never used CXM sends nothing', () => {
   const other = [assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'ls' } }]), result('t1', 2, 'x')];
   assert.deepEqual(buildSessionTrace(other, { sessionId: 's' }), []);
@@ -73,6 +91,8 @@ test('command names come from an allowlist, never from arguments', () => {
   assert.equal(cxmCommand('cxm my-secret-thing'), 'other');
   assert.equal(cxmCommand('echo cxmfoo'), null);
   assert.deepEqual(awsCall('AWS_PROFILE=x aws ec2 describe-instances --filters y'), { service: 'ec2', operation: 'describe-instances' });
+  assert.equal(awsCall('cxm mcp t aws s3 ls'), null);
+  assert.equal(awsCall('cxm context - <<EOF\naws s3 ls\nEOF'), null);
 });
 
 test('a skill loaded by reading its file counts, and one with no successful command is unused', () => {

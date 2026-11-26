@@ -50,8 +50,8 @@ Do not copy either shape into new code, and do not grow them.
 ## Conventions that differ from defaults
 
 - A new capability goes in `lib/` with its logic and in `commands/` with its interface, even when
-  only one command needs it today. The skills, the hooks and a future MCP wrapper are all callers
-  of the same `lib/`.
+  only one command needs it today. The skills and the hooks are all callers of the same
+  `lib/`.
 - Name the capability, not the service behind it. The plugin ships as readable text, so a comment
   naming an internal technology tells a customer what runs inside the platform. The query format
   is the exception: a skill that cannot say `cubejs` cannot write a query, and the cube names are
@@ -77,3 +77,9 @@ Do not copy either shape into new code, and do not grow them.
 - `lib/viz.js` is not a third compute exception. Its totals, shares and net figures show the rows
   of one block only. It fetches nothing and publishes no figure. When a `cube-chart` query returns
   `limit` rows, every total and net says `of top N`, because the platform can hold more rows.
+
+## The hosted CxM MCP
+
+The call to the hosted CxM MCP: `mcpRequest` in `lib/http.js`, behind `commands/mcp.js`. It sends the
+bearer token and no cookie, follows no redirect and sends a tool call once. A failure never becomes an
+empty result. Telemetry gets the command name and an error class, and no message.
