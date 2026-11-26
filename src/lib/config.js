@@ -54,11 +54,12 @@ export async function requireSession() {
   if (!config?.accessToken || !config?.organizationId || !config?.baseUrl) {
     throw new Error('Not logged in. Run: cxm login');
   }
-  // Refresh a little before expiry too, so a call that starts valid can't expire mid-flight.
-  const expiringSoon = config.expiresAt && config.expiresAt * 1000 < Date.now() + 30_000;
+  // Refresh before expiry too, so a call that starts valid can't expire mid-flight. 180 s covers the retry waits of lib/http.js.
+  const expiringSoon = config.expiresAt && config.expiresAt * 1000 < Date.now() + 180_000;
   if (expiringSoon) {
     const refreshed = config.refreshToken && (await refreshSession(config));
     if (refreshed) return refreshed;
+    if (config.expiresAt * 1000 > Date.now()) return config;
     throw new Error('Session expired. Run: cxm login');
   }
   return config;
