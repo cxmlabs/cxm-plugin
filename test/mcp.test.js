@@ -145,6 +145,8 @@ test('each failure prints one text, exits with 1 and prints no result', async ()
     ['another isError text', call, refused('No cost data for this period.'), /^Error: No cost data for this period\.$/m],
     ['isError with no text', call, rpc({ content: [], isError: true, structuredContent: { rows: [] } }), /^Error: The tool failed and gave no text\.$/m],
     ['a JSON-RPC error', call, (req, res) => res.writeHead(400, JSON_TYPE).end(JSON.stringify({ jsonrpc: '2.0', id: 'server-error', error: { code: -32600, message: 'bad request' } })), /^Error: The CxM MCP refused the request: bad request$/m],
+    ['the session text as a JSON-RPC error', call, (req, res) => res.writeHead(200, JSON_TYPE).end(JSON.stringify({ jsonrpc: '2.0', id: req.rpc.id, error: { code: -32000, message: 'Your CXM session expired, reconnect the connector.' } })), LOGIN],
+    ['still preparing as a JSON-RPC error', call, (req, res) => res.writeHead(200, JSON_TYPE).end(JSON.stringify({ jsonrpc: '2.0', id: req.rpc.id, error: { code: -32000, message: 'CXM is still preparing this data, try again in a minute.' } })), /^Error: CXM is still preparing this data\. Try again in a minute\.$/m],
     ['a JSON-RPC error beside a result', call, (req, res) => res.writeHead(200, JSON_TYPE).end(JSON.stringify({ jsonrpc: '2.0', id: req.rpc.id, result: rows, error: { message: 'broken' } })), /refused the request: broken$/m],
     ['no content', call, rpc({ content: [] }), /^Error: The tool gave no text and no structured content\.$/m],
     ['a list with no tools field', [], rpc({}), NOT_RPC],

@@ -43,7 +43,9 @@ export function cxmCommand(command) {
 }
 
 export function awsCall(command) {
-  const m = AWS_CALL.exec(command ?? '');
+  if (!command || MCP_CALL.test(command)) return null;
+  const text = /\bcxm\b/.test(command) ? command.replace(HEREDOC, '$1').replace(QUOTED, "''") : command;
+  const m = AWS_CALL.exec(text);
   return m ? { service: m[1], operation: m[2] } : null;
 }
 
@@ -135,7 +137,7 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
       tool: toolName(t.name),
       skill: t.name === 'Skill' ? cxmSkill(t.input, ours) : skillRead(t.name, t.input, ours),
       cxm,
-      aws: command && !MCP_CALL.test(command) ? awsCall(/\bcxm\b/.test(command) ? command.replace(HEREDOC, '$1').replace(QUOTED, "''") : command) : null,
+      aws: command ? awsCall(command) : null,
       isError: r?.isError ?? false,
       latency: ms(t.at, r?.at),
       at: t.at,

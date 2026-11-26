@@ -198,3 +198,21 @@ export async function mcpRequest(config, method, params = {}) {
     throw new Error(`The CxM MCP did not answer: network fault (${err.cause.code ?? 'no code'}).`);
   }
 }
+
+// The tools of the hosted MCP, as name, description and input schema.
+export async function mcpTools(config) {
+  const { tools, nextCursor } = await mcpRequest(config, 'tools/list');
+  if (!Array.isArray(tools)) throw mcpShapeError(200);
+  if (nextCursor) throw new Error('The CxM MCP lists its tools in parts, and this command reads one. Update the plugin.');
+  return tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+}
+
+// One tool call. It returns the structured content, or the text. A tool error or an empty answer throws.
+export async function mcpCall(config, tool, args) {
+  const result = await mcpRequest(config, 'tools/call', { name: tool, arguments: args });
+  const texts = Array.isArray(result.content) ? result.content.filter((c) => c?.type === 'text' && typeof c.text === 'string').map((c) => c.text) : [];
+  const text = texts.join('\n');
+  if (result.isError !== undefined && result.isError !== false) throw new Error(text || 'The tool failed and gave no text.');
+  if (result.structuredContent == null && text === '') throw new Error('The tool gave no text and no structured content.');
+  return result.structuredContent ?? text;
+}

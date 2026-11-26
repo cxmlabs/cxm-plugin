@@ -91,6 +91,8 @@ test('command names come from an allowlist, never from arguments', () => {
   assert.equal(cxmCommand('cxm my-secret-thing'), 'other');
   assert.equal(cxmCommand('echo cxmfoo'), null);
   assert.deepEqual(awsCall('AWS_PROFILE=x aws ec2 describe-instances --filters y'), { service: 'ec2', operation: 'describe-instances' });
+  assert.equal(awsCall('cxm mcp t aws s3 ls'), null);
+  assert.equal(awsCall('cxm context - <<EOF\naws s3 ls\nEOF'), null);
 });
 
 test('a skill loaded by reading its file counts, and one with no successful command is unused', () => {
