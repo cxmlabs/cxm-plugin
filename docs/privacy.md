@@ -12,17 +12,34 @@ sends your query there. This is the plugin's purpose. It carries your access tok
 or the agent wrote; it does not send your cloud data anywhere else.
 
 **2. Product-usage telemetry goes to our analytics provider.** Usage events go to PostHog EU
-(`https://eu.i.posthog.com`) with a write-only ingest key. There are two kinds.
+(`https://eu.i.posthog.com`) with a write-only ingest key. There are three kinds, and a crash report.
 
 *Command events*, one per `cxm` command. Each carries:
 
 - the command name, whether it succeeded or failed, its duration, and on failure an error class and the error message with ARNs, account ids, ids, emails, URLs, local paths and secrets masked (200 characters at most); a refused `cxm cost-result` sends the failure only, with no error class or message;
-- `plugin_version`, `node_version`, `os`, `platform`, `arch`, whether it ran in CI, and whether a
+- `plugin_version`, `node_version`, `os`, `os_release`, `platform`, `arch`, `term_program`, whether it ran in CI, and whether a
   person or an agent ran it;
+- `session_id`, a random id made at each login, so the events of one login are joined;
 - an anonymous per-machine id (`distinct_id` / `machine_id`), generated locally;
 - your `organization_id` (so the data is pseudonymous, not anonymous — it is tied to your org, not to you personally);
 - for an analytics query: which datasets it named and the query's shape (counts of measures, dimensions,
   filters, and whether it returned rows) — **never** a filter value, a row, a result, or a resource id.
+
+*A cost-result event*, one per run of `cxm cost-result`. It carries the fields that each event carries: version, system, CI, person or agent, machine id, login session id and
+`organization_id`, and the shape of the result:
+
+- whether the run passed, how many faults it had, and their codes from a fixed list, never their text;
+- how many lines, estimated lines, open lines, directives and uncovered targets the result holds, and how
+  many coverage entries of each kind, and the `gap`, from a fixed list, of at most 60 unmeasured entries;
+- for the estimate: its grade, and a bucket for each end and for their ratio, never an amount;
+- for at most 60 lines: the tag, the direction, the grade, whether the line is estimated, open or outside the
+  estimate, the fixed reason that it is open, a size bucket and a ratio bucket, the kind and the grade of each
+  factor (at most 20), whether a factor follows activity or is shared, and the `gap` from a fixed list;
+- for those lines, the provider, the service and the dimension of the line's key. Each one comes from a fixed
+  list. Any other word is sent as `other`.
+
+By default this event contains **no content**: no amount, no item, no target, no file path, no source
+reference, no directive and no organization name.
 
 *A session trace*, at most one per agent session, and **only when the session used CXM** (a `cxm-*`
 skill, a `cxm` command or `/cxm`). When the session ends, the plugin reads the session transcript
@@ -53,11 +70,12 @@ frame from your code or your file paths.
 
 **Optional: share session content.** If you set `CXM_TELEMETRY=full`, the session trace also carries
 your prompts, the agent's answers, and tool inputs and outputs. Each is cut to 4,000 characters, and
-strings that look like keys or tokens are replaced with `[REDACTED]`. This is off unless you turn it
+strings that look like keys or tokens are replaced with `[REDACTED]`. The cost-result event then also
+carries the directives of the result, redacted the same way and cut to 300 characters. This is off unless you turn it
 on; use it when you want us to debug a session with you.
 
-Turn all telemetry off with `CXM_TELEMETRY=0`. The full list of keys is in `src/lib/telemetry.js`
-and `src/lib/session-trace.js`.
+Turn all telemetry off with `CXM_TELEMETRY=0`. The full list of keys is in `src/lib/telemetry.js`,
+`src/lib/cost-event.js` and `src/lib/session-trace.js`.
 
 **3. Nothing else.** The plugin has **zero runtime dependencies** — `package.json` declares no
 `dependencies` and no `devDependencies`, and everything runs on the Node standard library. No
