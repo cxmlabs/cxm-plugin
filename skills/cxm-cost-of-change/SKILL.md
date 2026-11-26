@@ -8,8 +8,8 @@ description: Use when the user is writing or reviewing Terraform / IaC, running 
 **Read `../cxm-shared-rules.md` first** (relative to this skill's base directory).
 Step 6 replaces its answer style and its visuals for the result of a code change.
 
-- For a resource with no diff, follow "Price a resource".
-- For a diff, read `measurement.md` of this directory (it holds the maps and each quoted section that is not here), then follow "Price a code change". A resource in the diff is a line of that method. Its rate comes from "Price a resource".
+- For a resource with no diff, read `measurement.md`, then follow "Price a resource".
+- For a diff, read `measurement.md`, then follow "Price a code change". A resource in the diff is a line of that method; "Price a resource" gives its rate.
 
 ## Price a resource
 
@@ -166,5 +166,5 @@ Each entry holds `kind`, `what`, `why` and `source`.
 ### 6. Answer
 
 1. Write one sentence that names CloudExMachina, the organization and the window of step 4.
-2. Print the section of step 5 after it, complete and unchanged. Add no figure, no chart and no second summary. The section, with its two tables, is the end of the answer. The caller decides where the result goes, and can fold the second table.
+2. Print the section of step 5 after it, complete and unchanged. Add no figure, no chart and no second summary. The section, with its two tables, is the end of the answer. The caller decides where the result goes, and can fold the second table. It may name datasets, routes and error codes.
 3. The section holds the counts, the rates and the source kinds. Answer a question about units, counts or rates with the section. Write no table and no total of your own. A total over several tags is a figure that code did not compute: never write one.

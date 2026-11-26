@@ -259,7 +259,7 @@ function coverageRows(entries) {
 }
 
 const COLUMN = { commitment: 'direct (commitment)', 'added-runtime': 'direct (longer or shorter run)' };
-// What moves, the headline lines first and each part from the largest line, and what might move: the open lines, the flag-gated lines, the unmeasured entries and the small lines.
+// Splits the lines into what moves and what might move: open, flag-gated, unmeasured and small lines.
 function splitRows(input, result) {
   const lines = input.lines.map((line, i) => ({ line, computed: result.lines[i] }));
   const open = lines.filter(({ line }) => result.open.lines.includes(line.id));
@@ -268,7 +268,7 @@ function splitRows(input, result) {
   const monthly = priced.filter(({ computed }) => computed.unit !== '$');
   const sum = total(monthly.map(({ computed }) => weight(computed)));
   const bySize = (list) => [...list].sort((a, b) => weight(b.computed) - weight(a.computed));
-  // A $/mo line under $1/mo and under 10 percent of the priced $/mo lines is small, unless such lines are not small together. A line under a cent always is.
+  // Small: under a cent, or under $1/mo and 10 % of the sum while all such lines together stay under 10 %.
   const little = monthly.filter(({ computed }) => !reachesOne(computed) && weight(computed) < 0.1 * sum);
   const together = total(little.map(({ computed }) => weight(computed)));
   const small = priced.filter((l) => weight(l.computed) < 0.01 || (together < 0.1 * sum && little.includes(l)));

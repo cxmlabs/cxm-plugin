@@ -12,12 +12,28 @@ const CXM_COMMANDS = new Set([
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
-const HEREDOC = /((?<!<)<<-?[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([A-Za-z_][\w.-]*))[^\n]*)[\s\S]*?(?:\n\t*\2\3\4(?=\n|$)|$)/g;
+const HEREDOC_OPENER = /(?<!<)<<-?[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([A-Za-z_][\w.-]*))/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
 const MAX_CHARS = 4000;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const SECRET = /\b(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|phc_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b|((?:secret|token|password|passwd|api[_-]?key)["'\s:=]+)[^\s"',}]{8,}/gi;
+
+// Drop each heredoc body, through its terminator line. An opener with no terminator drops nothing.
+function stripHeredocs(command) {
+  const lines = command.split('\n');
+  const kept = [];
+  for (let i = 0; i < lines.length; i++) {
+    kept.push(lines[i]);
+    let at = i;
+    for (const m of lines[i].matchAll(HEREDOC_OPENER)) {
+      const end = lines.findIndex((l, j) => j > at && l.replace(/^\t+/, '') === (m[1] ?? m[2] ?? m[3]));
+      if (end > 0) at = end;
+    }
+    i = at;
+  }
+  return kept.join('\n');
+}
 
 // Why a block would show as source, not drawn: its kind and a fixed reason, never its content.
 function drawFailure({ kind, body }) {
@@ -126,7 +142,7 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
   const spans = [...toolUses.entries()].map(([id, t]) => {
     const r = results.get(id);
     // A heredoc body holds free text, so the command name and the aws call are read without it.
-    const command = t.name === 'Bash' && t.input?.command ? String(t.input.command).replace(HEREDOC, '$1') : null;
+    const command = t.name === 'Bash' && t.input?.command ? stripHeredocs(String(t.input.command)) : null;
     return {
       id,
       tool: toolName(t.name),
