@@ -138,6 +138,22 @@ test('the Node guard threshold matches package.json engines', () => {
   assert.equal(guard, floor, 'src/lib/node-guard.js MIN_MAJOR must equal package.json engines.node');
 });
 
+// Two rules that disagree make an agent obey the one it reads first. The phrases are the old rule.
+test('the repository states one rule for the API and the MCP', () => {
+  const flat = (p) => read(p).replace(/\s+/g, ' ').toLowerCase();
+  const oldRule = ['why-cli-not-mcp', 'not an MCP server', 'Do not add an MCP server', 'future MCP wrapper', 'do NOT use MCP'];
+  for (const path of tracked('*.md').filter((p) => p !== 'CHANGELOG.md')) {
+    for (const phrase of oldRule) assert.ok(!flat(path).includes(phrase.toLowerCase()), `${path} holds "${phrase}"`);
+  }
+  const agents = flat('AGENTS.md');
+  const durable = agents.slice(agents.lastIndexOf('bmad:context'));
+  assert.ok(durable.includes('docs/api-and-mcp.md'), 'AGENTS.md must name docs/api-and-mcp.md after the last bmad:context marker');
+  for (const [path, text] of [['AGENTS.md', durable], ['docs/api-and-mcp.md', flat('docs/api-and-mcp.md')]]) {
+    assert.match(text, /deterministic[^.]*\bapi\b/, `${path}: a deterministic operation uses the API`);
+    assert.match(text, /needs thinking[^.]*\bmcp\b/, `${path}: an operation that needs thinking uses the MCP`);
+  }
+});
+
 // `files` is what npm puts in the tarball. A directory the plugin loads from and the tarball
 // omits is a published version that is broken for `npx` users only — the marketplace installs
 // from git and never notices.
