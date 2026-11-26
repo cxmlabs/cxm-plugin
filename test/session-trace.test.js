@@ -86,11 +86,13 @@ test('a heredoc body never reaches the command name or the aws call', () => {
   assert.ok(!JSON.stringify(events).includes('payroll-nightly'));
   const spanOf = (command) => buildSessionTrace([assistant('m0', 0, [{ type: 'tool_use', id: 't0', name: 'Bash', input: { command: 'cxm price x' } }]), assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command } }])], { sessionId: 's' })[0].properties;
   for (const opener of ["<<'END-JSON'", '<<\\END-JSON', '<<"END-JSON"', '<<-END-JSON']) assert.deepEqual(spanOf(`cxm cost-result ${opener}\nthe aws batch payroll-x\nEND-JSON\naws s3 ls`).aws_cli_calls, { 's3 ls': 1 }, opener);
+  assert.deepEqual(spanOf("cat <<E'OF'\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf('cat <<EOF:\naws batch payroll-q\nEOF:\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
   for (const tail of ['', '\n  EOF']) assert.deepEqual(spanOf(`cxm cost-result <<'EOF'\nthe aws batch payroll-z${tail}`).aws_cli_calls, {}, tail);
   assert.deepEqual(spanOf('cat <<EOF > f\n\tEOF\naws batch payroll-z\nEOF\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
   assert.deepEqual(spanOf('cat <<A <<B\nx\nA\naws batch payroll-y\nB\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
   // Text that opens no heredoc, and an empty heredoc, hide no later call.
-  for (const before of ['jq . <<<"abc"', 'echo $((1<<20))', 'echo $((1<<n))', "python3 -c 'print(a << b)'", "grep -n '<<<<<<< HEAD' a.py", 'cat > /tmp/e <<EOF\nEOF']) assert.deepEqual(spanOf(`${before}\ncxm whoami`).cxm_commands, { price: 1, whoami: 1 }, before);
+  for (const before of ['jq . <<<"abc"', 'echo $((1<<20))', 'echo $((1<<n))', "python3 -c 'print(a << b)'", "python3 -c 'print(a << \"b\")'", "echo 'std::cout << \"hi\";' > a.cpp", "grep -n '<<<<<<< HEAD' a.py", 'cat > /tmp/e <<EOF\nEOF']) assert.deepEqual(spanOf(`${before}\ncxm whoami`).cxm_commands, { price: 1, whoami: 1 }, before);
   assert.doesNotThrow(() => spanOf(['cxm', 'whoami']));
 });
 

@@ -110,7 +110,8 @@ test('the source map keeps its rows and its units of one account and region', ()
   rows.forEach(row);
   assert.equal(map.split('\n').filter((l) => l.startsWith('| ')).length, rows.length + 1, 'the source map holds the 15 rows and a header');
   assert.ok(row('Pages').includes('of that account and region'));
-  assert.ok(row('Runs per month').includes('--created') && row('Runs per month').includes('A count equal to the limit is a floor'));
+  assert.ok(row('Runs per month').includes('--created') && row('Runs per month').includes('A count of 1000 is a floor'));
+  assert.ok(!measurement.includes('raise the limit'));
   for (const text of ['gh run list', 'whatever its event', 'github_workflow_costs', 'operator action']) assert.ok(row('CI runs per month').includes(text), text);
   for (const text of ['`github_workflow_costs.billable_minutes`', '`timeout-minutes`']) assert.ok(row('CI minutes per run').includes(text), text);
   assert.ok(row('Requests per month').includes('`lambda_functions.sum_request_count`'));

@@ -22,6 +22,7 @@ fixes, including security fixes.
   reply; a `cube-chart` block runs its query with your session first. The `rich_visuals` setting
   turns the in-reply drawing off.
 
+- A read is repeated after HTTP 502, 503 or 504, at most five times, except the `cxm context` search. A write is sent once.
 - `cxm install`: one command, `npx @cloudexmachina/cxm@latest install`, installs the plugin into
   Claude Code and Codex, signs in, and on a re-run updates to the latest version.
 - Releases run in CI: a `patch|minor|major` dispatch opens the version-bump PR; merging it tags,

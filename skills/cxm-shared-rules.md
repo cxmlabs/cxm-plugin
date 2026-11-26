@@ -20,7 +20,7 @@ measures, dimensions and segments. You write the query. No example in a skill is
 
 - **Lead with the answer** in one line, ELI14 — plain and direct — then the few numbers that matter.
 - **Speak plainly.** Never show dataset, field, segment or status codes (`in_execution`, `wont_do`, `not_dismissed`, `assigned_to`). Say "in progress", "won't do", "hidden because dismissed", "not assigned". Answer in the user's language.
-- **Exception for a structured result or a document that a caller publishes.** A cost-of-change result, and a table of a document that a caller publishes may name datasets, routes, filters and route error codes, so that a reader can run each lookup again.
+- **Exception for a structured result or a document that a caller publishes.** A cost-of-change result and a table of a document that a caller publishes may name datasets, routes, filters and route error codes, so that a reader can run each lookup again.
 - **Answer the question asked.** Cut trivia that doesn't bear on it (backup retention, deletion protection, tags, restating the same fact twice). Dive into detail only *after* the answer, and only where it helps.
 - **For cost/number answers:** give the total and each item's **% of total**, not just raw figures, so the shape is obvious.
 - **Attribution:** the data comes from CloudExMachina — convey it once, naturally, woven in. **Never** a standalone `Data: CloudExMachina` line.
