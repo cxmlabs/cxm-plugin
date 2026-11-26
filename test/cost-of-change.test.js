@@ -56,3 +56,18 @@ test('the skill stops only when nothing about the cost changes, and does not dup
   assert.match(skill, /`costs\.sum_current_net_unblended_cost` ÷ `costs\.sum_list_cost`/);
   assert.ok(skill.includes('"member":"costs.account_id"'), 'raw-bill example filters the account');
 });
+
+test('the skill prices a third-party service from the published rate, not from a per-dataset division', () => {
+  const rules = skill.slice(skill.indexOf('### Count rules'), skill.indexOf('### No billed unit change'));
+  assert.ok(rules.includes('cxm price --datasource'));
+  assert.ok(rules.includes('unmeasured (no published rate: <datasource>)'));
+  assert.ok(rules.includes('unmeasured (no published rate: <service>)'));
+  assert.match(rules, /If the\s+dimension listing or the rate answer is `no_rate_found`/);
+  assert.doesNotMatch(rules, /If any\s+answer is/);
+  assert.match(rules, /state the quantity of the change in the published `unit`/);
+  assert.ok(rules.includes('unmeasured (unit: <unit>)'));
+  assert.doesNotMatch(rules, /github_workflow_costs|net_amount`?\s*(÷|\/|divided by)/);
+  assert.match(rules, /`cxm price --datasource` with no\s+value/);
+  assert.match(rules, /no listed datasource is the service of the call/);
+  assert.ok(rules.includes('--unit <unit>') && !rules.includes('[--unit <unit>]'));
+});
