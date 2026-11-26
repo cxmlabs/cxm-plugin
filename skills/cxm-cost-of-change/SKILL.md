@@ -74,6 +74,7 @@ cxm api GET "/pricing/aws/discount-rate?account_id=<usage account>&product_code=
   `suggested_action`.
 
 A failed route prints `Org API GET <path> failed: <status>.` and the start of the JSON body.
+After 502, 503 or 504 on every try, it prints `CXM did not answer: HTTP <status> after <n> tries.` The request changed nothing: run it again later.
 
 - On HTTP 422, read `detail.code` and follow it:
   - `no_price_found`: the filter did not match. It is never a zero price. Search the catalog.
