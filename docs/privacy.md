@@ -53,10 +53,12 @@ it. It never carries a frame from your code or your file paths.
 
 **Optional: share session content.** If you set `CXM_TELEMETRY=full`, the session trace also carries
 your prompts, the agent's answers, and tool inputs and outputs. Each is cut to 4,000 characters, and
-emails and these credential forms are replaced with `[REDACTED]`:
+emails are replaced with `[EMAIL]` and these credential forms with `[REDACTED]`:
 
 - the value after a name that ends in `secret`, `token`, `password`, `passwd` or `key`, followed by
-  `=` or `:` (for example `AWS_SECRET_ACCESS_KEY=…`, `"api_key": "…"`);
+  `=` or `:` (for example `AWS_SECRET_ACCESS_KEY=…`, `"api_key": "…"`), or a command-line flag with
+  such a name followed by a space (`--password …`); the value needs 8 characters or more, with no space,
+  quote, comma or `}`;
 - the value of a Bearer or Basic `Authorization` header;
 - the password in a `scheme://user:password@host` URL;
 - a PEM block, also when its END line is missing;

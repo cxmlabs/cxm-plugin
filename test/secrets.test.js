@@ -18,6 +18,11 @@ test('each credential form is replaced, and each text that is not a credential s
     [`GITHUB_TOKEN=${v()}`, v()],
     [`db_password: ${v()}`, v()],
     [`passwd=${v()}`, v()],
+    [`mysql --password ${v()}`, v()],
+    [`cli --auth-token ${v()}`, v()],
+    [JSON.stringify({ command: `curl -d "{\\"password\\":\\"${v()}\\"}" x` }), v()],
+    [`password=ab\\cdefghij${v()}`, v()],
+    [`password=${v()}\\${v()}`, v()],
     [`client_secret: "${v()}"`, v()],
     [`Authorization: Bearer ${v()}`, v()],
     [`curl -H 'Authorization: Basic ${v()}=='`, v()],
@@ -30,7 +35,7 @@ test('each credential form is replaced, and each text that is not a credential s
     [pem, pem],
     [`out: ${pem.slice(0, 60)}`, pem.slice(0, 60)],
     [`token ${jwt}`, jwt],
-    ...['phc_', 'ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_', 'github_pat_', 'xoxb-', 'xoxp-', 'sk-', 'sk-proj-', 'sk-ant-', 'sk_live_', 'rk_live_', 'sk_test_', 'AIza'].map((p) => [`use ${v(p)} now`, v(p)]),
+    ...['phc_', 'ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_', 'github_pat_', 'xoxb-', 'xoxp-', 'sk-', 'sk-proj-', 'sk-ant-', 'sk_live_', 'rk_live_', 'sk_test_', 'AIza', 'phx_', 'whsec_', 'xapp-', 'xoxe-', 'ya29.', 'GOCSPX-'].map((p) => [`use ${v(p)} now`, v(p)]),
   ];
   for (const [text, value] of cases) assert.ok(!leaks(redactSecrets(text), value), text);
   const keep = [
@@ -39,6 +44,7 @@ test('each credential form is replaced, and each text that is not a credential s
     'bd36091f2c4e5a6b7c8d9e0f1a2b3c4d5e6f7a8b',
     'arn:aws:iam::123456789012:role/Deploy',
     '{"key": "name"}',
+    'the secret value is kept private',
   ];
   for (const text of keep) assert.equal(redactSecrets(text), text);
 });

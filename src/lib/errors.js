@@ -8,7 +8,7 @@ const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MAX_MESSAGE = 200;
 const SCRUB = [
   [/arn:aws[a-z-]*:[^\s"',)]+/gi, '<arn>'],
-  [/https?:\/\/[^\s"',)]+/gi, '<url>'],
+  [/\b[a-z][\w+.-]*:\/\/[^\s"',)]+/gi, '<url>'],
   [/[\w.+-]+@[\w-]+\.[\w.-]+/g, '<email>'],
   [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<id>'],
   // Local file paths only: an API path such as /commitments/summary-sp is what makes an error actionable.
