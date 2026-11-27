@@ -11,6 +11,9 @@ It holds how to query CXM and how to answer, for every CXM skill. Follow it in e
 You size a Savings Plan or Reservation buy for the estate. You return a layered buy list. Do the
 investigation and judgment below.
 
+For code that compares, sizes or orders commitment offers, go directly to "Check the offers and the
+quantity". It reads public AWS sources and needs no login.
+
 ## Step 1 — Settle the segment
 
 A commitment question is under-specified in one way that matters: the segment. Term and payment
@@ -88,6 +91,7 @@ is zero or negative, never because the estate already holds a lot. State the res
   quantity is that row's `buy_quantity_floor` (or `buy_quantity_breakeven`): instances of
   `buy_instance_type`. Never use `reserve_quantity_*` as a quantity — it counts normalized units.
   Drop a group whose buy quantity is 0. Copy the row's `current_od_monthly_usd` onto its line.
+  Before you order a line, do "Check the offers and the quantity" on the offer that it orders.
 - Drop a Reserved group whose gross savings are below $50/mo: the purchase effort outweighs the
   saving. Drop a group whose low `seasonal_trough_ratio` or high `single_month_divergence_ratio`
   marks a seasonal or draining fleet: a reservation strands on a shrinking pool. Name each dropped
@@ -127,6 +131,27 @@ is zero or negative, never because the estate already holds a lot. State the res
   commit.
 - Never state an EDP or PRA rate from memory. Each customer negotiates the discount per contract.
 
+## Check the offers and the quantity
+
+Do these checks for each offer, in a buy line or in code.
+
+1. **Compare per covered unit, not per node.** `price per unit = (hourly + upfront ÷ hours in the
+   term) ÷ units that one purchase supplies`. Read the units for the size and the engine
+   (`Normalization Size Factor` in the price list): one cache.r7g.large supplies 4 units as Redis
+   and 3.2 on another engine. Read in the service documentation which usage each offer covers. A
+   Redis reservation also covers that other engine; a reservation for the other engine does not cover
+   Redis. At an equal price per unit, prefer the wider coverage.
+2. **Compute the quantity in the units of the node ordered.** `quantity = floor(net demand in units
+   ÷ units of one node of the offer ordered)`. A quantity computed for 3.2-unit nodes and ordered
+   as 4-unit Redis nodes over-buys by 25 %. Print `quantity × units` beside the net demand.
+3. **Check that the offer is sold.** For every family, size, engine, region, term and payment option
+   that the code or the line can reach, find the offer in the public price list. The index is
+   `https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/index.json`; the region file is
+   `/offers/v1.0/aws/<service code>/current/<region>/index.csv`. Some families have no Redis
+   reservation in some regions (r8g, m8g, c8gn and i8ge in us-east-1). Where the offer is not sold,
+   use an offer that is sold and covers the usage, or leave the usage on demand. If the price list
+   cannot be read, print `unmeasured` and the error, and give no ranking or quantity.
+
 ## Answer shape
 
 1. Summary: the buy in one line, the segment you sized, and the cleanup to sequence first.
@@ -138,8 +163,9 @@ is zero or negative, never because the estate already holds a lot. State the res
 ## Guardrails
 
 - Read-only: never call write endpoints.
-- Copy the platform's figures; do not recompute them. Net them against holdings, but never restate
-  a savings, rate, or floor the queries did not report. All savings are gross (pre-EDP).
+- Copy the platform's figures; do not recompute them, except in "Check the offers and the quantity".
+  Net them against holdings, but never restate a savings, rate, or floor the queries did not report.
+  All savings are gross (pre-EDP).
 - Frame the output as loss avoided, in console dollars. Every dollar must trace to a line in the
   buy list.
 - Do not use internal metric names (MCT, redline, ESR, MCR, ICR) in the summary or rationale.
