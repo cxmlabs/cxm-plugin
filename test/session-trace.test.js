@@ -12,7 +12,7 @@ const result = (id, s, content, isError = false) => ({
 
 const session = [
   { type: 'attachment', attachment: { type: 'skill_listing', content: '- cxm-agent-plugin:cxm: Run a command\n- cxm-agent-plugin:cxm-cost-drivers: Use when…\n- cxm-waste: Use when…\n- my-private-skill: secret' } },
-  { type: 'user', timestamp: at(0), sessionId: 'sess-1', message: { content: 'What drives my bill? key=AKIAABCDEFGHIJKLMNOP' } },
+  { type: 'user', timestamp: at(0), sessionId: 'sess-1', message: { content: 'What drives my bill? key=AKIA' + 'ABCDEFGHIJKLMNOP' } },
   assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Skill', input: { skill: 'cxm-agent-plugin:cxm-cost-drivers' } }]),
   result('t1', 2, 'Launching skill'),
   assistant('m2', 3, [{ type: 'tool_use', id: 't2', name: 'Bash', input: { command: "cxm analytics query '{\"filters\":[\"secret-arn\"]}'" } }]),
@@ -78,7 +78,16 @@ test('a session that never used CXM sends nothing', () => {
 test('full mode shares content, redacted and truncated', () => {
   const events = buildSessionTrace(session, { sessionId: 'sess-1', full: true });
   assert.match(events[0].properties.$ai_input_state, /What drives my bill/);
-  assert.ok(!JSON.stringify(events).includes('AKIAABCDEFGHIJKLMNOP'));
+  assert.ok(!JSON.stringify(events).includes('AKIA' + 'ABCDEFGHIJKLMNOP'));
+  const secret = (tag) => `${tag}Fake${'q7'.repeat(10)}`;
+  const forms = (tag) => `aws_secret_access_key = ${secret(`${tag}1`)}\nghp_${secret(`${tag}2`)}\n-H 'Authorization: Bearer ${secret(`${tag}3`)}'`;
+  const lines = [
+    { type: 'user', timestamp: at(0), sessionId: 's', message: { content: `connect ${forms('prompt')}` } },
+    assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: `cxm whoami ${forms('input')}` } }]),
+    result('t1', 2, forms('output')),
+  ];
+  const sent = JSON.stringify(buildSessionTrace(lines, { sessionId: 's', full: true }));
+  for (const tag of ['prompt', 'input', 'output']) for (const n of [1, 2, 3]) assert.ok(!sent.includes(secret(`${tag}${n}`)), `${tag} leaked form ${n}`);
   assert.equal(redact('signed in as jane.doe@example.com'), 'signed in as [EMAIL]');
   assert.equal(redact('x'.repeat(5000)).length < 4100, true);
 });

@@ -3,6 +3,7 @@
 // A session that never used CXM produces nothing: we do not observe the customer's other work.
 
 import { createHash } from 'node:crypto';
+import { redactSecrets } from './secrets.js';
 import { draw, needsRows, splitReply } from './viz.js';
 
 // `cxm` sub-commands we may name. Anything else is reported as `other`, so an argument can never leak.
@@ -20,7 +21,6 @@ const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
 const MAX_CHARS = 4000;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
-const SECRET = /\b(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|phc_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b|((?:secret|token|password|passwd|api[_-]?key)["'\s:=]+)[^\s"',}]{8,}/gi;
 
 // Why a block would show as source, not drawn: its kind and a fixed reason, never its content.
 function drawFailure({ kind, body }) {
@@ -76,7 +76,7 @@ function toolName(name) {
 
 export function redact(text) {
   const s = typeof text === 'string' ? text : JSON.stringify(text);
-  const clean = (s ?? '').replace(SECRET, (all, token, prefix) => (prefix ? `${prefix}[REDACTED]` : '[REDACTED]')).replace(EMAIL, '[EMAIL]');
+  const clean = redactSecrets(s ?? '').replace(EMAIL, '[EMAIL]');
   return clean.length > MAX_CHARS ? `${clean.slice(0, MAX_CHARS)}…[truncated]` : clean;
 }
 

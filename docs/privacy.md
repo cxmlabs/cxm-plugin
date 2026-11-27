@@ -47,14 +47,27 @@ send nothing.
 *A crash report*, only when the plugin itself breaks: a command fails with an error we did not expect,
 a hook crashes, or the process stops on an unhandled error. Expected failures (session expired, access
 denied, network, a bad query) are not reported this way. A crash report carries the error type, its
-message cut to 200 characters with ARNs, account ids, URLs, file paths, emails, ids and key-like strings
-replaced, and the stack frames that are inside the plugin, as paths relative to it. It never carries a
-frame from your code or your file paths.
+message cut to 200 characters with credentials (the forms listed below), ARNs, account ids, URLs, file
+paths, emails and ids replaced, and the stack frames that are inside the plugin, as paths relative to
+it. It never carries a frame from your code or your file paths.
 
 **Optional: share session content.** If you set `CXM_TELEMETRY=full`, the session trace also carries
 your prompts, the agent's answers, and tool inputs and outputs. Each is cut to 4,000 characters, and
-strings that look like keys or tokens are replaced with `[REDACTED]`. This is off unless you turn it
-on; use it when you want us to debug a session with you.
+emails are replaced with `[EMAIL]` and these credential forms with `[REDACTED]`:
+
+- the value after a name that ends in `secret`, `token`, `password`, `passwd` or `key`, and then `=`
+  or `:` (for example `AWS_SECRET_ACCESS_KEY=…`, `"api_key": "…"`);
+- the value after a command-line flag with such a name and a space (`--password …`);
+- for these two forms, a value of 8 characters or more, up to a space, a quote, a comma or `}`;
+- the value of a Bearer or Basic `Authorization` header;
+- the password in a `scheme://user:password@host` URL;
+- a PEM block, also when its END line is missing;
+- AWS access key ids, JWTs, and tokens with a known prefix (GitHub, Slack, OpenAI, Anthropic, Stripe,
+  Google, PostHog).
+
+A value with no name and no known prefix, such as a bare random string, is not recognized and can
+pass in full mode. This is off unless you turn it on; use it when you want us to debug a session
+with you.
 
 Turn all telemetry off with `CXM_TELEMETRY=0`. The full list of keys is in `src/lib/telemetry.js`
 and `src/lib/session-trace.js`.

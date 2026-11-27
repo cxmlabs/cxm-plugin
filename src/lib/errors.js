@@ -2,22 +2,22 @@
 // sanitized and cut short, and only stack frames inside the plugin are kept, as paths relative to it.
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { redactSecrets } from './secrets.js';
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MAX_MESSAGE = 200;
 const SCRUB = [
   [/arn:aws[a-z-]*:[^\s"',)]+/gi, '<arn>'],
-  [/https?:\/\/[^\s"',)]+/gi, '<url>'],
+  [/\b[a-z][\w+.-]*:\/\/[^\s"',)]+/gi, '<url>'],
   [/[\w.+-]+@[\w-]+\.[\w.-]+/g, '<email>'],
   [/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<id>'],
-  [/\b(AKIA|ASIA)[0-9A-Z]{16}\b|\bphc_[A-Za-z0-9]{20,}|\beyJ[\w-]{10,}\.[\w-]+\.[\w-]+/g, '<secret>'],
   // Local file paths only: an API path such as /commitments/summary-sp is what makes an error actionable.
   [/(?:[A-Za-z]:\\|~\/|\/(?:Users|home|private|tmp|var|opt|root|mnt|Volumes|etc)\/)[^\s"',:)]*/g, '<path>'],
   [/\b\d{12}\b/g, '<account>'],
 ];
 
 export function sanitizeMessage(message) {
-  let text = String(message ?? '');
+  let text = redactSecrets(String(message ?? ''), '<secret>');
   for (const [pattern, replacement] of SCRUB) text = text.replace(pattern, replacement);
   return text.length > MAX_MESSAGE ? `${text.slice(0, MAX_MESSAGE)}…` : text;
 }
