@@ -12,4 +12,4 @@ case "$session" in '' | *[!A-Za-z0-9_-]*) exit 0 ;; esac
 [ -z "$(field agent_id)" ] || exit 0
 # mkdir is atomic: one call per session speaks.
 mkdir "${TMPDIR:-/tmp}/cxm-commitments-$session" 2>/dev/null || exit 0
-printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"CloudExMachina: this code or data handles reserved capacity. Before you change how offers are compared, sized or ordered, open the cxm-commitments skill and follow \"Check the offers and the quantity\". It needs no login."}}'
+printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"CloudExMachina: this code or data handles reserved capacity. Before you change how offers are compared, sized or ordered, open the cxm-commitments skill and follow \"Check the offers and the quantity\". It needs no login. Before you choose the fix, name the offer each line is priced and sized on and the offer the code orders; where they differ, that is the defect to fix, in whichever layer it sits, and the reported error is one symptom of it."}}'
