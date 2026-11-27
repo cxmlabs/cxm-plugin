@@ -93,6 +93,7 @@ test('command names come from an allowlist, never from arguments', () => {
   assert.equal(cxmCommand('echo cxmfoo'), null);
   assert.deepEqual(awsCall('AWS_PROFILE=x aws ec2 describe-instances --filters y'), { service: 'ec2', operation: 'describe-instances' });
   assert.equal(awsCall('cxm mcp t aws s3 ls'), null);
+  assert.deepEqual(awsCall("cat > n.md <<'EOF'\nask cxm mcp\nEOF\naws s3 ls"), { service: 's3', operation: 'ls' });
   assert.equal(awsCall('cxm context - <<EOF\naws s3 ls\nEOF'), null);
 });
 
@@ -112,7 +113,10 @@ test('a heredoc body never reaches the command name or the aws call', () => {
   assert.deepEqual(spanOf('cat <<EOF > f\n\tEOF\naws batch payroll-z\nEOF\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
   assert.deepEqual(spanOf('cat <<A <<B\nx\nA\naws batch payroll-y\nB\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
   // Text that opens no heredoc, and an empty heredoc, hide no later call.
-  for (const before of ['jq . <<<"abc"', 'echo $((1<<20))', 'echo $((1<<n))', "python3 -c 'print(a << b)'", "python3 -c 'print(a << \"b\")'", "echo 'std::cout << \"hi\";' > a.cpp", "grep -n '<<<<<<< HEAD' a.py", 'cat > /tmp/e <<EOF\nEOF']) assert.deepEqual(spanOf(`${before}\ncxm whoami`).cxm_commands, { price: 1, whoami: 1 }, before);
+  for (const before of ['jq . <<<"abc"', 'echo $((1<<20))', 'echo $((1<<n))', "python3 -c 'print(a << b)'", "python3 -c 'print(a << \"b\")'", "echo 'std::cout << \"hi\";' > a.cpp", "grep -n '<<<<<<< HEAD' a.py", 'rg -n "<<\'EOF\'" skills', 'cat > /tmp/e <<EOF\nEOF']) assert.deepEqual(spanOf(`${before}\ncxm whoami`).cxm_commands, { price: 1, whoami: 1 }, before);
+  assert.deepEqual(spanOf('git commit -m "$(cat <<\'EOF\'\naws batch payroll-c\nEOF\n)"\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("echo 'a\nb'; cat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("# it's\ncat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
   assert.doesNotThrow(() => spanOf(['cxm', 'whoami']));
 });
 

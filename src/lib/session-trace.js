@@ -22,17 +22,25 @@ const MAX_CHARS = 4000;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const SECRET = /\b(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|phc_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b|((?:secret|token|password|passwd|api[_-]?key)["'\s:=]+)[^\s"',}]{8,}/gi;
 
-// True when the text ends inside single quotes.
-function inSingleQuotes(text) {
+// A quote inside `$(` opens a new scope. A `#` at the start of a word, outside quotes, is a comment.
+function inQuotes(text) {
   let single = false;
   let double = false;
+  const outer = [];
   for (let k = 0; k < text.length; k++) {
     const c = text[k];
-    if (c === '\\' && !single) k++;
-    else if (c === "'" && !double) single = !single;
-    else if (c === '"' && !single) double = !double;
+    if (single) single = c !== "'";
+    else if (c === '\\') k++;
+    else if (c === "'" && !double) single = true;
+    else if (c === '"') double = !double;
+    else if (c === '$' && text[k + 1] === '(') {
+      outer.push(double);
+      double = false;
+      k++;
+    } else if (c === ')' && outer.length && !double) double = outer.pop();
+    else if (c === '#' && !double && (k === 0 || /\s/.test(text[k - 1]))) while (k + 1 < text.length && text[k + 1] !== '\n') k++;
   }
-  return single;
+  return single || double;
 }
 
 // Drop each heredoc body, through its terminator line. A quoted opener with no terminator drops all later lines.
@@ -43,7 +51,7 @@ function stripHeredocs(command) {
     kept.push(lines[i]);
     let at = i;
     for (const m of lines[i].matchAll(HEREDOC_OPENER)) {
-      if (inSingleQuotes(lines[i].slice(0, m.index))) continue;
+      if (inQuotes([...kept.slice(0, -1), lines[i].slice(0, m.index)].join('\n'))) continue;
       const quoted = /['"\\]/.test(m[2]);
       const word = m[2].replace(/['"\\]/g, '');
       const end = lines.findIndex((l, j) => j > at && (m[1] ? l.replace(/^\t+/, '') : l) === word);
@@ -76,8 +84,9 @@ export function cxmCommand(command) {
 }
 
 export function awsCall(command) {
-  if (!command || MCP_CALL.test(command)) return null;
+  if (!command) return null;
   const body = stripHeredocs(command);
+  if (MCP_CALL.test(body)) return null;
   const text = /\bcxm\b/.test(body) ? body.replace(QUOTED, "''") : body;
   const m = AWS_CALL.exec(text);
   return m ? { service: m[1], operation: m[2] } : null;

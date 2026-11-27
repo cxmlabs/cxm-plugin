@@ -75,7 +75,7 @@ Read only the checkout of the change, the folder of this skill and the CXM skill
 3. Follow each changed code path up to its trigger: schedule, request, event, CI or person. Note each flag, setting or tag that decides if the path runs, in the diff or in a caller, and read its default in the code.
 4. Follow a helper call one level. A line exists when the diff gives the helper the billed work: a query, an object, a list of items. Work that a helper does by itself to load configuration, secrets or credentials makes no line.
 5. List each deployment target that runs the code, as "Money rules" says. A target that the session cannot read is an `uncovered_target` entry. It does not lower the grade. Never claim that a target is not deployed.
-6. Give each line a `key` as "Keys" says, one tag, one direction and one target. Write one line for each key, tag, direction and target. It names each of its triggers. A quantity that is a sum holds its terms in `ref`.
+6. Give each line a `key` as "Keys" says, one tag, one direction and one target. Each line names each of its triggers. A quantity that is a sum holds its terms in `ref`.
 7. Run the List and Mark check of "Billing dimensions". It reads names only.
 8. Read the list again against the diff once. Remove a line with no `file:line` of the diff. Add a line that you missed.
 9. Print the list before any read of a quantity, a count or a rate: write it as text in a message to the user, before the first command that reads one. A thought, a file, a plan or a command output is not a message.
@@ -97,7 +97,7 @@ Use the first that applies.
 #### Direction
 
 Directions: `add`, `remove`.
-When the diff replaces work, write one `add` line and one `remove` line. When the diff only changes a volume that both lines hold, write one line of the difference. Compare each list, map and set before and after: an entry that it loses (an account, a region, a member, a name) is a `remove` line, and a new entry is an `add` line. When the diff multiplies the same work, write one `add` line for the difference. When it decreases the same work, write one `remove` line for the difference.
+When the diff replaces work, write one `add` line and one `remove` line. When the diff only changes a volume that both lines hold, write one line of the difference. Compare each list, map and set before and after: an entry that it loses (an account, a region, a member, a name) is a `remove` line, and a new entry is an `add` line. When the diff multiplies the same work, write one `add` line for the difference. When it decreases the work, write one `remove` line.
 
 ### 3. Bound
 
@@ -116,7 +116,7 @@ Give each line a ceiling in dollars per month, from the code and from the bill r
 Use one window for each read that has a date: a bill row, a usage or metric row, and a CI run list. The window is the 30 full days that end 2 days before the earliest commit date (`git log --format=%cs <base>..HEAD`) of the diff, or 2 days before the last bill day, whichever is earlier. For an uncommitted change, use the last bill day. Read nothing after the window.
 Give each of these reads a fixed start date and a fixed end date, in each step, also when its cell of the source map shows no end date. Use no relative range. Write each date as a literal in the query itself, never through a shell variable, a loop or a script. A "latest day" cell takes the latest day of the window.
 A dataset that holds only the state of today, such as the inventory or the prices, has no date: read it as it is. A quantity from it is the state of its crawl date: write the date in `ref`. When the change is older than the crawl, the factor is C, and its `low` is the lowest count that a bill row of the window or the code supports. With none, the factor is D, of kind `assumption`, and its `low` is half: never a point. Every other query and every list of runs carries literal dates: no undated count and no sample.
-A list of runs returns 1000 rows at most, whatever its limit: when a read returns 1000 rows, split the window into shorter literal date ranges and add the counts.
+A list of runs returns 1000 rows at most, whatever its limit: when a read returns 1000 rows, split the window into shorter literal date ranges that share no date (`<start>..<day>`, then `<day + 1>..<end>`) and add the counts.
 
 For each line that step 3 did not stop:
 
@@ -166,5 +166,5 @@ Each entry holds `kind`, `what`, `why` and `source`.
 ### 6. Answer
 
 1. Write one sentence that names CloudExMachina, the organization and the window of step 4.
-2. Print the section of step 5 after it, complete and unchanged. Add no figure, no chart and no second summary. The section, with its two tables, is the end of the answer. The caller decides where the result goes, and can fold the second table.
-3. The section holds the counts, the rates and the source kinds. Answer a question about units, counts or rates with the section. Write no table and no total of your own. A total over several tags is a figure that code did not compute: never write one.
+2. Print the section of step 5 after it, complete and unchanged. Add no figure, no chart and no second summary. The section, with its two tables, is the end of the answer.
+3. The section may name datasets, routes, filters and route error codes. It holds the counts, the rates and the source kinds. Answer a question about units, counts or rates with the section. Write no table and no total of your own. A total over several tags is a figure that code did not compute: never write one.

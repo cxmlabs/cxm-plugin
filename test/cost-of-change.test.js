@@ -83,7 +83,7 @@ test('the no-diff path reads measurement.md, and each section that Price a resou
 test('the shared rules name a structured result, not a pull request body', () => {
   const shared = readFileSync(new URL('../skills/cxm-shared-rules.md', import.meta.url), 'utf8');
   assert.ok(shared.includes('Exception for a structured result or a document that a caller publishes'));
-  assert.ok(shared.includes('A cost-of-change result'));
+  assert.ok(!shared.includes('cost-of-change'));
   assert.ok(!shared.includes('pull request body'));
 });
 
@@ -115,6 +115,8 @@ test('the source map keeps its rows and its units of one account and region', ()
   for (const text of ['gh run list', 'whatever its event', 'github_workflow_costs', 'operator action']) assert.ok(row('CI runs per month').includes(text), text);
   for (const text of ['`github_workflow_costs.billable_minutes`', '`timeout-minutes`']) assert.ok(row('CI minutes per run').includes(text), text);
   assert.ok(row('Requests per month').includes('`lambda_functions.sum_request_count`'));
+  assert.ok(row('Requests per month').includes('not per route'));
+  for (const name of ['Runs per month', 'CI runs per month']) assert.ok(row(name).includes('step 4 of `SKILL.md`'), name);
   assert.ok(map.includes('latest inventory, crawled at <date of the last crawl>'));
 });
 
@@ -178,7 +180,7 @@ test('the method lists its lines before it bounds and measures, and computes wit
 test('the Measure step asks for a fixed start and end date for each read that has a date', () => {
   for (const text of ['each read that has a date: a bill row, a usage or metric row, and a CI run list', 'a fixed start date and a fixed end date', 'also when its cell of the source map shows no end date',
     'Use no relative range', 'Every other query and every list of runs carries literal dates: no undated count and no sample', 'Write each date as a literal in the query itself, never through a shell variable, a loop or a script', 'Read nothing after the window', 'the latest day of the window',
-    'A list of runs returns 1000 rows at most, whatever its limit: when a read returns 1000 rows, split the window into shorter literal date ranges and add the counts']) assert.match(step('Measure'), phrase(text), text);
+    'A list of runs returns 1000 rows at most, whatever its limit: when a read returns 1000 rows, split the window into shorter literal date ranges that share no date']) assert.match(step('Measure'), phrase(text), text);
 });
 
 test('compute is direct for a run that did not happen before, and added-runtime when an earlier run takes longer', () => {
