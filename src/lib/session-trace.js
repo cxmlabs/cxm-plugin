@@ -14,7 +14,7 @@ const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
 // An argument of a `cxm` call can hold the words of an AWS call.
 const MCP_CALL = /cxm[\s\S]*\bmcp\b/i;
-const QUOTED = /'[^']*'(?:\\''[^']*')*|"(?:\\[\s\S]|[^"\\])*"|(?<!\S)#.*/g;
+const QUOTED = /'[^']*'(?:\\''[^']*')*|"(?:\\[\s\S]|[^"\\])*"|(?<![^\s;&|()<>])#.*/g;
 const HEREDOC_OPENER = /(?<!<)<<(-?)[ \t]*((?:[^\s;&|<>()'"\\]|\\.|'[^'\n]*'|"[^"\n]*")+)/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
@@ -37,7 +37,7 @@ function quotedOrComment(text) {
     } else if (c === '\\') k++;
     else if (c === "'" && !double) {
       single = true;
-      ansi = text[k - 1] === '$';
+      ansi = text[k - 1] === '$' && text[k - 2] !== '\\';
     }
     else if (c === '"') double = !double;
     else if (c === '$' && text[k + 1] === '(') {
@@ -63,7 +63,9 @@ function stripHeredocs(command) {
     for (const m of lines[i].matchAll(HEREDOC_OPENER)) {
       const before = lines[i].slice(0, m.index);
       if (quotedOrComment([...kept.slice(0, -1), before].join('\n'))) continue;
-      if (/\(\([^()]*$/.test(before)) continue;
+      const bare = before.replace(QUOTED, "''");
+      const open = bare.lastIndexOf('((');
+      if (open >= 0 && [...bare.slice(open + 2)].reduce((d, c) => d + (c === '(') - (c === ')'), 2) >= 2) continue;
       const word = m[2].replace(/['"\\]/g, '');
       const end = lines.findIndex((l, j) => j > at && (m[1] ? l.replace(/^\t+/, '') : l) === word);
       if (end > at) at = end;

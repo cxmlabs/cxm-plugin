@@ -67,7 +67,7 @@ test('the mcp command is named, and its tool and arguments are not', () => {
   // A quoted word is a boundary: the words on its two sides never join.
   for (const command of ['aws "s3" ls my-bucket --profile cxm', 'aws --profile "cxm-prod" sts get-caller-identity']) assert.deepEqual(awsCalls(command), {}, command);
   for (const command of ['cxm context - <<EOF\nour aws secretword secretverb\nEOF', "cxm context 'it'\\''s aws secretword secretverb'"]) assert.deepEqual(awsCalls(command), {}, command);
-  for (const command of ["cxm whoami # don't\naws s3 ls\n# don't", 'cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1']) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
+  for (const command of ["cxm whoami # don't\naws s3 ls\n# don't", 'cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1', "cxm whoami;# don't\naws s3 ls\n# don't"]) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
 });
 
 test('a session that never used CXM sends nothing', () => {
@@ -120,6 +120,10 @@ test('a heredoc body never reaches the command name or the aws call', () => {
   assert.deepEqual(spanOf("cd x;# it's\ncat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
   assert.deepEqual(spanOf("printf $'it\\'s\\n'\ncat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
   assert.deepEqual(spanOf('if true; then\n  cat <<EOF\n  aws batch payroll-q\n  EOF\nfi').aws_cli_calls, {});
+  for (const before of ['echo $(( (1 << n) - 1 ))', 'for ((i=0; i<(1<<n); i++)); do :; done']) assert.deepEqual(spanOf(`${before}\ncxm whoami`).cxm_commands, { price: 1, whoami: 1 }, before);
+  assert.deepEqual(spanOf('((i++)); cat <<EOF\naws batch payroll-q\nEOF\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("grep -c '((' f; cat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("echo \\$'a\\'; cat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
   assert.doesNotThrow(() => spanOf(['cxm', 'whoami']));
 });
 
