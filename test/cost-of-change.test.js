@@ -200,6 +200,7 @@ test('the skill follows the headline, the activity band, the shared factor and t
     'only when no asset row of the window exists, and only when a fact of the code bounds the share of the change', 'Never write 0 to the account total', 'never from memory',
     'Never use another target as a ceiling of a target that has its own bill rows for that usage type']) assert.match(step('Measure'), phrase(text), text);
   assert.match(step('Scope'), phrase('When the diff only changes a volume that both lines hold, write one line of the difference'));
+  assert.match(step('Scope'), phrase('When it decreases the same work, write one `remove` line for the difference'));
   assert.match(step('Scope'), phrase('Compare each list, map and set before and after: an entry that it loses (an account, a region, a member, a name) is a `remove` line, and a new entry is an `add` line.'));
   // The calculator takes both fields as the skill writes them.
   const given = example();
@@ -231,8 +232,10 @@ test('the method reads the checkout of the change and the skill files only', () 
 test('the answer is the printed section, and the skill names no block and no block file', () => {
   assert.match(step('Answer'), phrase('Print the section of step 5'));
   assert.match(step('Answer'), /unchanged/);
+  assert.match(step('Answer'), phrase('The caller decides where the result goes'));
   for (const text of ['Answer a question about units, counts or rates with the section', 'Write no table and no total of your own', 'A total over several tags is a figure that code did not compute: never write one']) assert.match(step('Answer'), phrase(text), text);
   assert.doesNotMatch(step('Answer'), /block/i);
+  assert.ok(!skillOnly.includes('may name datasets'));
   assert.doesNotMatch(skill, /CXM_COST_RESULT_FILE|cxm-cost-result/);
 });
 

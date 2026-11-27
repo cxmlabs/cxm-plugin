@@ -97,7 +97,7 @@ Use the first that applies.
 #### Direction
 
 Directions: `add`, `remove`.
-When the diff replaces work, write one `add` line and one `remove` line. When the diff only changes a volume that both lines hold, write one line of the difference. Compare each list, map and set before and after: an entry that it loses (an account, a region, a member, a name) is a `remove` line, and a new entry is an `add` line. When the diff multiplies the same work, write one `add` line for the difference. When it decreases the work, write one `remove` line.
+When the diff replaces work, write one `add` line and one `remove` line. When the diff only changes a volume that both lines hold, write one line of the difference. Compare each list, map and set before and after: an entry that it loses (an account, a region, a member, a name) is a `remove` line, and a new entry is an `add` line. When the diff multiplies the same work, write one `add` line for the difference. When it decreases the same work, write one `remove` line for the difference.
 
 ### 3. Bound
 
@@ -166,5 +166,5 @@ Each entry holds `kind`, `what`, `why` and `source`.
 ### 6. Answer
 
 1. Write one sentence that names CloudExMachina, the organization and the window of step 4.
-2. Print the section of step 5 after it, complete and unchanged. Add no figure, no chart and no second summary. The section, with its two tables, is the end of the answer.
-3. The section may name datasets, routes, filters and route error codes. It holds the counts, the rates and the source kinds. Answer a question about units, counts or rates with the section. Write no table and no total of your own. A total over several tags is a figure that code did not compute: never write one.
+2. Print the section of step 5 after it, complete and unchanged. Add no figure, no chart and no second summary. The section, with its two tables, is the end of the answer. The caller decides where the result goes.
+3. The section holds counts, rates and source kinds. Answer a question about units, counts or rates with the section. Write no table and no total of your own. A total over several tags is a figure that code did not compute: never write one.

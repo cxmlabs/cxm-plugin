@@ -23,27 +23,37 @@ const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const SECRET = /\b(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|phc_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b|((?:secret|token|password|passwd|api[_-]?key)["'\s:=]+)[^\s"',}]{8,}/gi;
 
 // A quote inside `$(` opens a new scope. A `#` at the start of a word, outside quotes, is a comment.
-function inQuotes(text) {
+function quotedOrComment(text) {
   let single = false;
+  let ansi = false;
   let double = false;
+  let comment = false;
   const outer = [];
   for (let k = 0; k < text.length; k++) {
     const c = text[k];
-    if (single) single = c !== "'";
-    else if (c === '\\') k++;
-    else if (c === "'" && !double) single = true;
+    if (single) {
+      if (ansi && c === '\\') k++;
+      else single = c !== "'";
+    } else if (c === '\\') k++;
+    else if (c === "'" && !double) {
+      single = true;
+      ansi = text[k - 1] === '$';
+    }
     else if (c === '"') double = !double;
     else if (c === '$' && text[k + 1] === '(') {
       outer.push(double);
       double = false;
       k++;
     } else if (c === ')' && outer.length && !double) double = outer.pop();
-    else if (c === '#' && !double && (k === 0 || /\s/.test(text[k - 1]))) while (k + 1 < text.length && text[k + 1] !== '\n') k++;
+    else if (c === '#' && !double && (k === 0 || /[\s;&|()<>]/.test(text[k - 1]))) {
+      while (k + 1 < text.length && text[k + 1] !== '\n') k++;
+      comment = k + 1 >= text.length;
+    }
   }
-  return single || double;
+  return single || double || comment;
 }
 
-// Drop each heredoc body, through its terminator line. A quoted opener with no terminator drops all later lines.
+// Drop each heredoc body, through its terminator line. An opener with no terminator drops all later lines.
 function stripHeredocs(command) {
   const lines = command.split('\n');
   const kept = [];
@@ -51,12 +61,13 @@ function stripHeredocs(command) {
     kept.push(lines[i]);
     let at = i;
     for (const m of lines[i].matchAll(HEREDOC_OPENER)) {
-      if (inQuotes([...kept.slice(0, -1), lines[i].slice(0, m.index)].join('\n'))) continue;
-      const quoted = /['"\\]/.test(m[2]);
+      const before = lines[i].slice(0, m.index);
+      if (quotedOrComment([...kept.slice(0, -1), before].join('\n'))) continue;
+      if (/\(\([^()]*$/.test(before)) continue;
       const word = m[2].replace(/['"\\]/g, '');
       const end = lines.findIndex((l, j) => j > at && (m[1] ? l.replace(/^\t+/, '') : l) === word);
       if (end > at) at = end;
-      else if (quoted) at = lines.length;
+      else at = lines.length;
     }
     i = at;
   }
