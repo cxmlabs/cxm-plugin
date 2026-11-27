@@ -4,7 +4,7 @@
 const SECRETS = [
   /-----BEGIN [A-Z ]*-----[\s\S]*?(?:-----END [A-Z ]*-----|$)/g,
   /(?<=^|[^A-Za-z0-9]|\\[nrt])(?:(?:AKIA|ASIA)[0-9A-Z]{16}\b|(?:phc_|phx_|whsec_|xapp-|xoxe-|ya29\.|GOCSPX-|gh[pousr]_|github_pat_|xox[abposr]-|sk-|[sr]k_(?:live|test)_|AIza)[\w-]{16,}|eyJ[\w-]+\.[\w-]+\.[\w-]*)/g,
-  /(authorization\\*["']?\s*[:=]\s*\\?["']?(?:bearer|basic)\s+)[^\s"'\\,}]+/gi,
+  /(authorization\\*["']?\s*[:=]\s*\\*["']?(?:bearer|basic)\s+)[^\s"'\\,}]+/gi,
   /(\b[a-z][\w+.-]*:\/\/[^\s:@/]*:)[^\s@/]+(?=@)/gi,
   /((?:secret|token|password|passwd|key)\\*["']?\s*[:=]\s*\\*["']?)(?:[^\s"'\\,}]|\\\\|\\(?![nrt"'])){8,}/gi,
   /(\B--?[\w-]*(?:secret|token|password|passwd|key)\s+\\*["']?)[^\s"'\\,}]{8,}/gi,

@@ -27,6 +27,7 @@ test('each credential form is replaced, and each text that is not a credential s
     [`Authorization: Bearer ${v()}`, v()],
     [`curl -H 'Authorization: Basic ${v()}=='`, v()],
     [`{"authorization": "Bearer ${v()}"}`, v()],
+    [JSON.stringify({ command: `curl -d "{\\"authorization\\":\\"Bearer ${v()}\\"}" x` }), v()],
     [JSON.stringify({ content: `{"apiKey": "${v()}"}` }), v()],
     [`redis://default:${v()}@cache:6379`, v()],
     [`postgres://app:${v()}@db.internal/x`, v()],

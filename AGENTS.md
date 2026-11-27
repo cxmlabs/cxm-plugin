@@ -98,7 +98,7 @@ separate private `cxm-plugin-benchmark` repository.
 - ESM everywhere (`"type": "module"`); standalone scripts are `.mjs`.
 - Adding a directory the plugin loads from means adding it to `package.json` `files`, or `npx`
   installs ship without it while marketplace installs work. The structural test holds the list.
-- Locally installed agent state is not tracked: `.claude/`, `.codex/`, `_bmad/`, `_bmad-output/`
+- Locally installed agent state is not tracked: `.claude/` (except `.claude/CLAUDE.md`), `.codex/`, `_bmad/`, `_bmad-output/`
   and `.agents/skills/bmad-*/`. BMAD installs the same skills once per harness
   (`--tools claude-code,codex`), and `_bmad/` is the state both copies read. Anything meant to
   ship goes in `skills/`, which both harnesses load from.
