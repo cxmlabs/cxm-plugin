@@ -83,7 +83,7 @@ test('the no-diff path reads measurement.md, and each section that Price a resou
 test('the shared rules name a structured result, not a pull request body', () => {
   const shared = readFileSync(new URL('../skills/cxm-shared-rules.md', import.meta.url), 'utf8');
   assert.ok(shared.includes('Exception for a structured result or a document that a caller publishes'));
-  assert.ok(!shared.includes('cost-of-change'));
+  assert.ok(shared.includes('A cost-of-change result'));
   assert.ok(!shared.includes('pull request body'));
 });
 
