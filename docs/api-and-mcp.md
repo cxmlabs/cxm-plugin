@@ -20,11 +20,12 @@ This plugin holds no server of its own.
 | A query of a dataset, for example the cost of one service in one month | Deterministic | CxM API | `cxm analytics query '<json>'` |
 | A question whose answer needs interpretation | Needs thinking | Central CxM MCP | "Is this cost increase expected, and which change of the workload explains it?" |
 
-To place a call, ask one question: can a script send the request and use the answer without a judgment?
+To place a call, ask one question: can a script write the request from known values or from the schema, send it, and use the answer without a judgment?
 If yes, use the API. If no, use the central CxM MCP.
 
-An agent writes the query of a deterministic call, but the call itself stays deterministic. Write the
-query from the output of `cxm analytics schema`, and send it through the API.
+This is the exception to the second bullet of the rule. An agent writes the query of a deterministic
+call, but the call itself stays deterministic. Write the query from the output of
+`cxm analytics schema`, and send it through the API.
 
 ## Why the CLI stays
 

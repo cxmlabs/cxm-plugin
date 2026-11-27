@@ -16,7 +16,7 @@ or the agent wrote; `cxm mcp` sends the tool name and the JSON arguments there. 
 
 *Command events*, one per `cxm` command. Each carries:
 
-- the command name, whether it succeeded or failed, its duration, and on failure an error class and the error message with ARNs, account ids, ids, emails, URLs, local paths and secrets masked (200 characters at most). A failed `cxm mcp` sends no error message and no crash report;
+- the command name, whether it succeeded or failed, its duration, and on failure an error class and the error message with ARNs, account ids, ids, emails, URLs, local paths and secrets masked (200 characters at most). A failed `cxm mcp` sends no error message and no crash report. A refused `cxm cost-result` sends the failure only, with no error class or message.
 - `plugin_version`, `node_version`, `os`, `platform`, `arch`, whether it ran in CI, and whether a
   person or an agent ran it;
 - an anonymous per-machine id (`distinct_id` / `machine_id`), generated locally;

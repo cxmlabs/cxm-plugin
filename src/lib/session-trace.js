@@ -7,20 +7,74 @@ import { draw, needsRows, splitReply } from './viz.js';
 
 // `cxm` sub-commands we may name. Anything else is reported as `other`, so an argument can never leak.
 const CXM_COMMANDS = new Set([
-  'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'api',
+  'setup', 'init', 'login', 'whoami', 'uninstall', 'price', 'context', 'resolve', 'scan', 'report-opportunity', 'cost-result', 'api',
   'analytics query', 'analytics schema', 'cube', 'wiki', 'viz', 'viz chart', 'viz cube-chart', 'viz row', 'viz mermaid', 'mcp',
 ]);
 const CXM_CALL = /(?:^|[\s;&|(`])(?:cxm|\S*\/bin\/cxm\.js)\s+([a-z-]+)(?:\s+([a-z-]+))?/;
 const AWS_CALL = /(?:^|[\s;&|(`])aws\s+([a-z0-9-]+)\s+([a-z0-9-]+)/;
 // An argument of a `cxm` call can hold the words of an AWS call.
 const MCP_CALL = /cxm[\s\S]*\bmcp\b/i;
-const HEREDOC = /((?<!<)<<-?[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|\\?([A-Za-z_][\w.-]*))[^\n]*)[\s\S]*?(?:\n\t*\2\3\4(?=\n|$)|$)/g;
-const QUOTED = /'[^']*'(?:\\''[^']*')*|"(?:\\[\s\S]|[^"\\])*"|(?<!\S)#.*/g;
+const QUOTED = /'[^']*'(?:\\''[^']*')*|"(?:\\[\s\S]|[^"\\])*"|(?<![^\s;&|()<>])#.*/g;
+const HEREDOC_OPENER = /(?<!<)<<(-?)[ \t]*((?:[^\s;&|<>()'"\\]|\\.|'[^'\n]*'|"[^"\n]*")+)/g;
 const BUILTIN_TOOL = /^[A-Z][A-Za-z]+$/;
 const MAX_EVENTS = 400;
 const MAX_CHARS = 4000;
 const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const SECRET = /\b(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|phc_[A-Za-z0-9]{20,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b|((?:secret|token|password|passwd|api[_-]?key)["'\s:=]+)[^\s"',}]{8,}/gi;
+
+// A quote inside `$(` opens a new scope. A `#` at the start of a word, outside quotes, is a comment.
+function quotedOrComment(text) {
+  let single = false;
+  let ansi = false;
+  let double = false;
+  let comment = false;
+  const outer = [];
+  for (let k = 0; k < text.length; k++) {
+    const c = text[k];
+    if (single) {
+      if (ansi && c === '\\') k++;
+      else single = c !== "'";
+    } else if (c === '\\') k++;
+    else if (c === "'" && !double) {
+      single = true;
+      ansi = text[k - 1] === '$' && text[k - 2] !== '\\';
+    }
+    else if (c === '"') double = !double;
+    else if (c === '$' && text[k + 1] === '(') {
+      outer.push(double);
+      double = false;
+      k++;
+    } else if (c === ')' && outer.length && !double) double = outer.pop();
+    else if (c === '#' && !double && (k === 0 || /[\s;&|()<>]/.test(text[k - 1]))) {
+      while (k + 1 < text.length && text[k + 1] !== '\n') k++;
+      comment = k + 1 >= text.length;
+    }
+  }
+  return single || double || comment;
+}
+
+// Drop each heredoc body, through its terminator line. An opener with no terminator drops all later lines.
+function stripHeredocs(command) {
+  const lines = command.split('\n');
+  const kept = [];
+  for (let i = 0; i < lines.length; i++) {
+    kept.push(lines[i]);
+    let at = i;
+    for (const m of lines[i].matchAll(HEREDOC_OPENER)) {
+      const before = lines[i].slice(0, m.index);
+      if (quotedOrComment([...kept.slice(0, -1), before].join('\n'))) continue;
+      const bare = before.replace(QUOTED, "''");
+      const open = bare.lastIndexOf('((');
+      if (open >= 0 && [...bare.slice(open + 2)].reduce((d, c) => d + (c === '(') - (c === ')'), 2) >= 2) continue;
+      const word = m[2].replace(/['"\\]/g, '');
+      const end = lines.findIndex((l, j) => j > at && (m[1] ? l.replace(/^\t+/, '') : l) === word);
+      if (end > at) at = end;
+      else at = lines.length;
+    }
+    i = at;
+  }
+  return kept.join('\n');
+}
 
 // Why a block would show as source, not drawn: its kind and a fixed reason, never its content.
 function drawFailure({ kind, body }) {
@@ -43,8 +97,10 @@ export function cxmCommand(command) {
 }
 
 export function awsCall(command) {
-  if (!command || MCP_CALL.test(command)) return null;
-  const text = /\bcxm\b/.test(command) ? command.replace(HEREDOC, '$1').replace(QUOTED, "''") : command;
+  if (!command) return null;
+  const body = stripHeredocs(command);
+  if (MCP_CALL.test(body)) return null;
+  const text = /\bcxm\b/.test(body) ? body.replace(QUOTED, "''") : body;
   const m = AWS_CALL.exec(text);
   return m ? { service: m[1], operation: m[2] } : null;
 }
@@ -130,14 +186,16 @@ export function buildSessionTrace(lines, { sessionId, reason, full = false, alwa
 
   const spans = [...toolUses.entries()].map(([id, t]) => {
     const r = results.get(id);
-    const command = t.name === 'Bash' ? t.input?.command : null;
+    // A heredoc body holds free text, so the command name and the aws call are read without it.
+    const raw = t.name === 'Bash' && t.input?.command ? String(t.input.command) : null;
+    const command = raw ? stripHeredocs(raw) : null;
     const cxm = command ? cxmCommand(command) : null;
     return {
       id,
       tool: toolName(t.name),
       skill: t.name === 'Skill' ? cxmSkill(t.input, ours) : skillRead(t.name, t.input, ours),
       cxm,
-      aws: command ? awsCall(command) : null,
+      aws: raw ? awsCall(raw) : null,
       isError: r?.isError ?? false,
       latency: ms(t.at, r?.at),
       at: t.at,

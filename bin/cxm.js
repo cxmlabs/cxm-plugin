@@ -35,6 +35,7 @@ const { context } = await import('../src/commands/wiki.js');
 const { scan } = await import('../src/commands/scan.js');
 const { resolve } = await import('../src/commands/resolve.js');
 const { viz } = await import('../src/commands/viz.js');
+const { costResult } = await import('../src/commands/cost-result.js');
 const { mcp } = await import('../src/commands/mcp.js');
 const { updateNotice } = await import('../src/lib/update.js');
 
@@ -70,6 +71,8 @@ Everything else
   api <METHOD> <path> [--body '<json>']         Call a REST endpoint the datasets do not cover
   viz <chart|cube-chart|row|mermaid> '<body>' | <file> | - [--width n] [--color] [--csv <file>] [--svg <file>]
                                                 Draw one chart or diagram block as text
+  cost-result < <lines.json>                    Compute amounts, totals and grades from tagged cost lines on stdin
+                                                (CXM_COST_RESULT_FILE=<file>: also write the JSON block there)
   mcp                                           List the tools of the hosted CxM MCP
   mcp <tool> '<json>'                           Call one tool, for a question that needs thinking
   --version, -v                                 Print the CLI version
@@ -100,6 +103,7 @@ const tree = {
   'report-opportunity': (a) => reportOpportunity(a),
   api: (a) => api(a),
   viz: (a) => viz(a),
+  'cost-result': () => costResult(),
   mcp: (a) => mcp(a),
 };
 
@@ -171,7 +175,7 @@ if (!run) {
 const started = Date.now();
 Promise.resolve()
   .then(run)
-  .then(() => emit('plugin.command_run', { command: name, ok: true, duration_ms: Date.now() - started }))
+  .then(() => emit('plugin.command_run', { command: name, ok: !process.exitCode, duration_ms: Date.now() - started }))
   // On stderr, so a command's JSON output stays clean for the agent that reads it.
   .then(async () => {
     const notice = name === 'install' ? null : await updateNotice().catch(() => null);

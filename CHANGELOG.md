@@ -6,6 +6,10 @@ fixes, including security fixes.
 
 ## Unreleased
 
+- `cxm cost-result`: computes the amounts, totals and grades of a cost-of-change result from its tagged lines.
+  It prints what moves and, apart, what might move after the merge.
+  `CXM_COST_RESULT_FILE=<file>` also writes its JSON block to that file.
+- `cxm-cost-of-change`: lists the lines of a code change first, then gives one range in dollars per month, with each amount from `cxm cost-result`.
 - `cxm mcp`: lists the tools of the hosted CxM MCP and calls one of them, with the session of `cxm login`.
 
 - Auto-update: the installer asks once whether to keep the plugin up to date. On yes, Claude Code's

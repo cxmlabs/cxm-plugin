@@ -67,7 +67,7 @@ test('the mcp command is named, and its tool and arguments are not', () => {
   // A quoted word is a boundary: the words on its two sides never join.
   for (const command of ['aws "s3" ls my-bucket --profile cxm', 'aws --profile "cxm-prod" sts get-caller-identity']) assert.deepEqual(awsCalls(command), {}, command);
   for (const command of ['cxm context - <<EOF\nour aws secretword secretverb\nEOF', "cxm context 'it'\\''s aws secretword secretverb'"]) assert.deepEqual(awsCalls(command), {}, command);
-  for (const command of ["cxm whoami # don't\naws s3 ls\n# don't", 'cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1']) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
+  for (const command of ["cxm whoami # don't\naws s3 ls\n# don't", 'cxm whoami && aws s3 ls', 'aws s3 ls cxm --recursive', 'aws s3 ls --profile cxm --region us-east-1', "cxm whoami;# don't\naws s3 ls\n# don't"]) assert.deepEqual(awsCalls(command), { 's3 ls': 1 }, command);
 });
 
 test('a session that never used CXM sends nothing', () => {
@@ -88,11 +88,43 @@ test('command names come from an allowlist, never from arguments', () => {
   assert.equal(cxmCommand('node /p/bin/cxm.js price --service ec2'), 'price');
   assert.equal(cxmCommand("cxm viz chart '{}'"), 'viz chart');
   assert.equal(cxmCommand('cxm viz foo'), 'viz');
+  assert.equal(cxmCommand("cxm cost-result <<'EOF'"), 'cost-result');
   assert.equal(cxmCommand('cxm my-secret-thing'), 'other');
   assert.equal(cxmCommand('echo cxmfoo'), null);
   assert.deepEqual(awsCall('AWS_PROFILE=x aws ec2 describe-instances --filters y'), { service: 'ec2', operation: 'describe-instances' });
   assert.equal(awsCall('cxm mcp t aws s3 ls'), null);
+  assert.deepEqual(awsCall("cat > n.md <<'EOF'\nask cxm mcp\nEOF\naws s3 ls"), { service: 's3', operation: 'ls' });
   assert.equal(awsCall('cxm context - <<EOF\naws s3 ls\nEOF'), null);
+});
+
+test('a heredoc body never reaches the command name or the aws call', () => {
+  const command = "cxm cost-result <<'EOF'\nthe aws batch payroll-nightly job\nEOF";
+  const lines = [assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command } }]), result('t1', 2, 'ok')];
+  const events = buildSessionTrace(lines, { sessionId: 's' });
+  const span = events.find((e) => e.properties.cxm_command);
+  assert.equal(span.properties.cxm_command, 'cost-result');
+  assert.equal(span.properties.aws_service, null);
+  assert.ok(!JSON.stringify(events).includes('payroll-nightly'));
+  const spanOf = (command) => buildSessionTrace([assistant('m0', 0, [{ type: 'tool_use', id: 't0', name: 'Bash', input: { command: 'cxm price x' } }]), assistant('m1', 1, [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command } }])], { sessionId: 's' })[0].properties;
+  for (const opener of ["<<'END-JSON'", '<<\\END-JSON', '<<"END-JSON"', '<<-END-JSON']) assert.deepEqual(spanOf(`cxm cost-result ${opener}\nthe aws batch payroll-x\nEND-JSON\naws s3 ls`).aws_cli_calls, { 's3 ls': 1 }, opener);
+  assert.deepEqual(spanOf("cat <<E'OF'\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf('cat <<EOF:\naws batch payroll-q\nEOF:\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
+  for (const tail of ['', '\n  EOF']) assert.deepEqual(spanOf(`cxm cost-result <<'EOF'\nthe aws batch payroll-z${tail}`).aws_cli_calls, {}, tail);
+  assert.deepEqual(spanOf('cat <<EOF > f\n\tEOF\naws batch payroll-z\nEOF\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf('cat <<A <<B\nx\nA\naws batch payroll-y\nB\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
+  // Text that opens no heredoc, and an empty heredoc, hide no later call.
+  for (const before of ['jq . <<<"abc"', 'echo $((1<<20))', 'echo $((1<<n))', "# then cat <<'EOF' writes it", "python3 -c 'print(a << b)'", "python3 -c 'print(a << \"b\")'", "echo 'std::cout << \"hi\";' > a.cpp", "grep -n '<<<<<<< HEAD' a.py", 'rg -n "<<\'EOF\'" skills', 'cat > /tmp/e <<EOF\nEOF']) assert.deepEqual(spanOf(`${before}\ncxm whoami`).cxm_commands, { price: 1, whoami: 1 }, before);
+  assert.deepEqual(spanOf('git commit -m "$(cat <<\'EOF\'\naws batch payroll-c\nEOF\n)"\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("echo 'a\nb'; cat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("# it's\ncat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("cd x;# it's\ncat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("printf $'it\\'s\\n'\ncat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf('if true; then\n  cat <<EOF\n  aws batch payroll-q\n  EOF\nfi').aws_cli_calls, {});
+  for (const before of ['echo $(( (1 << n) - 1 ))', 'for ((i=0; i<(1<<n); i++)); do :; done']) assert.deepEqual(spanOf(`${before}\ncxm whoami`).cxm_commands, { price: 1, whoami: 1 }, before);
+  assert.deepEqual(spanOf('((i++)); cat <<EOF\naws batch payroll-q\nEOF\naws s3 ls').aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("grep -c '((' f; cat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.deepEqual(spanOf("echo \\$'a\\'; cat <<EOF\naws batch payroll-q\nEOF\naws s3 ls").aws_cli_calls, { 's3 ls': 1 });
+  assert.doesNotThrow(() => spanOf(['cxm', 'whoami']));
 });
 
 test('a skill loaded by reading its file counts, and one with no successful command is unused', () => {

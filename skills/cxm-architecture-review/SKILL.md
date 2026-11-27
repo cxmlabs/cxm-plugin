@@ -15,7 +15,7 @@ Do the relevant subset — don't over-run:
 
 1. **Understand the estate** (once): `cxm-cloud-topology` and `cxm-workload-context` skills tell you
    the account/region shape, prod-vs-dev split, and what's stateful/customer-facing.
-2. **Price each new/changed resource** with the `cxm-cost-of-change` skill (`cxm price …`).
+2. **Price each new/changed resource** with "Price a resource" of the `cxm-cost-of-change` skill (`cxm price …`).
 3. **Test a cheaper equivalent** — for any previous-generation family (m5/c5/r5, x86), price the
    current-gen or Graviton equivalent (m7g/c7g/r7g) with `cxm price` and show the delta. Graviton
    is typically ~20% cheaper for equivalent size.

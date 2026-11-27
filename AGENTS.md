@@ -111,6 +111,9 @@ Decided on 2026-11-24. `docs/api-and-mcp.md` gives the reasons and an example of
 - A purely deterministic operation uses the CxM API, through the `cxm` command.
 - An operation that needs thinking, to format its input or to interpret its output, uses the central
   authenticated CxM MCP.
+- Exception: a query that an agent writes from the output of `cxm analytics schema`, and a lookup by
+  key, such as a list price, stay deterministic. They use the API: `cxm analytics query` and
+  `cxm api GET`.
 - Prefer a CxM integration to a local call.
 
 ## Claude-only reply renderer

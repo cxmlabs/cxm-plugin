@@ -151,7 +151,7 @@ whatever the score: report it as `unmet`, with "a person from `@cxmlabs/sre` app
 widening" as the required change.
 
 **Citation**: `.github/CODEOWNERS:24` `A human owner approves every change below`;
-`AGENTS.md:48` `The release path has a human owner`;
+`AGENTS.md:46` `The release path has a human owner`;
 `.github/workflows/release.yml:17` `id-token: write`.
 
 **Unmet reads as**:
