@@ -1,7 +1,8 @@
 node_modules/
 *.log
 .DS_Store
-.claude/
+.claude/*
+!.claude/CLAUDE.md
 .codex/
 # benchmark/results/ is committed on purpose — it is the shared run corpus a teammate continues from.
 benchmark/.clean-claude-cfg/

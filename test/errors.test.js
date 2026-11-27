@@ -4,10 +4,10 @@ import { exceptionProperties, sanitizeMessage } from '../src/lib/errors.js';
 
 test('crash messages lose ARNs, accounts, URLs, paths, emails, ids and secrets, and stay short', () => {
   const raw =
-    'Org API GET /acxm/opportunities?arn=arn:aws:ec2:eu-west-1:123456789012:instance/i-1 failed: 404 ' +
-    'for jane@corp.com at https://api.corp.com/x in /Users/jane/repo/main.tf id 3f1c2a9e-1b2c-4d5e-8f90-1234567890ab key AKIAABCDEFGHIJKLMNOP';
+    `aws_secret_access_key=${'Fake'.repeat(6)} token ${'ghp_' + 'Fake'.repeat(9)} Org API GET /acxm/opportunities?arn=arn:aws:ec2:eu-west-1:123456789012:instance/i-1 failed: 404 ` +
+    'for jane@corp.com at https://api.corp.com/x in /Users/jane/repo/main.tf id 3f1c2a9e-1b2c-4d5e-8f90-1234567890ab key AKIA' + 'ABCDEFGHIJKLMNOP';
   const clean = sanitizeMessage(raw);
-  for (const leak of ['arn:aws', '123456789012', 'jane', 'corp.com', '/Users', '3f1c2a9e', 'AKIA']) assert.ok(!clean.includes(leak), `leaked ${leak}`);
+  for (const leak of ['arn:aws', '123456789012', 'jane', 'corp.com', '/Users', '3f1c2a9e', 'AKIA', 'Fake', 'ghp_']) assert.ok(!clean.includes(leak), `leaked ${leak}`);
   assert.ok(clean.includes('GET /acxm/opportunities'), 'the API path stays');
   assert.ok(sanitizeMessage('x'.repeat(500)).length <= 201);
 });

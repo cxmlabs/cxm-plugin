@@ -20,7 +20,7 @@ test:
 # be there; Codex ships no equivalent, so nothing here may depend on either.
 validate:
 	npm run --silent validate:plugin
-	@command -v claude >/dev/null 2>&1 && claude plugin validate . --strict || echo "claude CLI absent - the manifests were still validated above"
+	@if command -v claude >/dev/null 2>&1; then claude plugin validate . --strict; else echo "claude CLI absent - the manifests were still validated above"; fi
 
 patch minor major:
 	gh workflow run prepare-release.yml -f level=$@

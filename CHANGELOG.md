@@ -6,6 +6,9 @@ fixes, including security fixes.
 
 ## Unreleased
 
+- Telemetry: full-mode content and crash reports replace more credential forms, from one shared list
+  (`docs/privacy.md` lists them).
+
 - `cxm mcp`: lists the tools of the hosted CxM MCP and calls one of them, with the session of `cxm login`.
 
 - Auto-update: the installer asks once whether to keep the plugin up to date. On yes, Claude Code's

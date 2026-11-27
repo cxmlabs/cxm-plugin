@@ -59,8 +59,9 @@ separate private `cxm-plugin-benchmark` repository.
   that names one placeholder only fails silently at runtime, because hook output goes nowhere a
   user sees. `test/manifests.test.js` is what catches it.
 - These instructions load once per harness and are written once. Codex reads `AGENTS.md`
-  directly; `CLAUDE.md` is a one-line `@AGENTS.md` import and holds no content of its own. A rule
-  written in `CLAUDE.md` is a rule Codex never sees.
+  directly; `.claude/CLAUDE.md` is a one-line `@../AGENTS.md` import and holds no content of its own
+  (a `CLAUDE.md` at the plugin root fails `claude plugin validate --strict`). A rule written in it is a
+  rule Codex never sees.
 - Benchmark harness and run corpus: the separate private `cxm-plugin-benchmark` repository
 
 ## Running and verifying
